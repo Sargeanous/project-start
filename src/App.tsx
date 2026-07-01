@@ -28,6 +28,8 @@ import {
   PlugZap,
   RadioTower,
   RefreshCcw,
+  PanelLeftClose,
+  PanelLeftOpen,
   MessageSquare,
   X,
   Plus,
