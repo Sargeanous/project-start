@@ -28,6 +28,8 @@ import {
   PlugZap,
   RadioTower,
   RefreshCcw,
+  PanelLeftClose,
+  PanelLeftOpen,
   MessageSquare,
   X,
   Plus,
@@ -1198,6 +1200,7 @@ function App() {
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
   const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toast, setToast] = useState("");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
@@ -1318,8 +1321,8 @@ function App() {
 
   return (
     <I18nContext.Provider value={t}>
-      <div className="app" dir={lang === "ar" ? "rtl" : "ltr"}>
-        <Sidebar profile={profile} page={page} goTo={goTo} onSwitch={() => setProfile(null)} t={t} />
+      <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} dir={lang === "ar" ? "rtl" : "ltr"}>
+        <Sidebar profile={profile} page={page} goTo={goTo} onSwitch={() => setProfile(null)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((v) => !v)} t={t} />
         <main className="workspace">
           <Topbar profile={profile} page={page} lang={lang} setLang={setLang} t={t} />
           {page === "control" && (
@@ -1412,23 +1415,36 @@ function Sidebar({
   page,
   goTo,
   onSwitch,
+  collapsed,
+  onToggleCollapsed,
   t,
 }: {
   profile: Profile;
   page: Page;
   goTo: (page: Page) => void;
   onSwitch: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   t: (value: string) => string;
 }) {
   const allowed = new Set(profile.pages);
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
       <div className="sidebar-brand">
         <img className="brand-mark" src={admoLogo} alt="ADMO" />
-        <div>
+        <div className="sidebar-brand-text">
           <strong>{t("DOOH")}</strong>
           <span>{t("Unified Platform")}</span>
         </div>
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+          title={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
       <div className="current-profile">
         <small>{t("Access profile")}</small>
