@@ -993,8 +993,7 @@ function LoginScreen({
         <div className="login-brand">
           <img className="brand-mark" src={admoLogo} alt="ADMO" />
           <div>
-            <p>{t("ADMO Unified DOOH Platform")}</p>
-            <h1>{t("Access profile")}</h1>
+            <h1>{t("Unified DOOH Platform")}</h1>
           </div>
           <button className="icon-button" type="button" onClick={() => setLang(lang === "en" ? "ar" : "en")}>
             <Globe2 size={18} />
