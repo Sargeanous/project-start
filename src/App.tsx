@@ -228,6 +228,33 @@ const navGroups: NavGroup[] = [
 
 const stageOrder: SubmissionStage[] = ["Submitted", "In review", "Approved", "Scheduled", "Published"];
 
+const lifecycleStages = [
+  "Submission",
+  "AI Screening",
+  "Human Moderation",
+  "Scheduling",
+  "Distribution",
+  "Edge Play",
+  "Proof-of-Play",
+  "Reconciliation",
+] as const;
+
+function lifecycleIndex(stage: SubmissionStage): number {
+  if (stage === "Submitted") return 0;
+  if (stage === "In review") return 2;
+  if (stage === "Changes requested") return 2;
+  if (stage === "Approved") return 3;
+  if (stage === "Scheduled") return 4;
+  if (stage === "Published") return 6;
+  return 0;
+}
+
+function shortHash(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, "0").slice(0, 8);
+}
+
 const seedSubmissions: Submission[] = [
   {
     id: "SUB-1048",
