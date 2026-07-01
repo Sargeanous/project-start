@@ -994,6 +994,35 @@ function App() {
     setPage("campaigns");
   }
 
+  function placeBid(payload: { lotId: string; amount: number; campaign: string }) {
+    const lot = auctions.find((item) => item.id === payload.lotId);
+    if (!lot) return;
+    const bidderName = profile?.name ?? "Bidder";
+    setAuctions((items) =>
+      items.map((item) =>
+        item.id === payload.lotId
+          ? {
+              ...item,
+              currentBid: payload.amount,
+              leadingBidder: bidderName,
+              bidCount: item.bidCount + 1,
+            }
+          : item,
+      ),
+    );
+    const campaign: BidderCampaign = {
+      id: `CMP-${campaigns.length + 260}`,
+      campaign: payload.campaign,
+      packageName: lot.packageName,
+      budget: `${lot.currency} ${payload.amount.toLocaleString("en-US")}`,
+      status: "Bidding",
+      reach: lot.impressions,
+      nextStep: `Auction closes ${lot.closesAt}`,
+    };
+    setCampaigns((items) => [campaign, ...items.filter((c) => !(c.campaign === payload.campaign && c.status === "Bidding"))]);
+    notify(`Bid placed on ${lot.lotName}`);
+  }
+
   if (!profile) {
     return (
       <I18nContext.Provider value={t}>
