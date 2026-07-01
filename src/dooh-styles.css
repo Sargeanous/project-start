@@ -472,6 +472,10 @@ html[dir="rtl"] .metric::before {
   grid-template-columns: minmax(380px, 0.95fr) minmax(0, 1.25fr);
 }
 
+.split-grid.map-zones {
+  grid-template-columns: minmax(200px, 0.32fr) minmax(0, 1.3fr) minmax(280px, 0.72fr);
+}
+
 .panel {
   min-width: 0;
   padding: 16px;
