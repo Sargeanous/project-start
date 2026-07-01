@@ -3450,8 +3450,101 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
   flex: 0 0 auto;
 }
 
-/* Equal split panels shouldn't stretch to tallest sibling */
-.split-grid.equal { align-items: start; }
+/* Platform alignment rule: sibling cards align; long lists scroll inside the card */
+.split-grid,
+.split-grid.equal,
+.split-grid.wide-left,
+.split-grid.cms-grid,
+.split-grid.network-grid,
+.split-grid.map-zones,
+.media-layout,
+.workbench-grid,
+.metric-grid {
+  align-items: stretch;
+}
+
+.split-grid > .panel,
+.media-layout > .panel,
+.workbench-grid > .panel,
+.metric-grid > .metric {
+  height: 100%;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-header {
+  flex: 0 0 auto;
+}
+
+.panel > :not(.panel-header) {
+  min-height: 0;
+}
+
+.panel > .zone-list,
+.panel > .object-list,
+.panel > .submission-list,
+.panel > .asset-registry,
+.panel > .schedule-list,
+.panel > .asset-board,
+.panel > .media-grid,
+.panel > .agent-grid,
+.panel > .package-grid,
+.panel > .auction-grid,
+.panel > .verification-grid,
+.panel > .table-card {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.panel > .zone-list::-webkit-scrollbar,
+.panel > .object-list::-webkit-scrollbar,
+.panel > .submission-list::-webkit-scrollbar,
+.panel > .asset-registry::-webkit-scrollbar,
+.panel > .schedule-list::-webkit-scrollbar,
+.panel > .asset-board::-webkit-scrollbar,
+.panel > .media-grid::-webkit-scrollbar,
+.panel > .agent-grid::-webkit-scrollbar,
+.panel > .package-grid::-webkit-scrollbar,
+.panel > .auction-grid::-webkit-scrollbar,
+.panel > .verification-grid::-webkit-scrollbar,
+.panel > .table-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel > .zone-list::-webkit-scrollbar-thumb,
+.panel > .object-list::-webkit-scrollbar-thumb,
+.panel > .submission-list::-webkit-scrollbar-thumb,
+.panel > .asset-registry::-webkit-scrollbar-thumb,
+.panel > .schedule-list::-webkit-scrollbar-thumb,
+.panel > .asset-board::-webkit-scrollbar-thumb,
+.panel > .media-grid::-webkit-scrollbar-thumb,
+.panel > .agent-grid::-webkit-scrollbar-thumb,
+.panel > .package-grid::-webkit-scrollbar-thumb,
+.panel > .auction-grid::-webkit-scrollbar-thumb,
+.panel > .verification-grid::-webkit-scrollbar-thumb,
+.panel > .table-card::-webkit-scrollbar-thumb {
+  background: rgba(15,42,34,0.16);
+  border-radius: 999px;
+}
+
+.panel > .live-view,
+.panel > .device-dossier,
+.panel > .detail-stack,
+.panel > .inventory-stack,
+.panel > .scenario-form,
+.panel > .workbench {
+  flex: 1 1 auto;
+}
+
+.panel > .live-view {
+  align-content: start;
+}
 
 /* Agent rail: cap height + scroll so it doesn't run super long */
 .agent-rail {
@@ -3461,7 +3554,7 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 }
 .agent-rail::-webkit-scrollbar { width: 6px; }
 .agent-rail::-webkit-scrollbar-thumb { background: rgba(15,42,34,0.15); border-radius: 3px; }
-.workbench-grid { align-items: start; }
+.workbench-grid { align-items: stretch; }
 
 /* Powered by Origen */
 .powered-by {
