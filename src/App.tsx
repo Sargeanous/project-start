@@ -1950,14 +1950,19 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
 
 function MarketplacePage({
   onSubmit,
+  onBid,
+  auctions,
   t,
 }: {
   onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string }) => void;
+  onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
+  auctions: AuctionLot[];
   t: (value: string) => string;
 }) {
   const [selected, setSelected] = useState(marketplacePackages[0]);
   const [campaign, setCampaign] = useState("Airport retail launch");
   const [budget, setBudget] = useState("AED 420,000");
+  const [mode, setMode] = useState<"auction" | "fixed">("auction");
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -1966,43 +1971,152 @@ function MarketplacePage({
 
   return (
     <PageBody>
-      <div className="split-grid wide-left">
-        <Panel icon={ShoppingBag} title={t("Marketplace")}>
-          <div className="package-grid">
-            {marketplacePackages.map((item) => (
-              <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
-                <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
-                <strong>{t(item.name)}</strong>
-                <span>{t(item.reach)}</span>
-                <small>{t(item.assets)}</small>
-                <em>{t(item.price)}</em>
-              </button>
+      <MetricGrid>
+        <Metric label="Open auctions" value={String(auctions.length)} helper="Live inventory lots" tone="info" />
+        <Metric
+          label="Highest bid"
+          value={`AED ${Math.max(...auctions.map((a) => a.currentBid)).toLocaleString("en-US")}`}
+          helper="Across current lots"
+          tone="good"
+        />
+        <Metric
+          label="Total bids"
+          value={String(auctions.reduce((sum, a) => sum + a.bidCount, 0))}
+          helper="This bidding cycle"
+          tone="neutral"
+        />
+        <Metric label="Fixed-rate packages" value={String(marketplacePackages.length)} helper="Buy without bidding" tone="warn" />
+      </MetricGrid>
+
+      <div className="segmented-tabs">
+        <button type="button" className={mode === "auction" ? "active" : ""} onClick={() => setMode("auction")}>
+          {t("Open auctions")}
+        </button>
+        <button type="button" className={mode === "fixed" ? "active" : ""} onClick={() => setMode("fixed")}>
+          {t("Fixed-rate packages")}
+        </button>
+      </div>
+
+      {mode === "auction" ? (
+        <Panel icon={ShoppingBag} title={t("Open auctions")}>
+          <div className="auction-grid">
+            {auctions.map((lot) => (
+              <AuctionCard key={lot.id} lot={lot} onBid={onBid} t={t} />
             ))}
           </div>
         </Panel>
-        <Panel icon={FileText} title={t("Submit campaign")}>
-          <form className="stack-form" onSubmit={submit}>
-            <label>
-              {t("Campaign name")}
-              <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
-            </label>
-            <label>
-              {t("Package")}
-              <input value={t(selected.name)} readOnly />
-            </label>
-            <label>
-              {t("Budget target")}
-              <input value={t(budget)} onChange={(event) => setBudget(event.target.value)} />
-            </label>
-            <label>
-              {t("Creative pack")}
-              <input value={t("Arabic and English creative uploaded")} readOnly />
-            </label>
-            <Button type="submit">{t("Submit campaign")}</Button>
-          </form>
-        </Panel>
-      </div>
+      ) : (
+        <div className="split-grid wide-left">
+          <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
+            <div className="package-grid">
+              {marketplacePackages.map((item) => (
+                <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
+                  <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
+                  <strong>{t(item.name)}</strong>
+                  <span>{t(item.reach)}</span>
+                  <small>{t(item.assets)}</small>
+                  <em>{t(item.price)}</em>
+                </button>
+              ))}
+            </div>
+          </Panel>
+          <Panel icon={FileText} title={t("Submit campaign")}>
+            <form className="stack-form" onSubmit={submit}>
+              <label>
+                {t("Campaign name")}
+                <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
+              </label>
+              <label>
+                {t("Package")}
+                <input value={t(selected.name)} readOnly />
+              </label>
+              <label>
+                {t("Budget target")}
+                <input value={t(budget)} onChange={(event) => setBudget(event.target.value)} />
+              </label>
+              <label>
+                {t("Creative pack")}
+                <input value={t("Arabic and English creative uploaded")} readOnly />
+              </label>
+              <Button type="submit">{t("Submit campaign")}</Button>
+            </form>
+          </Panel>
+        </div>
+      )}
     </PageBody>
+  );
+}
+
+function AuctionCard({
+  lot,
+  onBid,
+  t,
+}: {
+  lot: AuctionLot;
+  onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
+  t: (value: string) => string;
+}) {
+  const minNext = lot.currentBid + lot.minIncrement;
+  const [amount, setAmount] = useState<number>(minNext);
+  const [campaign, setCampaign] = useState(`Bid on ${lot.lotName}`);
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (amount < minNext) {
+      setError(`${t("Minimum bid")}: ${lot.currency} ${minNext.toLocaleString("en-US")}`);
+      return;
+    }
+    setError("");
+    onBid({ lotId: lot.id, amount, campaign });
+  }
+
+  return (
+    <form className="auction-card" onSubmit={submit}>
+      <div className="auction-card-head">
+        <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(lot.creativeId)}")` }} />
+        <div>
+          <strong>{t(lot.lotName)}</strong>
+          <span>{t(lot.network)}</span>
+          <small>{t(lot.flightWindow)} · {t(lot.impressions)}</small>
+        </div>
+      </div>
+      <div className="auction-stats">
+        <div>
+          <span>{t("Current bid")}</span>
+          <strong>{lot.currency} {lot.currentBid.toLocaleString("en-US")}</strong>
+          <small>{t("Leading")}: {t(lot.leadingBidder)}</small>
+        </div>
+        <div>
+          <span>{t("Floor")}</span>
+          <strong>{lot.currency} {lot.floorPrice.toLocaleString("en-US")}</strong>
+          <small>{lot.bidCount} {t("bids")}</small>
+        </div>
+        <div>
+          <span>{t("Closes")}</span>
+          <strong>{t(lot.closesAt)}</strong>
+          <small>{t("Min increment")}: {lot.currency} {lot.minIncrement.toLocaleString("en-US")}</small>
+        </div>
+      </div>
+      <div className="auction-form">
+        <label>
+          {t("Campaign name")}
+          <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
+        </label>
+        <label>
+          {t("Your bid")} ({lot.currency})
+          <input
+            type="number"
+            min={minNext}
+            step={lot.minIncrement}
+            value={amount}
+            onChange={(event) => setAmount(Number(event.target.value))}
+          />
+        </label>
+        <Button type="submit">{t("Place bid")}</Button>
+      </div>
+      {error ? <p className="auction-error">{error}</p> : null}
+    </form>
   );
 }
 
