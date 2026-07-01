@@ -1916,7 +1916,7 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
         <Metric label="Campaigns" value={String(campaigns.length)} helper="Bidder workspace" tone="info" />
         <Metric label="Live or published" value={String(campaigns.filter((item) => item.status === "Published").length)} helper="On network" tone="good" />
         <Metric label="In review" value={String(campaigns.filter((item) => item.status === "Submitted" || item.status === "In review").length)} helper="ADMO action" tone="warn" />
-        <Metric label="Estimated reach" value="2.2M" helper="Current portfolio" tone="neutral" />
+        <Metric label="Active bids" value={String(campaigns.filter((item) => item.status === "Bidding").length)} helper="Auctions in progress" tone="info" />
       </MetricGrid>
       <Panel icon={Megaphone} title={t("Campaigns")}>
         <div className="table-card">
