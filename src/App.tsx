@@ -1735,37 +1735,46 @@ function ControlCentre({
         <Metric label={t("Queued campaigns")} value={String(queuedCount)} helper="Approved or scheduled" tone="info" />
       </MetricGrid>
 
-      <div className="split-grid map-zones">
-        <Panel icon={Building2} title={t("Zones")}>
-          <div className="zone-list">
-            {zoneStats.map((zone) => (
-              <button key={zone.name} type="button" onClick={() => setSelectedAssetId(zone.firstAssetId)}>
-                <span>
-                  <strong>{t(zone.name)}</strong>
-                  <small>{zone.live} {t("live")}, {zone.issue} {t("need attention")}</small>
-                </span>
-                <em>{zone.total}</em>
-              </button>
-            ))}
+      <section className="control-estate-group" aria-label={t("Live estate map")}>
+        <header className="control-estate-group-header">
+          <div>
+            <span className="panel-icon"><MapPinned size={18} /></span>
+            <h2>{t("Live estate map")}</h2>
           </div>
-        </Panel>
-        <Panel icon={MapPinned} title={t("Live map")} action={<Legend />}>
-          <LiveMap
-            assets={estateAssets}
-            selectedAssetId={selectedAssetId}
-            onMarkerClick={setSelectedAssetId}
-            openAlarmAssetIds={openAlarmAssetIds}
-            t={t}
-          />
-        </Panel>
-        <Panel
-          icon={MonitorPlay}
-          title="Live view"
-          action={<Button icon={Maximize2} variant="secondary" onClick={() => setLiveViewFullscreen(true)}>Full screen</Button>}
-        >
-          <LiveView asset={selectedAsset} />
-        </Panel>
-      </div>
+          <Legend />
+        </header>
+        <div className="split-grid map-zones">
+          <Panel icon={Building2} title={t("Zones")}>
+            <div className="zone-list">
+              {zoneStats.map((zone) => (
+                <button key={zone.name} type="button" onClick={() => setSelectedAssetId(zone.firstAssetId)}>
+                  <span>
+                    <strong>{t(zone.name)}</strong>
+                    <small>{zone.live} {t("live")}, {zone.issue} {t("need attention")}</small>
+                  </span>
+                  <em>{zone.total}</em>
+                </button>
+              ))}
+            </div>
+          </Panel>
+          <Panel icon={MapPinned} title={t("Live map")}>
+            <LiveMap
+              assets={estateAssets}
+              selectedAssetId={selectedAssetId}
+              onMarkerClick={setSelectedAssetId}
+              openAlarmAssetIds={openAlarmAssetIds}
+              t={t}
+            />
+          </Panel>
+          <Panel
+            icon={MonitorPlay}
+            title="Live view"
+            action={<Button icon={Maximize2} variant="secondary" onClick={() => setLiveViewFullscreen(true)}>{t("Full screen")}</Button>}
+          >
+            <LiveView asset={selectedAsset} />
+          </Panel>
+        </div>
+      </section>
 
       <Panel icon={AlertTriangle} title={t("Open alarms")}>
         <ObjectList

@@ -621,6 +621,9 @@ html[dir="rtl"] .metric::before {
 }
 
 .live-map {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
   width: 100%;
   height: clamp(360px, 42vh, 560px);
   overflow: hidden;
@@ -708,7 +711,8 @@ html[dir="rtl"] .metric::before {
 .live-view-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 10000;
+  isolation: isolate;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -716,6 +720,8 @@ html[dir="rtl"] .metric::before {
 }
 
 .live-view-fullscreen-panel {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
@@ -3432,6 +3438,54 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .app.sidebar-collapsed .switch-profile span, .app.sidebar-collapsed .switch-profile { font-size: 0; }
 .app.sidebar-collapsed .switch-profile svg { font-size: 16px; }
 
+.control-estate-group {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--surface-3);
+  box-shadow: var(--shadow);
+}
+
+.control-estate-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.control-estate-group-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.control-estate-group-header h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.control-estate-group-header .legend {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.control-estate-group .split-grid.map-zones {
+  margin: 0;
+}
+
+.control-estate-group .panel {
+  background: var(--surface);
+  box-shadow: none;
+}
+
 /* Zones column: give it enough room; make cards compact */
 .split-grid.map-zones {
   grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1.4fr) minmax(280px, 0.7fr) !important;
@@ -3544,6 +3598,22 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 
 .panel > .live-view {
   align-content: start;
+}
+
+.live-map {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+
+.live-view-fullscreen {
+  z-index: 10000;
+  isolation: isolate;
+}
+
+.live-view-fullscreen-panel {
+  position: relative;
+  z-index: 1;
 }
 
 /* Agent rail: cap height + scroll so it doesn't run super long */
