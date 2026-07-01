@@ -53,7 +53,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, FormEvent, ReactNode, useContext, useMemo, useState } from "react";
+import { createContext, FormEvent, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   assets as estateAssets,
   fieldTasks,
@@ -164,6 +164,18 @@ interface PublishedItem {
   started: string;
 }
 
+interface BidRecord {
+  id: string;
+  lotId: string;
+  lotName: string;
+  campaign: string;
+  bidder: string;
+  amount: number;
+  currency: string;
+  submittedAt: string;
+  status: "Leading" | "Outbid";
+}
+
 interface EmergencyAlert {
   id: string;
   title: string;
@@ -180,6 +192,27 @@ interface VerificationStep {
   label: string;
   owner: string;
   state: "Check required" | "Checked" | "Needs review";
+}
+
+interface ActivityItem {
+  id: string;
+  actor: string;
+  action: string;
+  subject: string;
+  at: string;
+}
+
+interface DoohStatePayload {
+  submissions: Submission[];
+  campaigns: BidderCampaign[];
+  schedule: ScheduleItem[];
+  published: PublishedItem[];
+  auctions: AuctionLot[];
+  bids: BidRecord[];
+  alerts: EmergencyAlert[];
+  verificationSteps: VerificationStep[];
+  financeApprovals: FinanceApproval[];
+  activity: ActivityItem[];
 }
 
 const profiles: Profile[] = [
@@ -414,6 +447,19 @@ const seedPublished: PublishedItem[] = [
   { id: "PUB-002", campaign: "Yas summer promotion", asset: "AD-BUS-022", creativeId: "yas-tourism", started: "09:30" },
   { id: "PUB-003", campaign: "Weekend mall offer", asset: "AD-DWT-011", creativeId: "mall-footfall", started: "11:00" },
   { id: "PUB-004", campaign: "Industrial safety notice", asset: "AD-BRG-014", creativeId: "industrial-notice", started: "14:00" },
+];
+
+const seedFinanceApprovals: FinanceApproval[] = [
+  {
+    id: "FIN-1200",
+    campaign: "Airport retail launch",
+    bidder: "Advertiser",
+    packageName: "Airport and premium roadside",
+    amount: "AED 420,000",
+    margin: "24%",
+    risk: "Low",
+    state: "Pending",
+  },
 ];
 
 const seedAlerts: EmergencyAlert[] = [
@@ -1192,6 +1238,29 @@ function langMoney(value: number, t: Translator) {
   return `${value}${t("k AED")}`;
 }
 
+async function doohGetState(): Promise<DoohStatePayload> {
+  const response = await fetch("/api/dooh/state");
+  return parseDoohResponse<DoohStatePayload>(response);
+}
+
+async function doohPost<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`/api/dooh/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseDoohResponse<T>(response);
+}
+
+async function parseDoohResponse<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : "Backend request failed";
+    throw new Error(message);
+  }
+  return payload as T;
+}
+
 function App() {
   const [lang, setLang] = useState<Lang>("en");
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -1201,15 +1270,66 @@ function App() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>(seedSchedule);
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
   const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
+  const [bids, setBids] = useState<BidRecord[]>([]);
+  const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
+  const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
+  const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toast, setToast] = useState("");
+  const [backendStatus, setBackendStatus] = useState<"syncing" | "online" | "offline">("syncing");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
+
+  useEffect(() => {
+    let active = true;
+    async function loadBackendState() {
+      try {
+        const next = await doohGetState();
+        if (!active) return;
+        applyBackendState(next);
+        setBackendStatus("online");
+      } catch {
+        if (active) setBackendStatus("offline");
+      }
+    }
+    void loadBackendState();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function notify(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
+  }
+
+  function applyBackendState(next: DoohStatePayload) {
+    setSubmissions(next.submissions);
+    setCampaigns(next.campaigns);
+    setSchedule(next.schedule);
+    setPublished(next.published);
+    setAuctions(next.auctions);
+    setBids(next.bids);
+    setAlerts(next.alerts);
+    setVerificationSteps(next.verificationSteps);
+    setFinanceApprovals(next.financeApprovals);
+    setActivity(next.activity);
+  }
+
+  async function syncMutation<T extends { state: DoohStatePayload }>(path: string, body: unknown): Promise<T | null> {
+    setBackendStatus("syncing");
+    try {
+      const result = await doohPost<T>(path, body);
+      applyBackendState(result.state);
+      setBackendStatus("online");
+      return result;
+    } catch (error) {
+      setBackendStatus("offline");
+      notify(error instanceof Error ? error.message : "Backend request failed");
+      return null;
+    }
   }
 
   function chooseProfile(next: Profile) {
@@ -1222,40 +1342,19 @@ function App() {
     setPage(next);
   }
 
-  function submitBrief(payload: BriefPayload) {
-    const suffix = String(submissions.length + 1049);
-    const submission: Submission = {
-      id: `SUB-${suffix}`,
-      campaign: payload.campaign,
-      bidder: profile?.name ?? "Bidder",
-      packageName: payload.packageName,
-      owner: payload.contactName || profile?.name || "Bidder account",
-      requestedStart: payload.startDate || "Jul 15, 2026",
-      budget: payload.budget,
-      priority: payload.priority === "High" ? "High" : "Medium",
-      stage: "Submitted",
-      creativeId: payload.creativeId,
-      language: payload.languages,
-      notes: payload.objective || "Submitted from the bidder workspace and waiting for ADMO CMS review.",
-    };
-    const campaign: BidderCampaign = {
-      id: `CMP-${campaigns.length + 222}`,
-      campaign: payload.campaign,
-      packageName: payload.packageName,
-      budget: payload.budget,
-      status: "Submitted",
-      reach: payload.reach || "Pending ADMO estimate",
-      nextStep: "ADMO content review",
-    };
-    setSubmissions((items) => [submission, ...items]);
-    setCampaigns((items) => [campaign, ...items]);
+  async function submitBrief(payload: BriefPayload) {
+    const result = await syncMutation<{ state: DoohStatePayload; submission: Submission }>("submissions", {
+      actor: profile?.name ?? "Bidder",
+      payload,
+    });
+    if (!result) return;
     setWizardOpen(false);
     notify("Campaign submitted to ADMO CMS");
-    setPage("campaigns");
+    if (profile?.pages.includes("campaigns")) setPage("campaigns");
   }
 
-  function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
-    submitBrief({
+  async function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
+    await submitBrief({
       campaign: payload.campaign,
       packageName: payload.packageName,
       budget: payload.budget,
@@ -1278,33 +1377,75 @@ function App() {
     });
   }
 
-  function placeBid(payload: { lotId: string; amount: number; campaign: string }) {
-    const lot = auctions.find((item) => item.id === payload.lotId);
-    if (!lot) return;
-    const bidderName = profile?.name ?? "Bidder";
-    setAuctions((items) =>
-      items.map((item) =>
-        item.id === payload.lotId
-          ? {
-              ...item,
-              currentBid: payload.amount,
-              leadingBidder: bidderName,
-              bidCount: item.bidCount + 1,
-            }
-          : item,
-      ),
-    );
-    const campaign: BidderCampaign = {
-      id: `CMP-${campaigns.length + 260}`,
-      campaign: payload.campaign,
-      packageName: lot.packageName,
-      budget: `${lot.currency} ${payload.amount.toLocaleString("en-US")}`,
-      status: "Bidding",
-      reach: lot.impressions,
-      nextStep: `Auction closes ${lot.closesAt}`,
-    };
-    setCampaigns((items) => [campaign, ...items.filter((c) => !(c.campaign === payload.campaign && c.status === "Bidding"))]);
-    notify(`Bid placed on ${lot.lotName}`);
+  async function placeBid(payload: { lotId: string; amount: number; campaign: string }) {
+    const result = await syncMutation<{ state: DoohStatePayload; bid: BidRecord }>("bids", {
+      actor: profile?.name ?? "Bidder",
+      payload,
+    });
+    if (result) notify(`Bid placed on ${result.bid.lotName}`);
+  }
+
+  async function updateSubmissionStage(id: string, stage: SubmissionStage) {
+    const result = await syncMutation<{ state: DoohStatePayload; submission: Submission }>(`submissions/${id}/stage`, {
+      actor: profile?.name ?? "ADMO",
+      stage,
+    });
+    if (result) notify(`${t(result.submission.campaign)}: ${t(stage)}`);
+  }
+
+  async function playSchedule(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`schedule/${id}/play`, {
+      actor: profile?.name ?? "ADMO",
+    });
+    if (result) notify("Schedule item is now playing");
+  }
+
+  async function createEmergencyAlert(payload: { title: string; scope: string; content: string; criticality: EmergencyAlert["criticality"] }) {
+    const result = await syncMutation<{ state: DoohStatePayload; alert: EmergencyAlert }>("alerts", {
+      actor: profile?.name ?? "Duty officer",
+      payload,
+    });
+    if (result) notify("Alert created and waiting for checks");
+    return result?.alert ?? null;
+  }
+
+  async function runAlertChecks(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/checks`, {
+      actor: profile?.name ?? "Duty officer",
+    });
+    if (result) notify("Emergency checks completed");
+  }
+
+  async function queueAlertBroadcast(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/queue`, {
+      actor: profile?.name ?? "Duty officer",
+    });
+    if (result) notify("Emergency broadcast queued");
+  }
+
+  async function broadcastAlertNow(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/broadcast`, {
+      actor: profile?.name ?? "Duty officer",
+    });
+    if (result) notify("Emergency alert live on network");
+  }
+
+  async function resetAlertChecks(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/reset`, {
+      actor: profile?.name ?? "Duty officer",
+    });
+    if (result) notify("Alert reset. Re-run checks.");
+  }
+
+  async function decideFinance(id: string, state: FinanceApproval["state"]) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`finance/${id}/decision`, {
+      actor: profile?.name ?? "Finance",
+      state,
+    });
+    if (result) {
+      const item = result.state.financeApprovals.find((approval) => approval.id === id);
+      if (item) notify(`${t(item.campaign)}: ${t(state)}`);
+    }
   }
 
   if (!profile) {
@@ -1333,20 +1474,28 @@ function App() {
           {page === "cms" && (
             <CmsPage
               submissions={submissions}
-              setSubmissions={setSubmissions}
               schedule={schedule}
-              setSchedule={setSchedule}
               published={published}
-              setPublished={setPublished}
-              setCampaigns={setCampaigns}
-              notify={notify}
+              onStage={updateSubmissionStage}
+              onPlaySchedule={playSchedule}
               t={t}
             />
           )}
-          {page === "alerts" && <AlertsPage notify={notify} t={t} />}
+          {page === "alerts" && (
+            <AlertsPage
+              alerts={alerts}
+              steps={verificationSteps}
+              onCreateAlert={createEmergencyAlert}
+              onRunChecks={runAlertChecks}
+              onQueueBroadcast={queueAlertBroadcast}
+              onBroadcastNow={broadcastAlertNow}
+              onResetAlert={resetAlertChecks}
+              t={t}
+            />
+          )}
           {page === "network" && <NetworkPage t={t} />}
           {page === "mediagpt" && <MediaGptSuite t={t} />}
-          {page === "financials" && <FinancialsPage submissions={submissions} notify={notify} t={t} />}
+          {page === "financials" && <FinancialsPage approvals={financeApprovals} onDecision={decideFinance} t={t} />}
           {page === "lab" && <AiLabPage t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} onNewBrief={() => setWizardOpen(true)} t={t} />}
@@ -1626,23 +1775,17 @@ function ControlCentre({
 
 function CmsPage({
   submissions,
-  setSubmissions,
   schedule,
-  setSchedule,
   published,
-  setPublished,
-  setCampaigns,
-  notify,
+  onStage,
+  onPlaySchedule,
   t,
 }: {
   submissions: Submission[];
-  setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>;
   schedule: ScheduleItem[];
-  setSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
   published: PublishedItem[];
-  setPublished: React.Dispatch<React.SetStateAction<PublishedItem[]>>;
-  setCampaigns: React.Dispatch<React.SetStateAction<BidderCampaign[]>>;
-  notify: (message: string) => void;
+  onStage: (id: string, next: SubmissionStage) => void;
+  onPlaySchedule: (id: string) => void;
   t: (value: string) => string;
 }) {
   const [tab, setTab] = useState<CmsTab>("submissions");
@@ -1651,45 +1794,6 @@ function CmsPage({
   const approved = submissions.filter((item) => ["Approved", "Scheduled", "Published"].includes(item.stage)).length;
   const pending = submissions.filter((item) => item.stage === "Submitted" || item.stage === "In review").length;
   const approvalRate = submissions.length ? Math.round((approved / submissions.length) * 100) : 0;
-
-  function updateStage(id: string, next: SubmissionStage) {
-    const item = submissions.find((submission) => submission.id === id);
-    if (!item) return;
-    setSubmissions((items) => items.map((submission) => (submission.id === id ? { ...submission, stage: next } : submission)));
-    setCampaigns((items) =>
-      items.map((campaign) =>
-        campaign.campaign === item.campaign
-          ? { ...campaign, status: mapCampaignStatus(next), nextStep: campaignNextStep(next) }
-          : campaign,
-      ),
-    );
-    if (next === "Scheduled" && !schedule.some((slot) => slot.campaign === item.campaign)) {
-      setSchedule((items) => [
-        ...items,
-        {
-          id: `SCH-${items.length + 1}`.padStart(7, "0"),
-          time: "16:00",
-          asset: "AD-HWY-001",
-          campaign: item.campaign,
-          owner: item.bidder,
-          state: "Queued",
-        },
-      ]);
-    }
-    if (next === "Published" && !published.some((publishedItem) => publishedItem.campaign === item.campaign)) {
-      setPublished((items) => [
-        {
-          id: `PUB-${items.length + 1}`.padStart(7, "0"),
-          campaign: item.campaign,
-          asset: "AD-HWY-001",
-          creativeId: item.creativeId,
-          started: "Now",
-        },
-        ...items,
-      ]);
-    }
-    notify(`${t(item.campaign)}: ${t(next)}`);
-  }
 
   return (
     <PageBody>
@@ -1723,13 +1827,13 @@ function CmsPage({
             </div>
           </Panel>
           <Panel icon={ClipboardCheck} title={t(selected.campaign)} action={selected.id}>
-            <SubmissionDetail submission={selected} onStage={updateStage} />
+            <SubmissionDetail submission={selected} onStage={onStage} />
           </Panel>
         </div>
       ) : null}
 
       {tab === "library" && <MediaLibrary t={t} />}
-      {tab === "scheduling" && <SchedulingBoard schedule={schedule} setSchedule={setSchedule} t={t} />}
+      {tab === "scheduling" && <SchedulingBoard schedule={schedule} onPlayNow={onPlaySchedule} t={t} />}
     </PageBody>
   );
 }
@@ -1945,17 +2049,13 @@ function MediaLibrary({ t }: { t: (value: string) => string }) {
 
 function SchedulingBoard({
   schedule,
-  setSchedule,
+  onPlayNow,
   t,
 }: {
   schedule: ScheduleItem[];
-  setSchedule: React.Dispatch<React.SetStateAction<ScheduleItem[]>>;
+  onPlayNow: (id: string) => void;
   t: (value: string) => string;
 }) {
-  function promote(id: string) {
-    setSchedule((items) => items.map((item) => (item.id === id ? { ...item, state: "Playing" } : item)));
-  }
-
   return (
     <Panel icon={CalendarDays} title={t("Scheduling")}>
       <div className="schedule-list">
@@ -1967,7 +2067,7 @@ function SchedulingBoard({
               <span>{slot.asset} / {t(slot.owner)}</span>
             </div>
             <StatusPill label={slot.state} tone={slot.state === "Playing" ? "good" : "info"} />
-            {slot.state !== "Playing" ? <Button variant="secondary" onClick={() => promote(slot.id)}>Play now</Button> : null}
+            {slot.state !== "Playing" ? <Button variant="secondary" onClick={() => onPlayNow(slot.id)}>Play now</Button> : null}
           </article>
         ))}
       </div>
@@ -1975,58 +2075,51 @@ function SchedulingBoard({
   );
 }
 
-function AlertsPage({ notify, t }: { notify: (message: string) => void; t: (value: string) => string }) {
-  const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
-  const [selectedAlertId, setSelectedAlertId] = useState(seedAlerts[0].id);
-  const [steps, setSteps] = useState<VerificationStep[]>(initialVerificationSteps);
+function AlertsPage({
+  alerts,
+  steps,
+  onCreateAlert,
+  onRunChecks,
+  onQueueBroadcast,
+  onBroadcastNow,
+  onResetAlert,
+  t,
+}: {
+  alerts: EmergencyAlert[];
+  steps: VerificationStep[];
+  onCreateAlert: (payload: { title: string; scope: string; content: string; criticality: EmergencyAlert["criticality"] }) => Promise<EmergencyAlert | null>;
+  onRunChecks: (id: string) => void;
+  onQueueBroadcast: (id: string) => void;
+  onBroadcastNow: (id: string) => void;
+  onResetAlert: (id: string) => void;
+  t: (value: string) => string;
+}) {
+  const [selectedAlertId, setSelectedAlertId] = useState(alerts[0]?.id ?? "");
   const [draft, setDraft] = useState({ title: "", scope: "", content: "", criticality: "Major" });
   const selected = alerts.find((alert) => alert.id === selectedAlertId) ?? alerts[0];
   const checked = steps.every((step) => step.state === "Checked");
 
-  function createAlert(event: FormEvent) {
+  useEffect(() => {
+    if (alerts.length && !alerts.some((alert) => alert.id === selectedAlertId)) {
+      setSelectedAlertId(alerts[0].id);
+    }
+  }, [alerts, selectedAlertId]);
+
+  async function createAlert(event: FormEvent) {
     event.preventDefault();
     if (!draft.title.trim()) return;
-    const alert: EmergencyAlert = {
-      id: `ALT-${alerts.length + 902}`,
+    const created = await onCreateAlert({
       title: draft.title,
-      scope: draft.scope || "Estate-wide",
-      authority: "Duty officer",
-      sla: "Display within 60s",
-      audience: "Public",
-      endTime: "Default 2 hours",
-      state: "Check required",
+      scope: draft.scope,
+      content: draft.content,
       criticality: draft.criticality as EmergencyAlert["criticality"],
-    };
-    setAlerts((items) => [alert, ...items]);
-    setSelectedAlertId(alert.id);
-    setSteps(initialVerificationSteps);
+    });
+    if (created) setSelectedAlertId(created.id);
     setDraft({ title: "", scope: "", content: "", criticality: "Major" });
-    notify("Alert created and waiting for checks");
   }
 
-  function runChecks() {
-    setSteps((items) => items.map((item) => ({ ...item, state: "Checked" })));
-    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Approval required" } : item)));
-    notify("Emergency checks completed");
-  }
 
-  function queueBroadcast() {
-    if (!checked) return;
-    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Broadcast queued" } : item)));
-    notify("Emergency broadcast queued");
-  }
-
-  function broadcastNow() {
-    if (!checked) return;
-    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Live on network" } : item)));
-    notify("Emergency alert live on network");
-  }
-
-  function resetAlert() {
-    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Check required" } : item)));
-    notify("Alert reset. Re-run checks.");
-  }
-
+  if (!selected) return null;
 
   return (
     <PageBody>
@@ -2106,10 +2199,10 @@ function AlertsPage({ notify, t }: { notify: (message: string) => void; t: (valu
           ))}
         </div>
         <ActionRow>
-          <Button onClick={runChecks}>{t("Run checks")}</Button>
-          <Button variant="secondary" onClick={queueBroadcast}>{t("Queue broadcast")}</Button>
-          <Button variant="secondary" onClick={broadcastNow}>{t("Broadcast now")}</Button>
-          <Button variant="secondary" onClick={resetAlert}>{t("Reset")}</Button>
+          <Button onClick={() => onRunChecks(selected.id)}>{t("Run checks")}</Button>
+          <Button variant="secondary" onClick={() => checked && onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button>
+          <Button variant="secondary" onClick={() => checked && onBroadcastNow(selected.id)}>{t("Broadcast now")}</Button>
+          <Button variant="secondary" onClick={() => onResetAlert(selected.id)}>{t("Reset")}</Button>
         </ActionRow>
 
       </Panel>
@@ -2793,51 +2886,19 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
   );
 }
 
-function FinancialsPage({ submissions, notify, t }: { submissions: Submission[]; notify: (message: string) => void; t: (value: string) => string }) {
+function FinancialsPage({
+  approvals,
+  onDecision,
+  t,
+}: {
+  approvals: FinanceApproval[];
+  onDecision: (id: string, state: FinanceApproval["state"]) => void;
+  t: (value: string) => string;
+}) {
   const [budget, setBudget] = useState(420);
   const [demand, setDemand] = useState(68);
   const [discount, setDiscount] = useState(8);
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
-
-  const seedApprovals: FinanceApproval[] = useMemo(() => {
-    const base: FinanceApproval[] = submissions
-      .filter((s) => s.stage === "Submitted" || s.stage === "In review")
-      .slice(0, 4)
-      .map((s, i) => ({
-        id: `FIN-${1200 + i}`,
-        campaign: s.campaign,
-        bidder: s.bidder,
-        packageName: s.packageName,
-        amount: s.budget,
-        margin: `${18 + i * 3}%`,
-        risk: i === 0 ? "Elevated" : i === 1 ? "Low" : "Medium",
-        state: "Pending",
-      }));
-    if (base.length === 0) {
-      base.push({
-        id: "FIN-1200",
-        campaign: "Airport retail launch",
-        bidder: "Advertiser",
-        packageName: "Airport and premium roadside",
-        amount: "AED 420,000",
-        margin: "24%",
-        risk: "Low",
-        state: "Pending",
-      });
-    }
-    return base;
-  }, [submissions]);
-
-  const [approvals, setApprovals] = useState<FinanceApproval[]>(seedApprovals);
-  // reset when underlying submissions change (persona switch)
-  const approvalsKey = seedApprovals.map((a) => a.id).join("|");
-  useMemo(() => setApprovals(seedApprovals), [approvalsKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function decide(id: string, state: FinanceApproval["state"]) {
-    setApprovals((items) => items.map((item) => (item.id === id ? { ...item, state } : item)));
-    const item = approvals.find((a) => a.id === id);
-    if (item) notify(`${t(item.campaign)}: ${t(state)}`);
-  }
 
   return (
     <PageBody>
@@ -2874,12 +2935,12 @@ function FinancialsPage({ submissions, notify, t }: { submissions: Submission[];
                   <td>
                     {row.state === "Pending" ? (
                       <div className="row-actions">
-                        <Button onClick={() => decide(row.id, "Approved")}>{t("Approve")}</Button>
-                        <Button variant="secondary" onClick={() => decide(row.id, "On hold")}>{t("Hold")}</Button>
-                        <Button variant="secondary" onClick={() => decide(row.id, "Rejected")}>{t("Reject")}</Button>
+                        <Button onClick={() => onDecision(row.id, "Approved")}>{t("Approve")}</Button>
+                        <Button variant="secondary" onClick={() => onDecision(row.id, "On hold")}>{t("Hold")}</Button>
+                        <Button variant="secondary" onClick={() => onDecision(row.id, "Rejected")}>{t("Reject")}</Button>
                       </div>
                     ) : (
-                      <Button variant="secondary" onClick={() => decide(row.id, "Pending")}>{t("Re-open")}</Button>
+                      <Button variant="secondary" onClick={() => onDecision(row.id, "Pending")}>{t("Re-open")}</Button>
                     )}
                   </td>
                 </tr>
