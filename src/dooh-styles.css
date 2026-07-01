@@ -3387,3 +3387,5 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .app.sidebar-collapsed .powered-by--sidebar span,
 .app.sidebar-collapsed .powered-by--sidebar strong { display: none; }
 .app.sidebar-collapsed .powered-by--sidebar { justify-content: center; padding: 8px 0 0; }
+.powered-by--sidebar { color: #556660; font-size: 11.5px; }
+.powered-by--sidebar strong { color: var(--text); font-weight: 600; }
