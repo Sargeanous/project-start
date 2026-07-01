@@ -1985,7 +1985,7 @@ function KanbanBoard() {
 
 type Boundary = "Read-only" | "Recommend" | "Execute with approval" | "Never modify";
 
-type AgentId = "discover" | "command" | "create" | "protect" | "optimize" | "safeguard";
+type AgentId = string;
 
 type AgentResult = {
   summary: string;
@@ -2001,10 +2001,10 @@ type AgentInputs = Record<string, string>;
 type AgentSpec = {
   id: AgentId;
   name: string;
+  family: string;
   icon: LucideIcon;
   tagline: string;
   boundary: Boundary;
-  agents: string[];
   fields: Array<
     | { key: string; kind: "text"; label: string; placeholder: string; defaultValue: string }
     | { key: string; kind: "textarea"; label: string; placeholder: string; defaultValue: string }
@@ -2025,12 +2025,12 @@ function fmtAed(n: number): string {
 
 const mediaGptAgents: AgentSpec[] = [
   {
-    id: "discover",
-    name: "Discover",
+    id: "insights",
+    family: "Discover",
+    name: "MediaGPT Insights",
     icon: Search,
     tagline: "Natural-language search across campaigns, assets, and archives.",
     boundary: "Read-only",
-    agents: ["MediaGPT Insights", "Archive NLQ"],
     fields: [
       { key: "q", kind: "text", label: "Query", placeholder: "e.g. Coca-Cola placements on Yas Island last year", defaultValue: "Coca-Cola placements on Yas Island last year" },
       { key: "scope", kind: "select", label: "Scope", options: ["Campaigns", "Assets", "Archive"], defaultValue: "Campaigns" },
@@ -2051,12 +2051,38 @@ const mediaGptAgents: AgentSpec[] = [
     },
   },
   {
-    id: "command",
-    name: "Command",
+    id: "archive-nlq",
+    family: "Discover",
+    name: "Archive NLQ",
+    icon: Search,
+    tagline: "Natural-language search across campaigns, assets, and archives.",
+    boundary: "Read-only",
+    fields: [
+      { key: "q", kind: "text", label: "Query", placeholder: "e.g. Coca-Cola placements on Yas Island last year", defaultValue: "Coca-Cola placements on Yas Island last year" },
+      { key: "scope", kind: "select", label: "Scope", options: ["Campaigns", "Assets", "Archive"], defaultValue: "Campaigns" },
+    ],
+    run: (input) => {
+      const q = input.q.trim() || "recent placements";
+      return {
+        summary: `${input.scope} matching "${q}" - 3 results found.`,
+        columns: ["Campaign", "Advertiser", "Zone", "Ran", "Value"],
+        rows: [
+          ["Yas summer promo", "Coca-Cola", "Yas Island", "Aug 2024", "AED 268,500"],
+          ["Retail activation", "Coca-Cola", "Downtown", "Nov 2024", "AED 142,000"],
+          ["Airport refresh", "Coca-Cola", "Airport route", "Mar 2025", "AED 318,900"],
+        ],
+        primaryAction: "Export results",
+        primaryTone: "info",
+      };
+    },
+  },
+  {
+    id: "workflow-composer",
+    family: "Command",
+    name: "Workflow Composer",
     icon: Terminal,
     tagline: "Compose workflows across scheduling, targeting, and distribution.",
     boundary: "Execute with approval",
-    agents: ["Workflow Composer", "Targeting Assistant"],
     fields: [
       { key: "zone", kind: "select", label: "Zone", options: zoneOptions, defaultValue: "Airport route" },
       { key: "daypart", kind: "select", label: "Daypart", options: daypartOptions, defaultValue: "Morning peak" },
@@ -2083,12 +2109,44 @@ const mediaGptAgents: AgentSpec[] = [
     },
   },
   {
-    id: "create",
-    name: "Create",
+    id: "targeting-assistant",
+    family: "Command",
+    name: "Targeting Assistant",
+    icon: Terminal,
+    tagline: "Compose workflows across scheduling, targeting, and distribution.",
+    boundary: "Execute with approval",
+    fields: [
+      { key: "zone", kind: "select", label: "Zone", options: zoneOptions, defaultValue: "Airport route" },
+      { key: "daypart", kind: "select", label: "Daypart", options: daypartOptions, defaultValue: "Morning peak" },
+      { key: "creative", kind: "text", label: "Approved creative ID", placeholder: "CR-90421", defaultValue: "CR-90421" },
+    ],
+    run: (input) => {
+      const matches = estateAssets.filter((a) => a.zone === input.zone).slice(0, 6);
+      const count = matches.length || 4;
+      return {
+        summary: `Workflow prepared: ${count} assets in ${input.zone}, ${input.daypart}, creative ${input.creative || "CR-90421"}.`,
+        columns: ["Asset", "Type", "Status"],
+        rows: matches.length
+          ? matches.map((a) => [a.id, a.type ?? "Panel", a.status])
+          : [
+              ["AD-APT-003", "Roadside", "Live"],
+              ["AD-APT-007", "Roadside", "Live"],
+              ["AD-APT-011", "Roadside", "Standby"],
+              ["AD-APT-014", "Roadside", "Live"],
+            ],
+        notes: ["Governance check pending", "Requires named approver before push"],
+        primaryAction: "Queue for approval",
+        primaryTone: "warn",
+      };
+    },
+  },
+  {
+    id: "studio",
+    family: "Create",
+    name: "MediaGPT Studio",
     icon: PenTool,
     tagline: "Generative studio for civic messaging in Arabic and English.",
     boundary: "Recommend",
-    agents: ["MediaGPT Studio", "DCO Adapter"],
     fields: [
       { key: "brief", kind: "textarea", label: "Brief", placeholder: "e.g. Make-it-in-the-Emirates, desert sunrise, civic tone", defaultValue: "Make-it-in-the-Emirates, desert sunrise, civic tone" },
       { key: "language", kind: "select", label: "Language", options: languageOptions, defaultValue: "Arabic first" },
@@ -2111,12 +2169,40 @@ const mediaGptAgents: AgentSpec[] = [
     },
   },
   {
-    id: "protect",
-    name: "Protect",
+    id: "dco-adapter",
+    family: "Create",
+    name: "DCO Adapter",
+    icon: PenTool,
+    tagline: "Generative studio for civic messaging in Arabic and English.",
+    boundary: "Recommend",
+    fields: [
+      { key: "brief", kind: "textarea", label: "Brief", placeholder: "e.g. Make-it-in-the-Emirates, desert sunrise, civic tone", defaultValue: "Make-it-in-the-Emirates, desert sunrise, civic tone" },
+      { key: "language", kind: "select", label: "Language", options: languageOptions, defaultValue: "Arabic first" },
+      { key: "tone", kind: "select", label: "Tone", options: toneOptions, defaultValue: "Civic" },
+    ],
+    run: (input) => {
+      const brief = input.brief.trim() || "civic campaign";
+      return {
+        summary: `3 concepts generated for "${brief.slice(0, 60)}" - ${input.language}, ${input.tone} tone.`,
+        columns: ["Concept", "Headline", "Formats"],
+        rows: [
+          ["Concept A", "Made here. Made for tomorrow.", "6:1, 9:16, 1:1"],
+          ["Concept B", "The future is manufactured here.", "6:1, 9:16, 3:4"],
+          ["Concept C", "From our sands, to the world.", "6:1, 1:1, 3:4"],
+        ],
+        notes: ["Arabic parity verified", "Awaiting reviewer sign-off before publish"],
+        primaryAction: "Send to CMS Library",
+        primaryTone: "info",
+      };
+    },
+  },
+  {
+    id: "moderator",
+    family: "Protect",
+    name: "MediaGPT Moderator",
     icon: ShieldCheck,
     tagline: "Content moderation, deepfake detection, and rights checks.",
     boundary: "Never modify",
-    agents: ["MediaGPT Moderator", "MediaGPT Compliance Agent"],
     fields: [
       { key: "submission", kind: "select", label: "Submission", options: seedSubmissions.map((s) => `${s.id} - ${s.campaign}`), defaultValue: `${seedSubmissions[0].id} - ${seedSubmissions[0].campaign}` },
       { key: "check", kind: "select", label: "Check depth", options: ["Standard", "Deep", "Cultural review"], defaultValue: "Deep" },
@@ -2139,12 +2225,40 @@ const mediaGptAgents: AgentSpec[] = [
     },
   },
   {
-    id: "optimize",
-    name: "Optimize",
+    id: "compliance",
+    family: "Protect",
+    name: "MediaGPT Compliance Agent",
+    icon: ShieldCheck,
+    tagline: "Content moderation, deepfake detection, and rights checks.",
+    boundary: "Never modify",
+    fields: [
+      { key: "submission", kind: "select", label: "Submission", options: seedSubmissions.map((s) => `${s.id} - ${s.campaign}`), defaultValue: `${seedSubmissions[0].id} - ${seedSubmissions[0].campaign}` },
+      { key: "check", kind: "select", label: "Check depth", options: ["Standard", "Deep", "Cultural review"], defaultValue: "Deep" },
+    ],
+    run: (input) => {
+      const id = input.submission.split(" ")[0];
+      return {
+        summary: `${input.check} check complete for ${id}. Cleared with 1 flag.`,
+        columns: ["Check", "Result", "Confidence"],
+        rows: [
+          ["Integrity scan", "Pass", "97%"],
+          ["Deepfake detection", "No manipulation", "99%"],
+          ["Rights and licensing", "Match found - review", "84%"],
+          ["Cultural soundness", "Pass", "96%"],
+        ],
+        notes: ["Rights match requires named approver review"],
+        primaryAction: "Escalate to reviewer",
+        primaryTone: "warn",
+      };
+    },
+  },
+  {
+    id: "optimizer",
+    family: "Optimize",
+    name: "MediaGPT Optimizer",
     icon: Lightbulb,
     tagline: "Yield, slot allocation, and dynamic pricing recommendations.",
     boundary: "Recommend",
-    agents: ["MediaGPT Optimizer", "Yield Advisor"],
     fields: [
       { key: "zone", kind: "select", label: "Asset group", options: zoneOptions, defaultValue: "Airport route" },
       { key: "target", kind: "select", label: "Target uplift", options: ["+5%", "+10%", "+15%", "+20%"], defaultValue: "+10%" },
@@ -2167,12 +2281,63 @@ const mediaGptAgents: AgentSpec[] = [
     },
   },
   {
-    id: "safeguard",
-    name: "Safeguard",
+    id: "yield-advisor",
+    family: "Optimize",
+    name: "Yield Advisor",
+    icon: Lightbulb,
+    tagline: "Yield, slot allocation, and dynamic pricing recommendations.",
+    boundary: "Recommend",
+    fields: [
+      { key: "zone", kind: "select", label: "Asset group", options: zoneOptions, defaultValue: "Airport route" },
+      { key: "target", kind: "select", label: "Target uplift", options: ["+5%", "+10%", "+15%", "+20%"], defaultValue: "+10%" },
+    ],
+    run: (input) => {
+      const uplift = parseInt(input.target.replace(/[^0-9]/g, ""), 10) || 10;
+      const base = 32000 + uplift * 900;
+      return {
+        summary: `${input.zone}: ${input.target} uplift plan - projected ${fmtAed(base)} / week, no civic conflict.`,
+        columns: ["Action", "Asset", "Impact"],
+        rows: [
+          ["Reallocate 6 evening slots", "AD-APT-003", `+${fmtAed(Math.round(base * 0.4))}`],
+          ["Reallocate 4 evening slots", "AD-APT-007", `+${fmtAed(Math.round(base * 0.35))}`],
+          ["Raise floor CPM", "Airport-loop pool", `+${fmtAed(Math.round(base * 0.25))}`],
+        ],
+        notes: ["No civic slot cannibalisation detected"],
+        primaryAction: "Send to Financials",
+        primaryTone: "good",
+      };
+    },
+  },
+  {
+    id: "sentinel",
+    family: "Safeguard",
+    name: "MediaGPT Sentinel",
     icon: Eye,
     tagline: "Edge, CMS and network anomaly detection with audit trails.",
     boundary: "Read-only",
-    agents: ["MediaGPT Sentinel", "Drift Monitor"],
+    fields: [
+      { key: "window", kind: "select", label: "Window", options: windowOptions, defaultValue: "Last 24 hours" },
+      { key: "surface", kind: "select", label: "Surface", options: ["All", "Edge", "CMS", "Network"], defaultValue: "All" },
+    ],
+    run: (input) => ({
+      summary: `${input.surface} surface, ${input.window}: 2 anomalies, 1 resolved.`,
+      columns: ["Time", "Signal", "Severity", "Status"],
+      rows: [
+        ["23:04", "Latency spike AD-BRG-014", "Medium", "Resolved"],
+        ["09:12", "Model drift - Moderator v1.4", "Low", "Within tolerance"],
+      ],
+      notes: ["Signed audit trail available for both events"],
+      primaryAction: "Open audit log",
+      primaryTone: "info",
+    }),
+  },
+  {
+    id: "drift-monitor",
+    family: "Safeguard",
+    name: "Drift Monitor",
+    icon: Eye,
+    tagline: "Edge, CMS and network anomaly detection with audit trails.",
+    boundary: "Read-only",
     fields: [
       { key: "window", kind: "select", label: "Window", options: windowOptions, defaultValue: "Last 24 hours" },
       { key: "surface", kind: "select", label: "Surface", options: ["All", "Edge", "CMS", "Network"], defaultValue: "All" },
@@ -2207,7 +2372,7 @@ type RunLogEntry = {
 };
 
 function MediaGptSuite({ t }: { t: (value: string) => string }) {
-  const [activeId, setActiveId] = useState<AgentId>("discover");
+  const [activeId, setActiveId] = useState<AgentId>("insights");
   const active = mediaGptAgents.find((a) => a.id === activeId)!;
   const [inputs, setInputs] = useState<AgentInputs>(() => {
     const seed: AgentInputs = {};
@@ -2287,7 +2452,7 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
               <span className="family-icon"><ActiveIcon size={18} /></span>
               <div>
                 <strong>{t(active.name)}</strong>
-                <small>{active.agents.map((a) => t(a)).join(" - ")}</small>
+                <small>{t(active.family)}</small>
               </div>
             </div>
             <span className={`boundary-badge tone-${boundaryTone(active.boundary)}`}>{t(active.boundary)}</span>
