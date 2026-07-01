@@ -111,9 +111,26 @@ interface BidderCampaign {
   campaign: string;
   packageName: string;
   budget: string;
-  status: "Draft" | "Submitted" | "In review" | "Approved" | "Scheduled" | "Published";
+  status: "Draft" | "Bidding" | "Submitted" | "In review" | "Approved" | "Scheduled" | "Published";
   reach: string;
   nextStep: string;
+}
+
+interface AuctionLot {
+  id: string;
+  lotName: string;
+  packageName: string;
+  network: string;
+  flightWindow: string;
+  impressions: string;
+  floorPrice: number;
+  currentBid: number;
+  leadingBidder: string;
+  minIncrement: number;
+  bidCount: number;
+  closesAt: string;
+  creativeId: string;
+  currency: string;
 }
 
 interface ScheduleItem {
@@ -290,6 +307,59 @@ const seedBidderCampaigns: BidderCampaign[] = [
     nextStep: "Proof-of-play reconciliation",
   },
 ];
+
+const seedAuctions: AuctionLot[] = [
+  {
+    id: "LOT-4411",
+    lotName: "Corniche prime — evening rotation",
+    packageName: "Airport and premium roadside",
+    network: "12 panels · Corniche, Airport Road",
+    flightWindow: "Jul 20 – Aug 03, 2026",
+    impressions: "1.4M weekly",
+    floorPrice: 380000,
+    currentBid: 442000,
+    leadingBidder: "Yas Tourism",
+    minIncrement: 5000,
+    bidCount: 7,
+    closesAt: "Jul 04, 2026 · 18:00",
+    creativeId: "etihad-retail",
+    currency: "AED",
+  },
+  {
+    id: "LOT-4408",
+    lotName: "Downtown retail loop — weekend",
+    packageName: "Downtown retail loop",
+    network: "18 mall & urban panels",
+    flightWindow: "Jul 12 – Jul 26, 2026",
+    impressions: "790k weekly",
+    floorPrice: 150000,
+    currentBid: 168500,
+    leadingBidder: "Retail Majlis",
+    minIncrement: 2500,
+    bidCount: 4,
+    closesAt: "Jul 03, 2026 · 12:00",
+    creativeId: "mall-footfall",
+    currency: "AED",
+  },
+  {
+    id: "LOT-4402",
+    lotName: "Yas leisure loop — summer flight",
+    packageName: "Yas leisure loop",
+    network: "9 panels · Yas Island & hotel corridor",
+    flightWindow: "Jul 15 – Aug 15, 2026",
+    impressions: "620k weekly",
+    floorPrice: 210000,
+    currentBid: 210000,
+    leadingBidder: "No bids yet",
+    minIncrement: 5000,
+    bidCount: 0,
+    closesAt: "Jul 05, 2026 · 20:00",
+    creativeId: "yas-tourism",
+    currency: "AED",
+  },
+];
+
+
 
 const seedSchedule: ScheduleItem[] = [
   { id: "SCH-001", time: "08:00", asset: "AD-HWY-001", campaign: "Road safety rotation", owner: "ADMO", state: "Playing" },
@@ -604,6 +674,45 @@ const translations: Record<string, string> = {
   "From AED 150,000": "ابتداءً من 150,000 درهم",
   "From AED 210,000": "ابتداءً من 210,000 درهم",
 
+  "Open auctions": "المزادات المفتوحة",
+  "Fixed-rate packages": "الباقات بسعر ثابت",
+  "Buy without bidding": "شراء دون مزايدة",
+  "Live inventory lots": "لوطات معروضة مباشرة",
+  "Across current lots": "عبر اللوطات الحالية",
+  "Total bids": "إجمالي المزايدات",
+  "This bidding cycle": "دورة المزايدة الحالية",
+  "Highest bid": "أعلى مزايدة",
+  "Current bid": "المزايدة الحالية",
+  "Leading": "المتصدر",
+  "Floor": "السعر الأدنى",
+  "bids": "مزايدات",
+  "Closes": "ينتهي",
+  "Min increment": "أدنى زيادة",
+  "Minimum bid": "الحد الأدنى للمزايدة",
+  "Your bid": "مزايدتك",
+  "Place bid": "تقديم مزايدة",
+  "Bidding": "قيد المزايدة",
+  "Active bids": "المزايدات النشطة",
+  "Auctions in progress": "مزادات جارية",
+  "No bids yet": "لا توجد مزايدات بعد",
+  "Corniche prime — evening rotation": "الكورنيش الرئيسي — دورة المساء",
+  "Downtown retail loop — weekend": "مسار التجزئة في وسط المدينة — نهاية الأسبوع",
+  "Yas leisure loop — summer flight": "مسار ياس الترفيهي — الرحلة الصيفية",
+  "12 panels · Corniche, Airport Road": "12 شاشة · الكورنيش، طريق المطار",
+  "18 mall & urban panels": "18 شاشة في المولات والمناطق الحضرية",
+  "9 panels · Yas Island & hotel corridor": "9 شاشات · جزيرة ياس وممر الفنادق",
+  "Jul 20 – Aug 03, 2026": "20 يوليو – 3 أغسطس 2026",
+  "Jul 12 – Jul 26, 2026": "12 يوليو – 26 يوليو 2026",
+  "Jul 15 – Aug 15, 2026": "15 يوليو – 15 أغسطس 2026",
+  "1.4M weekly": "1.4 مليون أسبوعياً",
+  "790k weekly": "790 ألف أسبوعياً",
+  "620k weekly": "620 ألف أسبوعياً",
+  "Jul 04, 2026 · 18:00": "4 يوليو 2026 · 18:00",
+  "Jul 03, 2026 · 12:00": "3 يوليو 2026 · 12:00",
+  "Jul 05, 2026 · 20:00": "5 يوليو 2026 · 20:00",
+
+
+
   "Models online": "النماذج المتصلة",
   "Vision, language, anomaly": "رؤية، لغة، شذوذ",
   "Token spend": "استهلاك الرموز",
@@ -873,6 +982,7 @@ function App() {
   const [campaigns, setCampaigns] = useState<BidderCampaign[]>(seedBidderCampaigns);
   const [schedule, setSchedule] = useState<ScheduleItem[]>(seedSchedule);
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
+  const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
   const [toast, setToast] = useState("");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
@@ -923,6 +1033,35 @@ function App() {
     setPage("campaigns");
   }
 
+  function placeBid(payload: { lotId: string; amount: number; campaign: string }) {
+    const lot = auctions.find((item) => item.id === payload.lotId);
+    if (!lot) return;
+    const bidderName = profile?.name ?? "Bidder";
+    setAuctions((items) =>
+      items.map((item) =>
+        item.id === payload.lotId
+          ? {
+              ...item,
+              currentBid: payload.amount,
+              leadingBidder: bidderName,
+              bidCount: item.bidCount + 1,
+            }
+          : item,
+      ),
+    );
+    const campaign: BidderCampaign = {
+      id: `CMP-${campaigns.length + 260}`,
+      campaign: payload.campaign,
+      packageName: lot.packageName,
+      budget: `${lot.currency} ${payload.amount.toLocaleString("en-US")}`,
+      status: "Bidding",
+      reach: lot.impressions,
+      nextStep: `Auction closes ${lot.closesAt}`,
+    };
+    setCampaigns((items) => [campaign, ...items.filter((c) => !(c.campaign === payload.campaign && c.status === "Bidding"))]);
+    notify(`Bid placed on ${lot.lotName}`);
+  }
+
   if (!profile) {
     return (
       <I18nContext.Provider value={t}>
@@ -965,7 +1104,7 @@ function App() {
           {page === "financials" && <FinancialsPage t={t} />}
           {page === "lab" && <AiLabPage t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} t={t} />}
-          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} t={t} />}
+          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} t={t} />}
         </main>
         <MediaGptChatbot t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
@@ -1816,7 +1955,7 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
         <Metric label="Campaigns" value={String(campaigns.length)} helper="Bidder workspace" tone="info" />
         <Metric label="Live or published" value={String(campaigns.filter((item) => item.status === "Published").length)} helper="On network" tone="good" />
         <Metric label="In review" value={String(campaigns.filter((item) => item.status === "Submitted" || item.status === "In review").length)} helper="ADMO action" tone="warn" />
-        <Metric label="Estimated reach" value="2.2M" helper="Current portfolio" tone="neutral" />
+        <Metric label="Active bids" value={String(campaigns.filter((item) => item.status === "Bidding").length)} helper="Auctions in progress" tone="info" />
       </MetricGrid>
       <Panel icon={Megaphone} title={t("Campaigns")}>
         <div className="table-card">
@@ -1850,14 +1989,19 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
 
 function MarketplacePage({
   onSubmit,
+  onBid,
+  auctions,
   t,
 }: {
   onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string }) => void;
+  onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
+  auctions: AuctionLot[];
   t: (value: string) => string;
 }) {
   const [selected, setSelected] = useState(marketplacePackages[0]);
   const [campaign, setCampaign] = useState("Airport retail launch");
   const [budget, setBudget] = useState("AED 420,000");
+  const [mode, setMode] = useState<"auction" | "fixed">("auction");
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -1866,43 +2010,152 @@ function MarketplacePage({
 
   return (
     <PageBody>
-      <div className="split-grid wide-left">
-        <Panel icon={ShoppingBag} title={t("Marketplace")}>
-          <div className="package-grid">
-            {marketplacePackages.map((item) => (
-              <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
-                <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
-                <strong>{t(item.name)}</strong>
-                <span>{t(item.reach)}</span>
-                <small>{t(item.assets)}</small>
-                <em>{t(item.price)}</em>
-              </button>
+      <MetricGrid>
+        <Metric label="Open auctions" value={String(auctions.length)} helper="Live inventory lots" tone="info" />
+        <Metric
+          label="Highest bid"
+          value={`AED ${Math.max(...auctions.map((a) => a.currentBid)).toLocaleString("en-US")}`}
+          helper="Across current lots"
+          tone="good"
+        />
+        <Metric
+          label="Total bids"
+          value={String(auctions.reduce((sum, a) => sum + a.bidCount, 0))}
+          helper="This bidding cycle"
+          tone="neutral"
+        />
+        <Metric label="Fixed-rate packages" value={String(marketplacePackages.length)} helper="Buy without bidding" tone="warn" />
+      </MetricGrid>
+
+      <div className="segmented-tabs">
+        <button type="button" className={mode === "auction" ? "active" : ""} onClick={() => setMode("auction")}>
+          {t("Open auctions")}
+        </button>
+        <button type="button" className={mode === "fixed" ? "active" : ""} onClick={() => setMode("fixed")}>
+          {t("Fixed-rate packages")}
+        </button>
+      </div>
+
+      {mode === "auction" ? (
+        <Panel icon={ShoppingBag} title={t("Open auctions")}>
+          <div className="auction-grid">
+            {auctions.map((lot) => (
+              <AuctionCard key={lot.id} lot={lot} onBid={onBid} t={t} />
             ))}
           </div>
         </Panel>
-        <Panel icon={FileText} title={t("Submit campaign")}>
-          <form className="stack-form" onSubmit={submit}>
-            <label>
-              {t("Campaign name")}
-              <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
-            </label>
-            <label>
-              {t("Package")}
-              <input value={t(selected.name)} readOnly />
-            </label>
-            <label>
-              {t("Budget target")}
-              <input value={t(budget)} onChange={(event) => setBudget(event.target.value)} />
-            </label>
-            <label>
-              {t("Creative pack")}
-              <input value={t("Arabic and English creative uploaded")} readOnly />
-            </label>
-            <Button type="submit">{t("Submit campaign")}</Button>
-          </form>
-        </Panel>
-      </div>
+      ) : (
+        <div className="split-grid wide-left">
+          <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
+            <div className="package-grid">
+              {marketplacePackages.map((item) => (
+                <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
+                  <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
+                  <strong>{t(item.name)}</strong>
+                  <span>{t(item.reach)}</span>
+                  <small>{t(item.assets)}</small>
+                  <em>{t(item.price)}</em>
+                </button>
+              ))}
+            </div>
+          </Panel>
+          <Panel icon={FileText} title={t("Submit campaign")}>
+            <form className="stack-form" onSubmit={submit}>
+              <label>
+                {t("Campaign name")}
+                <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
+              </label>
+              <label>
+                {t("Package")}
+                <input value={t(selected.name)} readOnly />
+              </label>
+              <label>
+                {t("Budget target")}
+                <input value={t(budget)} onChange={(event) => setBudget(event.target.value)} />
+              </label>
+              <label>
+                {t("Creative pack")}
+                <input value={t("Arabic and English creative uploaded")} readOnly />
+              </label>
+              <Button type="submit">{t("Submit campaign")}</Button>
+            </form>
+          </Panel>
+        </div>
+      )}
     </PageBody>
+  );
+}
+
+function AuctionCard({
+  lot,
+  onBid,
+  t,
+}: {
+  lot: AuctionLot;
+  onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
+  t: (value: string) => string;
+}) {
+  const minNext = lot.currentBid + lot.minIncrement;
+  const [amount, setAmount] = useState<number>(minNext);
+  const [campaign, setCampaign] = useState(`Bid on ${lot.lotName}`);
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (amount < minNext) {
+      setError(`${t("Minimum bid")}: ${lot.currency} ${minNext.toLocaleString("en-US")}`);
+      return;
+    }
+    setError("");
+    onBid({ lotId: lot.id, amount, campaign });
+  }
+
+  return (
+    <form className="auction-card" onSubmit={submit}>
+      <div className="auction-card-head">
+        <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(lot.creativeId)}")` }} />
+        <div>
+          <strong>{t(lot.lotName)}</strong>
+          <span>{t(lot.network)}</span>
+          <small>{t(lot.flightWindow)} · {t(lot.impressions)}</small>
+        </div>
+      </div>
+      <div className="auction-stats">
+        <div>
+          <span>{t("Current bid")}</span>
+          <strong>{lot.currency} {lot.currentBid.toLocaleString("en-US")}</strong>
+          <small>{t("Leading")}: {t(lot.leadingBidder)}</small>
+        </div>
+        <div>
+          <span>{t("Floor")}</span>
+          <strong>{lot.currency} {lot.floorPrice.toLocaleString("en-US")}</strong>
+          <small>{lot.bidCount} {t("bids")}</small>
+        </div>
+        <div>
+          <span>{t("Closes")}</span>
+          <strong>{t(lot.closesAt)}</strong>
+          <small>{t("Min increment")}: {lot.currency} {lot.minIncrement.toLocaleString("en-US")}</small>
+        </div>
+      </div>
+      <div className="auction-form">
+        <label>
+          {t("Campaign name")}
+          <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
+        </label>
+        <label>
+          {t("Your bid")} ({lot.currency})
+          <input
+            type="number"
+            min={minNext}
+            step={lot.minIncrement}
+            value={amount}
+            onChange={(event) => setAmount(Number(event.target.value))}
+          />
+        </label>
+        <Button type="submit">{t("Place bid")}</Button>
+      </div>
+      {error ? <p className="auction-error">{error}</p> : null}
+    </form>
   );
 }
 
@@ -2257,6 +2510,7 @@ function campaignStatusTone(status: BidderCampaign["status"]): Tone {
   if (status === "Published") return "good";
   if (status === "Approved" || status === "Scheduled") return "info";
   if (status === "Submitted" || status === "In review") return "warn";
+  if (status === "Bidding") return "info";
   return "neutral";
 }
 
