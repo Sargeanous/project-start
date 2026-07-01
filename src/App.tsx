@@ -1468,6 +1468,11 @@ function CmsPage({
 
 function SubmissionDetail({ submission, onStage }: { submission: Submission; onStage: (id: string, stage: SubmissionStage) => void }) {
   const t = useT();
+  const approvalHash = shortHash(`${submission.id}-approval`);
+  const contentHash = shortHash(`${submission.id}-content`);
+  const highImpact = submission.priority === "High" || submission.budget.includes("civic") || submission.campaign.toLowerCase().includes("takeover");
+  const published = submission.stage === "Published";
+
   return (
     <div className="detail-stack">
       <div className="submission-hero">
@@ -1482,6 +1487,61 @@ function SubmissionDetail({ submission, onStage }: { submission: Submission; onS
       </div>
       <StageTracker stage={submission.stage} />
       <p className="notes">{t(submission.notes)}</p>
+
+      <div className="governance-row">
+        <article className="governance-card">
+          <header>
+            <BadgeCheck size={15} />
+            <span>{t("Named approver")}</span>
+          </header>
+          <strong>{t(submission.owner)}</strong>
+          <div className="gov-chips">
+            <span className="gov-chip">UAE PASS</span>
+            <span className="gov-chip">MFA</span>
+            {highImpact ? <span className="gov-chip dual">{t("Dual-control")}</span> : null}
+          </div>
+          <dl>
+            <div><dt>{t("Approval hash")}</dt><dd><code>{approvalHash}</code></dd></div>
+            <div><dt>{t("Content hash")}</dt><dd><code>{contentHash}</code></dd></div>
+          </dl>
+        </article>
+        <article className="governance-card">
+          <header>
+            <ShieldCheck size={15} />
+            <span>{t("AI screening")}</span>
+          </header>
+          <strong>{t("Cleared by MediaGPT Moderator")}</strong>
+          <ul className="gov-list">
+            <li><span>{t("Integrity")}</span><em>97%</em></li>
+            <li><span>{t("OCR AR/EN")}</span><em>{t("Passed")}</em></li>
+            <li><span>{t("Deepfake scan")}</span><em>{t("Clean")}</em></li>
+          </ul>
+        </article>
+        <article className="governance-card">
+          <header>
+            <FileCheck2 size={15} />
+            <span>{t("Proof-of-Play ledger")}</span>
+          </header>
+          {published ? (
+            <ul className="pop-ledger">
+              {[0, 1, 2].map((offset) => {
+                const block = shortHash(`${submission.id}-pop-${offset}`);
+                return (
+                  <li key={block}>
+                    <span className="pop-time">{`16:${(30 + offset * 4).toString().padStart(2, "0")}`}</span>
+                    <span className="pop-asset">AD-HWY-{(1 + offset).toString().padStart(3, "0")}</span>
+                    <code>{block}</code>
+                    <span className="pop-sig">TPM</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="gov-empty">{t("Evidence appears after Edge Play.")}</p>
+          )}
+        </article>
+      </div>
+
       <ActionRow>
         {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
         {submission.stage === "In review" && (
