@@ -308,6 +308,59 @@ const seedBidderCampaigns: BidderCampaign[] = [
   },
 ];
 
+const seedAuctions: AuctionLot[] = [
+  {
+    id: "LOT-4411",
+    lotName: "Corniche prime — evening rotation",
+    packageName: "Airport and premium roadside",
+    network: "12 panels · Corniche, Airport Road",
+    flightWindow: "Jul 20 – Aug 03, 2026",
+    impressions: "1.4M weekly",
+    floorPrice: 380000,
+    currentBid: 442000,
+    leadingBidder: "Yas Tourism",
+    minIncrement: 5000,
+    bidCount: 7,
+    closesAt: "Jul 04, 2026 · 18:00",
+    creativeId: "etihad-retail",
+    currency: "AED",
+  },
+  {
+    id: "LOT-4408",
+    lotName: "Downtown retail loop — weekend",
+    packageName: "Downtown retail loop",
+    network: "18 mall & urban panels",
+    flightWindow: "Jul 12 – Jul 26, 2026",
+    impressions: "790k weekly",
+    floorPrice: 150000,
+    currentBid: 168500,
+    leadingBidder: "Retail Majlis",
+    minIncrement: 2500,
+    bidCount: 4,
+    closesAt: "Jul 03, 2026 · 12:00",
+    creativeId: "mall-footfall",
+    currency: "AED",
+  },
+  {
+    id: "LOT-4402",
+    lotName: "Yas leisure loop — summer flight",
+    packageName: "Yas leisure loop",
+    network: "9 panels · Yas Island & hotel corridor",
+    flightWindow: "Jul 15 – Aug 15, 2026",
+    impressions: "620k weekly",
+    floorPrice: 210000,
+    currentBid: 210000,
+    leadingBidder: "No bids yet",
+    minIncrement: 5000,
+    bidCount: 0,
+    closesAt: "Jul 05, 2026 · 20:00",
+    creativeId: "yas-tourism",
+    currency: "AED",
+  },
+];
+
+
+
 const seedSchedule: ScheduleItem[] = [
   { id: "SCH-001", time: "08:00", asset: "AD-HWY-001", campaign: "Road safety rotation", owner: "ADMO", state: "Playing" },
   { id: "SCH-002", time: "09:30", asset: "AD-BUS-022", campaign: "Yas summer promotion", owner: "Yas Tourism", state: "Queued" },
