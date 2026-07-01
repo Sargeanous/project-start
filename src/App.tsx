@@ -2471,6 +2471,7 @@ function campaignStatusTone(status: BidderCampaign["status"]): Tone {
   if (status === "Published") return "good";
   if (status === "Approved" || status === "Scheduled") return "info";
   if (status === "Submitted" || status === "In review") return "warn";
+  if (status === "Bidding") return "info";
   return "neutral";
 }
 
