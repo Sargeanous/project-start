@@ -2781,3 +2781,275 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 @media (max-width: 720px) {
   .auction-form { grid-template-columns: 1fr; }
 }
+
+/* ===== PRD alignment: 8-stage lifecycle, governance, MediaGPT families ===== */
+
+.lifecycle-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  list-style: none;
+  padding: 10px;
+  margin: 0;
+  background: color-mix(in oklab, var(--bg-panel, #ffffff) 100%, transparent);
+  border: 1px solid var(--border-subtle, rgba(15, 42, 34, 0.08));
+  border-radius: 14px;
+}
+.lifecycle-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lifecycle-step .lifecycle-num {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--fg-muted, #64748b) 12%, transparent);
+  color: var(--fg-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+.lifecycle-step .lifecycle-label {
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--fg-muted, #64748b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lifecycle-step.done .lifecycle-num {
+  background: color-mix(in oklab, var(--primary, #1f4a3d) 15%, transparent);
+  color: var(--primary, #1f4a3d);
+}
+.lifecycle-step.done .lifecycle-label {
+  color: var(--fg-default, #1f2937);
+}
+.lifecycle-step.active {
+  background: color-mix(in oklab, var(--primary, #1f4a3d) 8%, transparent);
+  border-color: color-mix(in oklab, var(--primary, #1f4a3d) 25%, transparent);
+}
+.lifecycle-step.active .lifecycle-num {
+  background: var(--primary, #1f4a3d);
+  color: #fff;
+}
+.lifecycle-step.active .lifecycle-label {
+  color: var(--primary, #1f4a3d);
+  font-weight: 600;
+}
+@media (max-width: 900px) {
+  .lifecycle-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Governance row (approver, screening, PoP ledger) */
+.governance-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .governance-row { grid-template-columns: 1fr; }
+}
+.governance-card {
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(15, 42, 34, 0.08));
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.governance-card > header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted, #64748b);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.governance-card > strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-default, #1f2937);
+}
+.gov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gov-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary, #1f4a3d) 8%, transparent);
+  color: var(--primary, #1f4a3d);
+  letter-spacing: 0.03em;
+}
+.gov-chip.dual {
+  background: color-mix(in oklab, #b45309 14%, transparent);
+  color: #92400e;
+}
+.governance-card dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.governance-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.governance-card dt {
+  color: var(--fg-muted, #64748b);
+}
+.governance-card dd {
+  margin: 0;
+}
+.governance-card code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--fg-default, #1f2937) 6%, transparent);
+  color: var(--fg-default, #1f2937);
+}
+.gov-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 11.5px;
+}
+.gov-list li {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fg-muted, #64748b);
+}
+.gov-list em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--fg-default, #1f2937);
+}
+.gov-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted, #64748b);
+}
+.pop-ledger {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.pop-ledger li {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 11.5px;
+  padding: 4px 0;
+  border-bottom: 1px dashed color-mix(in oklab, var(--fg-muted, #64748b) 20%, transparent);
+}
+.pop-ledger li:last-child { border-bottom: 0; }
+.pop-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted, #64748b);
+}
+.pop-asset {
+  font-weight: 600;
+  color: var(--fg-default, #1f2937);
+}
+.pop-sig {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary, #1f4a3d) 12%, transparent);
+  color: var(--primary, #1f4a3d);
+  letter-spacing: 0.06em;
+}
+
+/* MediaGPT six-family grid */
+.family-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1200px) {
+  .family-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .family-grid { grid-template-columns: 1fr; }
+}
+.family-card {
+  background: var(--bg-panel, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(15, 42, 34, 0.08));
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.family-card > header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.family-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--primary, #1f4a3d) 10%, transparent);
+  color: var(--primary, #1f4a3d);
+}
+.family-card header > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.family-card header strong { font-size: 15px; font-weight: 600; color: var(--fg-default, #1f2937); }
+.family-card header small { font-size: 11.5px; color: var(--fg-muted, #64748b); line-height: 1.35; }
+.boundary-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.boundary-badge.tone-info { background: color-mix(in oklab, #2563eb 12%, transparent); color: #1d4ed8; }
+.boundary-badge.tone-neutral { background: color-mix(in oklab, #64748b 14%, transparent); color: #475569; }
+.boundary-badge.tone-warn { background: color-mix(in oklab, #b45309 14%, transparent); color: #92400e; }
+.boundary-badge.tone-danger { background: color-mix(in oklab, #b91c1c 12%, transparent); color: #991b1b; }
+.family-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agent-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--fg-default, #1f2937) 6%, transparent);
+  color: var(--fg-default, #1f2937);
+  font-weight: 500;
+}
+
+/* RTL flip for lifecycle strip */
+html[dir="rtl"] .lifecycle-strip { direction: rtl; }

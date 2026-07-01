@@ -30,6 +30,11 @@ import {
   Search,
   Send,
   ShieldAlert,
+  ShieldCheck,
+  Eye,
+  Lightbulb,
+  PenTool,
+  Terminal,
   ShoppingBag,
   Sparkles,
   Upload,
@@ -227,6 +232,33 @@ const navGroups: NavGroup[] = [
 ];
 
 const stageOrder: SubmissionStage[] = ["Submitted", "In review", "Approved", "Scheduled", "Published"];
+
+const lifecycleStages = [
+  "Submission",
+  "AI Screening",
+  "Human Moderation",
+  "Scheduling",
+  "Distribution",
+  "Edge Play",
+  "Proof-of-Play",
+  "Reconciliation",
+] as const;
+
+function lifecycleIndex(stage: SubmissionStage): number {
+  if (stage === "Submitted") return 0;
+  if (stage === "In review") return 2;
+  if (stage === "Changes requested") return 2;
+  if (stage === "Approved") return 3;
+  if (stage === "Scheduled") return 4;
+  if (stage === "Published") return 6;
+  return 0;
+}
+
+function shortHash(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, "0").slice(0, 8);
+}
 
 const seedSubmissions: Submission[] = [
   {
@@ -951,7 +983,59 @@ const translations: Record<string, string> = {
   "Waiting for ADMO review": "بانتظار مراجعة مكتب أبوظبي الإعلامي",
   "Content screening": "فحص المحتوى",
   "Awaiting publish": "بانتظار النشر",
-  "Revise creative pack": "تعديل حزمة التصميم"
+  "Revise creative pack": "تعديل حزمة التصميم",
+
+  "Content lifecycle": "دورة حياة المحتوى",
+  "Submission": "التقديم",
+  "AI Screening": "الفحص بالذكاء الاصطناعي",
+  "Human Moderation": "المراجعة البشرية",
+  
+  "Distribution": "التوزيع",
+  "Edge Play": "التشغيل على الحافة",
+  "Proof-of-Play": "إثبات التشغيل",
+  "Reconciliation": "التسوية",
+
+  "Named approver": "المعتمد المحدد",
+  "Approval hash": "بصمة الاعتماد",
+  "Content hash": "بصمة المحتوى",
+  "Dual-control": "تحكم مزدوج",
+  "AI screening": "فحص الذكاء الاصطناعي",
+  "Cleared by MediaGPT Moderator": "تم الفحص بواسطة مشرف MediaGPT",
+  "Integrity": "السلامة",
+  "OCR AR/EN": "التعرف الضوئي عربي/إنجليزي",
+  "Passed": "ناجح",
+  "Deepfake scan": "فحص التزييف العميق",
+  "Clean": "نظيف",
+  "Proof-of-Play ledger": "سجل إثبات التشغيل",
+  "Evidence appears after Edge Play.": "تظهر الأدلة بعد التشغيل على الحافة.",
+
+  "Families": "العائلات",
+  "Discover, Command, Create, Protect, Optimize, Safeguard": "الاكتشاف، التنفيذ، الإنشاء، الحماية، التحسين، الحراسة",
+  "Arabic parity": "التكافؤ العربي",
+  "Bilingual QA on outputs": "فحص ثنائي اللغة للمخرجات",
+  
+  "Optimize": "التحسين",
+  "Safeguard": "الحراسة",
+  "Natural-language search across campaigns, assets, and archives.": "بحث بلغة طبيعية عبر الحملات والأصول والأرشيف.",
+  "Compose workflows across scheduling, targeting, and distribution.": "بناء تدفقات العمل عبر الجدولة والاستهداف والتوزيع.",
+  "Generative studio for civic messaging in Arabic and English.": "استوديو توليدي للرسائل المدنية بالعربية والإنجليزية.",
+  "Content moderation, deepfake detection, and rights checks.": "الإشراف على المحتوى، الكشف عن التزييف العميق، وفحص الحقوق.",
+  "Yield, slot allocation, and dynamic pricing recommendations.": "توصيات العائد وتوزيع الفترات والتسعير الديناميكي.",
+  "Edge, CMS and network anomaly detection with audit trails.": "كشف الشذوذ في الحافة وإدارة المحتوى والشبكة مع سجلات التدقيق.",
+  "Read-only": "قراءة فقط",
+  "Recommend": "توصية",
+  "Execute with approval": "تنفيذ بعد الاعتماد",
+  "Never modify": "لا يعدل أبداً",
+  "Archive NLQ": "استعلام أرشيفي بلغة طبيعية",
+  "Workflow Composer": "منشئ تدفقات العمل",
+  "Targeting Assistant": "مساعد الاستهداف",
+  "DCO Adapter": "محول DCO",
+  "Yield Advisor": "مستشار العائد",
+  "Drift Monitor": "مراقب الانحراف",
+  "Where can we lift airport-loop yield without cannibalising civic slots?": "أين يمكن رفع عائد مسار المطار دون التأثير على الفترات المدنية؟",
+  "Reallocate 6 evening slots on AD-APT-{003,007} to premium retail. Projected uplift AED 42,000 / week. No civic conflict.": "إعادة توزيع 6 فترات مسائية على AD-APT-{003,007} لتجزئة مميزة. ارتفاع متوقع 42,000 درهم/أسبوع. لا يوجد تعارض مدني.",
+  "Anything unusual on the network in the last 24h?": "هل من شيء غير معتاد على الشبكة خلال 24 ساعة؟",
+  "2 anomalies: latency spike on AD-BRG-014 (23:04, resolved), signed model drift within tolerance on Moderator v1.4.": "شذوذان: ارتفاع زمن الاستجابة على AD-BRG-014 (23:04، تم الحل)، انحراف نموذج موقّع ضمن الحدود لمشرف v1.4."
 };
 
 const I18nContext = createContext<Translator>((value) => value);
@@ -1441,6 +1525,11 @@ function CmsPage({
 
 function SubmissionDetail({ submission, onStage }: { submission: Submission; onStage: (id: string, stage: SubmissionStage) => void }) {
   const t = useT();
+  const approvalHash = shortHash(`${submission.id}-approval`);
+  const contentHash = shortHash(`${submission.id}-content`);
+  const highImpact = submission.priority === "High" || submission.budget.includes("civic") || submission.campaign.toLowerCase().includes("takeover");
+  const published = submission.stage === "Published";
+
   return (
     <div className="detail-stack">
       <div className="submission-hero">
@@ -1455,6 +1544,61 @@ function SubmissionDetail({ submission, onStage }: { submission: Submission; onS
       </div>
       <StageTracker stage={submission.stage} />
       <p className="notes">{t(submission.notes)}</p>
+
+      <div className="governance-row">
+        <article className="governance-card">
+          <header>
+            <BadgeCheck size={15} />
+            <span>{t("Named approver")}</span>
+          </header>
+          <strong>{t(submission.owner)}</strong>
+          <div className="gov-chips">
+            <span className="gov-chip">UAE PASS</span>
+            <span className="gov-chip">MFA</span>
+            {highImpact ? <span className="gov-chip dual">{t("Dual-control")}</span> : null}
+          </div>
+          <dl>
+            <div><dt>{t("Approval hash")}</dt><dd><code>{approvalHash}</code></dd></div>
+            <div><dt>{t("Content hash")}</dt><dd><code>{contentHash}</code></dd></div>
+          </dl>
+        </article>
+        <article className="governance-card">
+          <header>
+            <ShieldCheck size={15} />
+            <span>{t("AI screening")}</span>
+          </header>
+          <strong>{t("Cleared by MediaGPT Moderator")}</strong>
+          <ul className="gov-list">
+            <li><span>{t("Integrity")}</span><em>97%</em></li>
+            <li><span>{t("OCR AR/EN")}</span><em>{t("Passed")}</em></li>
+            <li><span>{t("Deepfake scan")}</span><em>{t("Clean")}</em></li>
+          </ul>
+        </article>
+        <article className="governance-card">
+          <header>
+            <FileCheck2 size={15} />
+            <span>{t("Proof-of-Play ledger")}</span>
+          </header>
+          {published ? (
+            <ul className="pop-ledger">
+              {[0, 1, 2].map((offset) => {
+                const block = shortHash(`${submission.id}-pop-${offset}`);
+                return (
+                  <li key={block}>
+                    <span className="pop-time">{`16:${(30 + offset * 4).toString().padStart(2, "0")}`}</span>
+                    <span className="pop-asset">AD-HWY-{(1 + offset).toString().padStart(3, "0")}</span>
+                    <code>{block}</code>
+                    <span className="pop-sig">TPM</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="gov-empty">{t("Evidence appears after Edge Play.")}</p>
+          )}
+        </article>
+      </div>
+
       <ActionRow>
         {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
         {submission.stage === "In review" && (
@@ -1793,67 +1937,121 @@ function KanbanBoard() {
   );
 }
 
-function MediaGptSuite({ t }: { t: (value: string) => string }) {
-  const agents = [
-    ["MediaGPT Moderator", "Screens creative, flags OCR, deepfake and cultural risks.", "Mandatory"],
-    ["MediaGPT Compliance Agent", "Routes named approvers and policy checks.", "Mandatory"],
-    ["MediaGPT Studio", "Creates and adapts panel formats in Arabic and English.", "Advanced"],
-    ["MediaGPT Sentinel", "Detects edge, CMS and network anomalies.", "Mandatory"],
-    ["MediaGPT Optimizer", "Optimizes yield, slot allocation and dynamic pricing.", "Optional"],
-    ["MediaGPT Insights", "Answers natural-language questions across campaigns and assets.", "Advanced"],
-  ];
+type Boundary = "Read-only" | "Recommend" | "Execute with approval" | "Never modify";
 
+type MediaGptFamily = {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  tagline: string;
+  boundary: Boundary;
+  agents: string[];
+  prompt: string;
+  output: string;
+};
+
+const mediaGptFamilies: MediaGptFamily[] = [
+  {
+    id: "discover",
+    name: "Discover",
+    icon: Search,
+    tagline: "Natural-language search across campaigns, assets, and archives.",
+    boundary: "Read-only",
+    agents: ["MediaGPT Insights", "Archive NLQ"],
+    prompt: "When did Coca-Cola last advertise on Yas Island, and what was the contract value?",
+    output: "Last Yas Island placement: Aug 2024. Contract value AED 268,500. Most recent estate placement: Mar 2025, Maqta Bridge.",
+  },
+  {
+    id: "command",
+    name: "Command",
+    icon: Terminal,
+    tagline: "Compose workflows across scheduling, targeting, and distribution.",
+    boundary: "Execute with approval",
+    agents: ["Workflow Composer", "Targeting Assistant"],
+    prompt: "Select all parking assets within 1 km of ADNEC and push a weekday morning campaign.",
+    output: "Workflow prepared: resolve geography, select approved creative, set schedule, run governance check, save reusable task.",
+  },
+  {
+    id: "create",
+    name: "Create",
+    icon: PenTool,
+    tagline: "Generative studio for civic messaging in Arabic and English.",
+    boundary: "Recommend",
+    agents: ["MediaGPT Studio", "DCO Adapter"],
+    prompt: "Make-it-in-the-Emirates, desert sunrise, Arabic first, civic tone.",
+    output: "Three bilingual concepts generated and adapted to 6:1, 9:16, 1:1 and 3:4 panels.",
+  },
+  {
+    id: "protect",
+    name: "Protect",
+    icon: ShieldCheck,
+    tagline: "Content moderation, deepfake detection, and rights checks.",
+    boundary: "Never modify",
+    agents: ["MediaGPT Moderator", "MediaGPT Compliance Agent"],
+    prompt: "Check authenticity, rights and cultural soundness for CR-90421.",
+    output: "Integrity score 97%. No manipulation detected. Copyright match requires named approver review.",
+  },
+  {
+    id: "optimize",
+    name: "Optimize",
+    icon: Lightbulb,
+    tagline: "Yield, slot allocation, and dynamic pricing recommendations.",
+    boundary: "Recommend",
+    agents: ["MediaGPT Optimizer", "Yield Advisor"],
+    prompt: "Where can we lift airport-loop yield without cannibalising civic slots?",
+    output: "Reallocate 6 evening slots on AD-APT-{003,007} to premium retail. Projected uplift AED 42,000 / week. No civic conflict.",
+  },
+  {
+    id: "safeguard",
+    name: "Safeguard",
+    icon: Eye,
+    tagline: "Edge, CMS and network anomaly detection with audit trails.",
+    boundary: "Read-only",
+    agents: ["MediaGPT Sentinel", "Drift Monitor"],
+    prompt: "Anything unusual on the network in the last 24h?",
+    output: "2 anomalies: latency spike on AD-BRG-014 (23:04, resolved), signed model drift within tolerance on Moderator v1.4.",
+  },
+];
+
+function boundaryTone(boundary: Boundary): Tone {
+  if (boundary === "Read-only") return "info";
+  if (boundary === "Recommend") return "neutral";
+  if (boundary === "Execute with approval") return "warn";
+  return "danger";
+}
+
+function MediaGptSuite({ t }: { t: (value: string) => string }) {
   return (
     <PageBody>
       <MetricGrid>
-        <Metric label="Agents active" value="8" helper="Governed platform agents" tone="good" />
-        <Metric label="Saved outputs" value="42" helper="Dashboards, tables, drafts" tone="info" />
+        <Metric label="Agents active" value="12" helper="Governed platform agents" tone="good" />
+        <Metric label="Families" value="6" helper="Discover, Command, Create, Protect, Optimize, Safeguard" tone="info" />
         <Metric label="Human approvals" value="11" helper="Required before execution" tone="warn" />
-        <Metric label="Arabic QA" value="98%" helper="Copy parity checks" tone="good" />
+        <Metric label="Arabic parity" value="98%" helper="Bilingual QA on outputs" tone="good" />
       </MetricGrid>
 
-      <Panel icon={Bot} title="Agents">
-        <div className="agent-grid">
-          {agents.map(([name, body, badge]) => (
-            <article key={name} className="agent-card">
-              <div>
-                <Sparkles size={18} />
-                <StatusPill label={badge} tone={badge === "Mandatory" ? "good" : "info"} />
+      <div className="family-grid">
+        {mediaGptFamilies.map((family) => {
+          const Icon = family.icon;
+          return (
+            <article key={family.id} className="family-card">
+              <header>
+                <span className="family-icon"><Icon size={18} /></span>
+                <div>
+                  <strong>{t(family.name)}</strong>
+                  <small>{t(family.tagline)}</small>
+                </div>
+                <span className={`boundary-badge tone-${boundaryTone(family.boundary)}`}>{t(family.boundary)}</span>
+              </header>
+              <div className="family-agents">
+                {family.agents.map((agent) => (
+                  <span key={agent} className="agent-chip">{t(agent)}</span>
+                ))}
               </div>
-              <strong>{t(name)}</strong>
-              <p>{t(body)}</p>
+              <MediaGptPrompt prompt={family.prompt} output={family.output} />
             </article>
-          ))}
-        </div>
-      </Panel>
-
-      <div className="split-grid equal">
-        <Panel icon={Search} title="Discover">
-          <MediaGptPrompt
-            prompt="When did Coca-Cola last advertise on Yas Island, and what was the contract value?"
-            output="Last Yas Island placement: Aug 2024. Contract value AED 268,500. Most recent estate placement: Mar 2025, Maqta Bridge."
-          />
-        </Panel>
-        <Panel icon={Workflow} title="Command">
-          <MediaGptPrompt
-            prompt="Select all parking assets within 1 km of ADNEC and push a weekday morning campaign."
-            output="Workflow prepared: resolve geography, select approved creative, set schedule, run governance check, save reusable task."
-          />
-        </Panel>
-      </div>
-      <div className="split-grid equal">
-        <Panel icon={Zap} title="Create">
-          <MediaGptPrompt
-            prompt="Make-it-in-the-Emirates, desert sunrise, Arabic first, civic tone."
-            output="Three bilingual concepts generated and adapted to 6:1, 9:16, 1:1 and 3:4 panels."
-          />
-        </Panel>
-        <Panel icon={BadgeCheck} title="Protect">
-          <MediaGptPrompt
-            prompt="Check authenticity, rights and cultural soundness for CR-90421."
-            output="Integrity score 97%. No manipulation detected. Copyright match requires named approver review."
-          />
-        </Panel>
+          );
+        })}
       </div>
     </PageBody>
   );
@@ -2315,15 +2513,19 @@ function StatusPill({ label, tone }: { label: string; tone: Tone }) {
 
 function StageTracker({ stage }: { stage: SubmissionStage }) {
   const t = useT();
-  const currentIndex = stageOrder.indexOf(stage);
+  const current = lifecycleIndex(stage);
   return (
-    <div className="stage-tracker">
-      {stageOrder.map((item, index) => (
-        <span key={item} className={index <= currentIndex ? "complete" : ""}>
-          {t(item)}
-        </span>
-      ))}
-    </div>
+    <ol className="lifecycle-strip" aria-label={t("Content lifecycle")}>
+      {lifecycleStages.map((item, index) => {
+        const state = index < current ? "done" : index === current ? "active" : "pending";
+        return (
+          <li key={item} className={`lifecycle-step ${state}`}>
+            <span className="lifecycle-num">{index + 1}</span>
+            <span className="lifecycle-label">{t(item)}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
