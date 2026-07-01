@@ -52,6 +52,7 @@ import {
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
 import admoLogo from "./assets/admo-logo.png";
+import "../dooh-styles.css";
 
 type Page =
   | "control"
