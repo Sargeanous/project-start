@@ -2426,7 +2426,7 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
 
       <div className="workbench-grid">
         <aside className="agent-rail" aria-label={t("Agents")}>
-          <div className="agent-rail-title">{t("Agent families")}</div>
+          <div className="agent-rail-title">{t("Agents")}</div>
           {mediaGptAgents.map((a) => {
             const Icon = a.icon;
             return (
