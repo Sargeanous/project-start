@@ -25,6 +25,7 @@ import {
   MapPinned,
   Megaphone,
   MonitorPlay,
+  Maximize2,
   PlugZap,
   RadioTower,
   RefreshCcw,
@@ -609,6 +610,8 @@ const translations: Record<string, string> = {
   "Continue": "متابعة",
   "Submit to ADMO": "إرسال إلى أدمو",
   "Close": "إغلاق",
+  "Full screen": "ملء الشاشة",
+  "Close full screen": "إغلاق ملء الشاشة",
   "Corniche": "الكورنيش",
   "Downtown": "وسط المدينة",
   "Yas Island": "جزيرة ياس",
@@ -1686,11 +1689,28 @@ function ControlCentre({
   t: (value: string) => string;
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
+  const [liveViewFullscreen, setLiveViewFullscreen] = useState(false);
   const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? estateAssets[0];
   const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
   const queuedCount = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled").length;
   const zoneStats = useMemo(() => summarizeZones(estateAssets), []);
   const openAlarmAssetIds = tickets.filter((ticket) => ticket.status !== "Resolved").map((ticket) => ticket.asset);
+
+  useEffect(() => {
+    if (!liveViewFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setLiveViewFullscreen(false);
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [liveViewFullscreen]);
 
   return (
     <PageBody>
@@ -1738,7 +1758,11 @@ function ControlCentre({
             t={t}
           />
         </Panel>
-        <Panel icon={MonitorPlay} title="Live view">
+        <Panel
+          icon={MonitorPlay}
+          title="Live view"
+          action={<Button icon={Maximize2} variant="secondary" onClick={() => setLiveViewFullscreen(true)}>Full screen</Button>}
+        >
           <LiveView asset={selectedAsset} />
         </Panel>
       </div>
@@ -1769,6 +1793,9 @@ function ControlCentre({
           ))}
         </div>
       </Panel>
+      {liveViewFullscreen ? (
+        <LiveViewFullscreen asset={selectedAsset} onClose={() => setLiveViewFullscreen(false)} />
+      ) : null}
     </PageBody>
   );
 }
@@ -3513,6 +3540,36 @@ function LiveView({ asset }: { asset: Asset }) {
         <Detail label="POP" value={asset.pop} />
         <Detail label="Next slot" value={asset.nextSlot} />
       </div>
+    </div>
+  );
+}
+
+function LiveViewFullscreen({ asset, onClose }: { asset: Asset; onClose: () => void }) {
+  const t = useT();
+
+  return (
+    <div
+      className="live-view-fullscreen"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("Live view")}
+      onClick={(event) => {
+        if (event.currentTarget === event.target) onClose();
+      }}
+    >
+      <section className="live-view-fullscreen-panel">
+        <header className="live-view-fullscreen-header">
+          <div>
+            <span>{t("Live view")}</span>
+            <h2>{t(asset.name)}</h2>
+            <p>{asset.id} / {t(asset.type)} / {asset.controller}</p>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label={t("Close full screen")}>
+            <X size={18} />
+          </button>
+        </header>
+        <LiveView asset={asset} />
+      </section>
     </div>
   );
 }

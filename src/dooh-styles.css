@@ -705,6 +705,76 @@ html[dir="rtl"] .metric::before {
   gap: 14px;
 }
 
+.live-view-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(7, 16, 20, 0.76);
+}
+
+.live-view-fullscreen-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(1280px, 100%);
+  max-height: calc(100vh - 48px);
+  min-height: min(760px, calc(100vh - 48px));
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.live-view-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.live-view-fullscreen-header span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.live-view-fullscreen-header h2 {
+  margin: 4px 0;
+  color: var(--ink);
+  font-size: clamp(22px, 2vw, 34px);
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.live-view-fullscreen-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.live-view-fullscreen .live-view {
+  min-height: 0;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.live-view-fullscreen .feed-frame {
+  min-height: 0;
+  height: 100%;
+  border-radius: var(--radius);
+}
+
+.live-view-fullscreen .detail-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .feed-frame,
 .creative-frame {
   position: relative;
@@ -1569,6 +1639,19 @@ select:focus {
   .live-map {
     height: 360px;
   }
+
+  .live-view-fullscreen {
+    padding: 14px;
+  }
+
+  .live-view-fullscreen-panel {
+    max-height: calc(100vh - 28px);
+    min-height: calc(100vh - 28px);
+  }
+
+  .live-view-fullscreen .detail-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -1594,6 +1677,25 @@ select:focus {
   .panel-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .live-view-fullscreen {
+    padding: 8px;
+  }
+
+  .live-view-fullscreen-panel {
+    gap: 12px;
+    max-height: calc(100vh - 16px);
+    min-height: calc(100vh - 16px);
+    padding: 12px;
+  }
+
+  .live-view-fullscreen-header {
+    align-items: flex-start;
+  }
+
+  .live-view-fullscreen .detail-cards {
+    grid-template-columns: 1fr;
   }
 
   .zone-list button,
