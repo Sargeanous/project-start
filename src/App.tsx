@@ -1133,7 +1133,20 @@ function ControlCentre({
         <Metric label={t("Queued campaigns")} value={String(queuedCount)} helper="Approved or scheduled" tone="info" />
       </MetricGrid>
 
-      <div className="split-grid wide-left">
+      <div className="split-grid map-zones">
+        <Panel icon={Building2} title={t("Zones")}>
+          <div className="zone-list">
+            {zoneStats.map((zone) => (
+              <button key={zone.name} type="button" onClick={() => setSelectedAssetId(zone.firstAssetId)}>
+                <span>
+                  <strong>{t(zone.name)}</strong>
+                  <small>{zone.live} {t("live")}, {zone.issue} {t("need attention")}</small>
+                </span>
+                <em>{zone.total}</em>
+              </button>
+            ))}
+          </div>
+        </Panel>
         <Panel icon={MapPinned} title={t("Live map")} action={<Legend />}>
           <LiveMap
             assets={estateAssets}
@@ -1148,32 +1161,17 @@ function ControlCentre({
         </Panel>
       </div>
 
-      <div className="split-grid equal">
-        <Panel icon={Building2} title={t("Zones")}>
-          <div className="zone-list">
-            {zoneStats.map((zone) => (
-              <button key={zone.name} type="button" onClick={() => setSelectedAssetId(zone.firstAssetId)}>
-                <span>
-                  <strong>{t(zone.name)}</strong>
-                  <small>{zone.live} {t("live")}, {zone.issue} {t("need attention")}</small>
-                </span>
-                <em>{zone.total}</em>
-              </button>
-            ))}
-          </div>
-        </Panel>
-        <Panel icon={AlertTriangle} title={t("Open alarms")}>
-          <ObjectList
-            rows={tickets.map((ticket) => ({
-              id: ticket.id,
-              title: ticket.title,
-              meta: `${ticket.asset} / ${ticket.team}`,
-              tone: severityTone(ticket.severity),
-              status: ticket.status,
-            }))}
-          />
-        </Panel>
-      </div>
+      <Panel icon={AlertTriangle} title={t("Open alarms")}>
+        <ObjectList
+          rows={tickets.map((ticket) => ({
+            id: ticket.id,
+            title: ticket.title,
+            meta: `${ticket.asset} / ${ticket.team}`,
+            tone: severityTone(ticket.severity),
+            status: ticket.status,
+          }))}
+        />
+      </Panel>
 
       <Panel icon={Layers3} title={t("Asset board")}>
         <div className="asset-board">
