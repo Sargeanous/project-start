@@ -1735,6 +1735,21 @@ function ControlCentre({
         <Metric label={t("Queued campaigns")} value={String(queuedCount)} helper="Approved or scheduled" tone="info" />
       </MetricGrid>
 
+      <Panel icon={Layers3} title={t("Asset board")}>
+        <div className="asset-board">
+          {published.map((item) => (
+            <article key={item.id} className="asset-tile">
+              <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
+              <div>
+                <strong>{item.asset}</strong>
+                <span>{t(item.campaign)}</span>
+              </div>
+              <StatusPill label="Playing" tone="good" />
+            </article>
+          ))}
+        </div>
+      </Panel>
+
       <section className="control-estate-group" aria-label={t("Live estate map")}>
         <header className="control-estate-group-header">
           <div>
@@ -1786,21 +1801,6 @@ function ControlCentre({
             status: ticket.status,
           }))}
         />
-      </Panel>
-
-      <Panel icon={Layers3} title={t("Asset board")}>
-        <div className="asset-board">
-          {published.map((item) => (
-            <article key={item.id} className="asset-tile">
-              <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
-              <div>
-                <strong>{item.asset}</strong>
-                <span>{t(item.campaign)}</span>
-              </div>
-              <StatusPill label="Playing" tone="good" />
-            </article>
-          ))}
-        </div>
       </Panel>
       {liveViewFullscreen ? (
         <LiveViewFullscreen asset={selectedAsset} onClose={() => setLiveViewFullscreen(false)} />
