@@ -2342,15 +2342,19 @@ function StatusPill({ label, tone }: { label: string; tone: Tone }) {
 
 function StageTracker({ stage }: { stage: SubmissionStage }) {
   const t = useT();
-  const currentIndex = stageOrder.indexOf(stage);
+  const current = lifecycleIndex(stage);
   return (
-    <div className="stage-tracker">
-      {stageOrder.map((item, index) => (
-        <span key={item} className={index <= currentIndex ? "complete" : ""}>
-          {t(item)}
-        </span>
-      ))}
-    </div>
+    <ol className="lifecycle-strip" aria-label={t("Content lifecycle")}>
+      {lifecycleStages.map((item, index) => {
+        const state = index < current ? "done" : index === current ? "active" : "pending";
+        return (
+          <li key={item} className={`lifecycle-step ${state}`}>
+            <span className="lifecycle-num">{index + 1}</span>
+            <span className="lifecycle-label">{t(item)}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
