@@ -1410,7 +1410,7 @@ function LoginScreen({
       </section>
       <div className="powered-by powered-by--login">
         <span>{t("Powered by")}</span>
-        <img src={origenLogo} alt="Origen" width={16} height={16} loading="lazy" />
+        <img src={origenLogo} alt="Origen" width={18} height={18} loading="lazy" />
         <strong>Origen</strong>
       </div>
     </main>
