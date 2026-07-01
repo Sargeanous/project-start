@@ -1198,6 +1198,7 @@ function App() {
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
   const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toast, setToast] = useState("");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
