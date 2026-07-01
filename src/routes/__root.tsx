@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ADMO Unified DOOH Platform" },
+      { title: "Unified DOOH Platform" },
       { name: "description", content: "Standalone DOOH operating platform frontend" },
       { name: "author", content: "Origen" },
       { property: "og:title", content: "ADMO Unified DOOH Platform" },
