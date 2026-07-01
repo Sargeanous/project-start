@@ -3360,3 +3360,32 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .agent-rail::-webkit-scrollbar { width: 6px; }
 .agent-rail::-webkit-scrollbar-thumb { background: rgba(15,42,34,0.15); border-radius: 3px; }
 .workbench-grid { align-items: start; }
+
+/* Powered by Origen */
+.powered-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.powered-by img { display: block; width: 14px; height: 14px; object-fit: contain; }
+.powered-by strong { font-weight: 600; color: var(--text); letter-spacing: 0.01em; }
+.powered-by--login {
+  position: absolute;
+  bottom: 20px;
+  inset-inline-start: 28px;
+}
+.login-screen { position: relative; }
+.powered-by--sidebar {
+  margin-top: 4px;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+.app.sidebar-collapsed .powered-by--sidebar span,
+.app.sidebar-collapsed .powered-by--sidebar strong { display: none; }
+.app.sidebar-collapsed .powered-by--sidebar { justify-content: center; padding: 8px 0 0; }
+.powered-by--sidebar { color: var(--ink-2, #3a463f); font-size: 12px; padding: 10px 6px 4px; }
+.powered-by--sidebar strong { color: var(--ink, #17251f); font-weight: 600; }

@@ -65,6 +65,7 @@ import {
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
 import admoLogo from "./assets/admo-logo.png";
+import origenLogo from "./assets/origen-logo.png";
 import "./dooh-styles.css";
 
 type Page =
@@ -575,6 +576,7 @@ const translations: Record<string, string> = {
   "Access profile": "ملف الدخول",
   "Choose who is using the platform. The sidebar and workflow are permissioned from this point.": "اختر ملف المستخدم. ستظهر القوائم وسير العمل حسب الصلاحيات من هذه النقطة.",
   "Switch profile": "تغيير الملف",
+  "Powered by": "مشغّل بواسطة",
   "Control Centre": "مركز التحكم",
   "CMS": "إدارة المحتوى",
   "Alerts and Emergencies": "التنبيهات والطوارئ",
@@ -1406,6 +1408,11 @@ function LoginScreen({
           ))}
         </div>
       </section>
+      <div className="powered-by powered-by--login">
+        <span>{t("Powered by")}</span>
+        <img src={origenLogo} alt="Origen" width={16} height={16} loading="lazy" />
+        <strong>Origen</strong>
+      </div>
     </main>
   );
 }
@@ -1476,6 +1483,11 @@ function Sidebar({
         <LogOut size={17} />
         {t("Switch profile")}
       </button>
+      <div className="powered-by powered-by--sidebar">
+        <span>{t("Powered by")}</span>
+        <img src={origenLogo} alt="Origen" width={14} height={14} loading="lazy" />
+        <strong>Origen</strong>
+      </div>
     </aside>
   );
 }
