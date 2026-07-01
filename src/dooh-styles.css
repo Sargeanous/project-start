@@ -1105,7 +1105,7 @@ select:focus {
   align-items: start;
 }
 
-.verification-step > span {
+.verification-step > span:not(.status-pill) {
   grid-column: 1;
   grid-row: 1;
   width: 30px;
