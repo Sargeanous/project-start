@@ -1885,67 +1885,121 @@ function KanbanBoard() {
   );
 }
 
-function MediaGptSuite({ t }: { t: (value: string) => string }) {
-  const agents = [
-    ["MediaGPT Moderator", "Screens creative, flags OCR, deepfake and cultural risks.", "Mandatory"],
-    ["MediaGPT Compliance Agent", "Routes named approvers and policy checks.", "Mandatory"],
-    ["MediaGPT Studio", "Creates and adapts panel formats in Arabic and English.", "Advanced"],
-    ["MediaGPT Sentinel", "Detects edge, CMS and network anomalies.", "Mandatory"],
-    ["MediaGPT Optimizer", "Optimizes yield, slot allocation and dynamic pricing.", "Optional"],
-    ["MediaGPT Insights", "Answers natural-language questions across campaigns and assets.", "Advanced"],
-  ];
+type Boundary = "Read-only" | "Recommend" | "Execute with approval" | "Never modify";
 
+type MediaGptFamily = {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  tagline: string;
+  boundary: Boundary;
+  agents: string[];
+  prompt: string;
+  output: string;
+};
+
+const mediaGptFamilies: MediaGptFamily[] = [
+  {
+    id: "discover",
+    name: "Discover",
+    icon: Search,
+    tagline: "Natural-language search across campaigns, assets, and archives.",
+    boundary: "Read-only",
+    agents: ["MediaGPT Insights", "Archive NLQ"],
+    prompt: "When did Coca-Cola last advertise on Yas Island, and what was the contract value?",
+    output: "Last Yas Island placement: Aug 2024. Contract value AED 268,500. Most recent estate placement: Mar 2025, Maqta Bridge.",
+  },
+  {
+    id: "command",
+    name: "Command",
+    icon: Terminal,
+    tagline: "Compose workflows across scheduling, targeting, and distribution.",
+    boundary: "Execute with approval",
+    agents: ["Workflow Composer", "Targeting Assistant"],
+    prompt: "Select all parking assets within 1 km of ADNEC and push a weekday morning campaign.",
+    output: "Workflow prepared: resolve geography, select approved creative, set schedule, run governance check, save reusable task.",
+  },
+  {
+    id: "create",
+    name: "Create",
+    icon: PenTool,
+    tagline: "Generative studio for civic messaging in Arabic and English.",
+    boundary: "Recommend",
+    agents: ["MediaGPT Studio", "DCO Adapter"],
+    prompt: "Make-it-in-the-Emirates, desert sunrise, Arabic first, civic tone.",
+    output: "Three bilingual concepts generated and adapted to 6:1, 9:16, 1:1 and 3:4 panels.",
+  },
+  {
+    id: "protect",
+    name: "Protect",
+    icon: ShieldCheck,
+    tagline: "Content moderation, deepfake detection, and rights checks.",
+    boundary: "Never modify",
+    agents: ["MediaGPT Moderator", "MediaGPT Compliance Agent"],
+    prompt: "Check authenticity, rights and cultural soundness for CR-90421.",
+    output: "Integrity score 97%. No manipulation detected. Copyright match requires named approver review.",
+  },
+  {
+    id: "optimize",
+    name: "Optimize",
+    icon: Lightbulb,
+    tagline: "Yield, slot allocation, and dynamic pricing recommendations.",
+    boundary: "Recommend",
+    agents: ["MediaGPT Optimizer", "Yield Advisor"],
+    prompt: "Where can we lift airport-loop yield without cannibalising civic slots?",
+    output: "Reallocate 6 evening slots on AD-APT-{003,007} to premium retail. Projected uplift AED 42,000 / week. No civic conflict.",
+  },
+  {
+    id: "safeguard",
+    name: "Safeguard",
+    icon: Eye,
+    tagline: "Edge, CMS and network anomaly detection with audit trails.",
+    boundary: "Read-only",
+    agents: ["MediaGPT Sentinel", "Drift Monitor"],
+    prompt: "Anything unusual on the network in the last 24h?",
+    output: "2 anomalies: latency spike on AD-BRG-014 (23:04, resolved), signed model drift within tolerance on Moderator v1.4.",
+  },
+];
+
+function boundaryTone(boundary: Boundary): Tone {
+  if (boundary === "Read-only") return "info";
+  if (boundary === "Recommend") return "neutral";
+  if (boundary === "Execute with approval") return "warn";
+  return "danger";
+}
+
+function MediaGptSuite({ t }: { t: (value: string) => string }) {
   return (
     <PageBody>
       <MetricGrid>
-        <Metric label="Agents active" value="8" helper="Governed platform agents" tone="good" />
-        <Metric label="Saved outputs" value="42" helper="Dashboards, tables, drafts" tone="info" />
+        <Metric label="Agents active" value="12" helper="Governed platform agents" tone="good" />
+        <Metric label="Families" value="6" helper="Discover, Command, Create, Protect, Optimize, Safeguard" tone="info" />
         <Metric label="Human approvals" value="11" helper="Required before execution" tone="warn" />
-        <Metric label="Arabic QA" value="98%" helper="Copy parity checks" tone="good" />
+        <Metric label="Arabic parity" value="98%" helper="Bilingual QA on outputs" tone="good" />
       </MetricGrid>
 
-      <Panel icon={Bot} title="Agents">
-        <div className="agent-grid">
-          {agents.map(([name, body, badge]) => (
-            <article key={name} className="agent-card">
-              <div>
-                <Sparkles size={18} />
-                <StatusPill label={badge} tone={badge === "Mandatory" ? "good" : "info"} />
+      <div className="family-grid">
+        {mediaGptFamilies.map((family) => {
+          const Icon = family.icon;
+          return (
+            <article key={family.id} className="family-card">
+              <header>
+                <span className="family-icon"><Icon size={18} /></span>
+                <div>
+                  <strong>{t(family.name)}</strong>
+                  <small>{t(family.tagline)}</small>
+                </div>
+                <span className={`boundary-badge tone-${boundaryTone(family.boundary)}`}>{t(family.boundary)}</span>
+              </header>
+              <div className="family-agents">
+                {family.agents.map((agent) => (
+                  <span key={agent} className="agent-chip">{t(agent)}</span>
+                ))}
               </div>
-              <strong>{t(name)}</strong>
-              <p>{t(body)}</p>
+              <MediaGptPrompt prompt={family.prompt} output={family.output} />
             </article>
-          ))}
-        </div>
-      </Panel>
-
-      <div className="split-grid equal">
-        <Panel icon={Search} title="Discover">
-          <MediaGptPrompt
-            prompt="When did Coca-Cola last advertise on Yas Island, and what was the contract value?"
-            output="Last Yas Island placement: Aug 2024. Contract value AED 268,500. Most recent estate placement: Mar 2025, Maqta Bridge."
-          />
-        </Panel>
-        <Panel icon={Workflow} title="Command">
-          <MediaGptPrompt
-            prompt="Select all parking assets within 1 km of ADNEC and push a weekday morning campaign."
-            output="Workflow prepared: resolve geography, select approved creative, set schedule, run governance check, save reusable task."
-          />
-        </Panel>
-      </div>
-      <div className="split-grid equal">
-        <Panel icon={Zap} title="Create">
-          <MediaGptPrompt
-            prompt="Make-it-in-the-Emirates, desert sunrise, Arabic first, civic tone."
-            output="Three bilingual concepts generated and adapted to 6:1, 9:16, 1:1 and 3:4 panels."
-          />
-        </Panel>
-        <Panel icon={BadgeCheck} title="Protect">
-          <MediaGptPrompt
-            prompt="Check authenticity, rights and cultural soundness for CR-90421."
-            output="Integrity score 97%. No manipulation detected. Copyright match requires named approver review."
-          />
-        </Panel>
+          );
+        })}
       </div>
     </PageBody>
   );
