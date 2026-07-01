@@ -1482,6 +1482,11 @@ function Sidebar({
         <LogOut size={17} />
         {t("Switch profile")}
       </button>
+      <div className="powered-by powered-by--sidebar">
+        <span>{t("Powered by")}</span>
+        <img src={origenLogo} alt="Origen" width={14} height={14} loading="lazy" />
+        <strong>Origen</strong>
+      </div>
     </aside>
   );
 }
