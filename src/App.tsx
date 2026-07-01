@@ -695,8 +695,6 @@ const translations: Record<string, string> = {
   "Active bids": "المزايدات النشطة",
   "Auctions in progress": "مزادات جارية",
   "No bids yet": "لا توجد مزايدات بعد",
-  "Yas Tourism": "سياحة ياس",
-  "Retail Majlis": "ريتيل مجلس",
   "Corniche prime — evening rotation": "الكورنيش الرئيسي — دورة المساء",
   "Downtown retail loop — weekend": "مسار التجزئة في وسط المدينة — نهاية الأسبوع",
   "Yas leisure loop — summer flight": "مسار ياس الترفيهي — الرحلة الصيفية",
