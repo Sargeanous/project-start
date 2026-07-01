@@ -2191,9 +2191,10 @@ html[dir="rtl"] .panel-header h2 {
   background: var(--surface);
 }
 .brand-mark {
-  border-radius: 10px;
-  background: linear-gradient(135deg, #1f4a3d 0%, #143026 100%);
-  color: #fff;
+  border-radius: 50%;
+  background: transparent;
+  object-fit: contain;
+  display: block;
 }
 .login-intro { color: var(--muted); font-size: 14px; line-height: 1.6; }
 .profile-card {

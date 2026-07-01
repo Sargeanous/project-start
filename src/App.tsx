@@ -51,6 +51,7 @@ import {
   type MediaAsset,
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
+import admoLogo from "./assets/admo-logo.png";
 
 type Page =
   | "control"
@@ -989,7 +990,7 @@ function LoginScreen({
     <main className="login-screen" dir={lang === "ar" ? "rtl" : "ltr"}>
       <section className="login-panel">
         <div className="login-brand">
-          <div className="brand-mark">O</div>
+          <img className="brand-mark" src={admoLogo} alt="ADMO" />
           <div>
             <p>{t("ADMO Unified DOOH Platform")}</p>
             <h1>{t("Access profile")}</h1>
@@ -1035,7 +1036,7 @@ function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-mark">O</div>
+        <img className="brand-mark" src={admoLogo} alt="ADMO" />
         <div>
           <strong>{t("DOOH")}</strong>
           <span>{t("Unified Platform")}</span>
