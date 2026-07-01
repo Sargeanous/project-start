@@ -576,6 +576,7 @@ const translations: Record<string, string> = {
   "Access profile": "ملف الدخول",
   "Choose who is using the platform. The sidebar and workflow are permissioned from this point.": "اختر ملف المستخدم. ستظهر القوائم وسير العمل حسب الصلاحيات من هذه النقطة.",
   "Switch profile": "تغيير الملف",
+  "Powered by": "مشغّل بواسطة",
   "Control Centre": "مركز التحكم",
   "CMS": "إدارة المحتوى",
   "Alerts and Emergencies": "التنبيهات والطوارئ",
