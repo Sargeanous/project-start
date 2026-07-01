@@ -54,7 +54,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, FormEvent, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   assets as estateAssets,
   fieldTasks,
@@ -66,7 +66,7 @@ import {
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
 import admoLogo from "./assets/admo-logo.png";
-import origenLogo from "./assets/origen-logo.png";
+import origenGreenIcon from "./assets/origen-green-icon.png";
 import "./dooh-styles.css";
 
 type Page =
@@ -774,6 +774,46 @@ const translations: Record<string, string> = {
   "Asset registry": "سجل الأصول",
   "Maintenance workbench": "منصة عمل الصيانة",
   "BoM, service orders and POs": "قائمة المواد وأوامر الخدمة وأوامر الشراء",
+  "AI recommendations enabled": "توصيات الذكاء الاصطناعي مفعلة",
+  "BOM items": "عناصر قائمة المواد",
+  "Open SOs": "أوامر الخدمة المفتوحة",
+  "Open POs": "أوامر الشراء المفتوحة",
+  "Next PO ETA": "موعد وصول أمر الشراء التالي",
+  "AI recommendation": "توصية الذكاء الاصطناعي",
+  "Expanded BoM and work orders": "قائمة المواد وأوامر العمل المفصلة",
+  "Component": "المكوّن",
+  "Qty": "الكمية",
+  "PO / ETA": "أمر الشراء / الوصول المتوقع",
+  "SO / step": "أمر الخدمة / المرحلة",
+  "Operational": "تشغيلي",
+  "Attention": "يتطلب متابعة",
+  "Procurement risk": "مخاطر توريد",
+  "Available in depot": "متاح في المستودع",
+  "Ordered from supplier": "مطلوب من المورد",
+  "Reserved for field team": "محجوز للفريق الميداني",
+  "Warranty exchange": "استبدال ضمن الضمان",
+  "No PO required": "لا يتطلب أمر شراء",
+  "N/A": "غير منطبق",
+  "Panel health inspection": "فحص حالة اللوحة",
+  "Preventive maintenance scheduled": "صيانة وقائية مجدولة",
+  "Thermal inspection in progress": "فحص حراري قيد التنفيذ",
+  "Controller replacement queued": "استبدال وحدة التحكم في قائمة الانتظار",
+  "Awaiting vendor confirmation": "بانتظار تأكيد المورد",
+  "Technician dispatch": "إرسال فني",
+  "Part received": "تم استلام القطعة",
+  "Close-out evidence": "أدلة الإغلاق",
+  "Keep current preventive plan. Bundle LED cabinet checks with next quarterly visit.": "الإبقاء على خطة الوقاية الحالية ودمج فحص خزائن LED مع الزيارة الفصلية التالية.",
+  "Prioritize controller swap before weekend campaigns; PO date is the delivery risk.": "إعطاء أولوية لاستبدال وحدة التحكم قبل حملات نهاية الأسبوع؛ تاريخ أمر الشراء هو نقطة المخاطر.",
+  "Dispatch technician after router arrives; keep asset in maintenance rotation until SO close-out.": "إرسال الفني بعد وصول الموجه؛ إبقاء الأصل ضمن دورة الصيانة حتى إغلاق أمر الخدمة.",
+  "Group power supply replacement with adjacent Al Ain asset to reduce truck roll.": "تجميع استبدال مزود الطاقة مع أصل العين المجاور لتقليل الزيارات الميدانية.",
+  "No action: keep in standard preventive cycle.": "لا إجراء: الإبقاء ضمن دورة الوقاية القياسية.",
+  "Replace during next low-traffic window.": "الاستبدال خلال نافذة حركة منخفضة قادمة.",
+  "Escalate PO confirmation if supplier does not acknowledge by 17:00.": "تصعيد تأكيد أمر الشراء إذا لم يؤكد المورد قبل 17:00.",
+  "Use reserved stock; avoid opening a new PO.": "استخدام المخزون المحجوز وتجنب فتح أمر شراء جديد.",
+  "Attach thermal images before closing SO.": "إرفاق الصور الحرارية قبل إغلاق أمر الخدمة.",
+  "Run remote diagnostics before technician dispatch.": "تشغيل التشخيص عن بعد قبل إرسال الفني.",
+  "Hold publish-heavy schedule until controller replacement is complete.": "تعليق الجدولة كثيفة النشر حتى اكتمال استبدال وحدة التحكم.",
+  "Keep vendor replacement under warranty claim.": "إبقاء الاستبدال لدى المورد ضمن مطالبة الضمان.",
   "Device model": "نموذج الجهاز",
   "Selected part": "الجزء المحدد",
   "Network": "الشبكة",
@@ -799,6 +839,13 @@ const translations: Record<string, string> = {
   "Edge controller": "وحدة التحكم الطرفية",
   "Power supply": "مزود الطاقة",
   "5G router": "موجه الجيل الخامس",
+  "LED module batch": "دفعة وحدات LED",
+  "Thermal sensor kit": "حزمة حساس حراري",
+  "Main breaker": "قاطع رئيسي",
+  "Router antenna": "هوائي الموجه",
+  "Cooling fan kit": "حزمة مراوح تبريد",
+  "Media player": "مشغل الوسائط",
+  "Asset unit": "وحدة الأصل",
 
   "Agents active": "الوكلاء النشطون",
   "Governed platform agents": "وكلاء المنصة المحكومون",
@@ -978,11 +1025,17 @@ const translations: Record<string, string> = {
   "Campaign submitted to ADMO CMS": "تم إرسال الحملة إلى إدارة المحتوى في مكتب أبوظبي الإعلامي",
 
   "Corniche Highway Main": "لوحة طريق الكورنيش الرئيسية",
+  "Airport Road Premium": "لوحة طريق المطار المميزة",
+  "Downtown Retail Loop": "حلقة وسط المدينة التجارية",
+  "Al Ain Civic": "لوحة العين المدنية",
   "Mussafah Bridge Banner": "لوحة جسر مصفح",
   "Yas Island Bus Stop Pair": "زوج شاشات محطة حافلات جزيرة ياس",
   "Al Ain Gateway": "بوابة العين",
   "Downtown Mall Entrance": "مدخل مركز وسط المدينة التجاري",
   "Highway billboard": "لوحة طريق سريع",
+  "Premium roadside LED": "شاشة LED مميزة على جانب الطريق",
+  "Urban LED totem": "عمود LED حضري",
+  "Highway gateway billboard": "لوحة بوابة طريق سريع",
   "Bridge display": "شاشة جسر",
   "Dual-sided bus stop": "محطة حافلات مزدوجة الجهة",
   "Indoor/outdoor LED": "شاشة LED داخلية وخارجية",
@@ -1032,7 +1085,6 @@ const translations: Record<string, string> = {
   "Maintenance team": "فريق الصيانة",
   "O&M admin": "مدير التشغيل والصيانة",
 
-  "LED module batch": "دفعة وحدات LED",
   "Power supply 48V": "مزود طاقة 48 فولت",
   "Commercial premium": "تجاري مميز",
   "Emergency reserve": "احتياطي الطوارئ",
@@ -1562,7 +1614,7 @@ function LoginScreen({
       </section>
       <div className="powered-by powered-by--login">
         <span>{t("Powered by")}</span>
-        <img src={origenLogo} alt="Origen" width={18} height={18} loading="lazy" />
+        <img src={origenGreenIcon} alt="Origen" width={18} height={18} loading="lazy" />
         <strong>Origen</strong>
       </div>
     </main>
@@ -1637,7 +1689,7 @@ function Sidebar({
       </button>
       <div className="powered-by powered-by--sidebar">
         <span>{t("Powered by")}</span>
-        <img src={origenLogo} alt="Origen" width={16} height={16} loading="lazy" />
+        <img src={origenGreenIcon} alt="Origen" width={16} height={16} loading="lazy" />
         <strong>Origen</strong>
       </div>
     </aside>
@@ -2281,14 +2333,13 @@ function NetworkPage({ t }: { t: (value: string) => string }) {
         </Panel>
       </div>
 
-      <div className="split-grid equal">
-        <Panel icon={Wrench} title="Maintenance workbench">
-          <KanbanBoard />
-        </Panel>
-        <Panel icon={ClipboardCheck} title="BoM, service orders and POs">
-          <InventoryTables />
-        </Panel>
-      </div>
+      <Panel icon={Wrench} title="Maintenance workbench">
+        <KanbanBoard />
+      </Panel>
+
+      <Panel icon={ClipboardCheck} title="BoM, service orders and POs" action="AI recommendations enabled">
+        <InventoryOperationsTable />
+      </Panel>
     </PageBody>
   );
 }
@@ -2331,40 +2382,212 @@ function DeviceDossier({ asset }: { asset: Asset }) {
   );
 }
 
-function InventoryTables() {
+type SupplyComponent = {
+  component: string;
+  quantity: string;
+  state: string;
+  stateTone: Tone;
+  po: string;
+  poEta: string;
+  so: string;
+  soStep: string;
+  owner: string;
+  recommendation: string;
+};
+
+type AssetSupplyRecord = {
+  assetId: string;
+  assetName: string;
+  assetType: string;
+  health: string;
+  tone: Tone;
+  openSos: number;
+  openPos: number;
+  nextPoEta: string;
+  recommendation: string;
+  components: SupplyComponent[];
+};
+
+const assetSupplyRecords: AssetSupplyRecord[] = [
+  {
+    assetId: "AD-HWY-001",
+    assetName: "Corniche Highway Main",
+    assetType: "Highway billboard",
+    health: "Operational",
+    tone: "good",
+    openSos: 1,
+    openPos: 1,
+    nextPoEta: "12 Jul 2026",
+    recommendation: "Keep current preventive plan. Bundle LED cabinet checks with next quarterly visit.",
+    components: [
+      { component: "Asset unit", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8840", soStep: "Preventive maintenance scheduled", owner: "Maintenance team", recommendation: "No action: keep in standard preventive cycle." },
+      { component: "LED cabinet", quantity: "2", state: "Available in depot", stateTone: "good", po: "PO-4471", poEta: "12 Jul 2026", so: "SO-8840", soStep: "Panel health inspection", owner: "Field dispatch", recommendation: "Replace during next low-traffic window." },
+      { component: "Thermal sensor kit", quantity: "1", state: "Reserved for field team", stateTone: "warn", po: "PO-4452", poEta: "08 Jul 2026", so: "SO-8840", soStep: "Close-out evidence", owner: "Verification team", recommendation: "Attach thermal images before closing SO." },
+    ],
+  },
+  {
+    assetId: "AD-BRG-014",
+    assetName: "Airport Road Premium",
+    assetType: "Premium roadside LED",
+    health: "Attention",
+    tone: "warn",
+    openSos: 2,
+    openPos: 2,
+    nextPoEta: "06 Jul 2026",
+    recommendation: "Prioritize controller swap before weekend campaigns; PO date is the delivery risk.",
+    components: [
+      { component: "Asset unit", quantity: "1", state: "Attention", stateTone: "warn", po: "No PO required", poEta: "N/A", so: "SO-8821", soStep: "Thermal inspection in progress", owner: "NOC operator", recommendation: "Run remote diagnostics before technician dispatch." },
+      { component: "Edge controller", quantity: "1", state: "Ordered from supplier", stateTone: "warn", po: "PO-4490", poEta: "06 Jul 2026", so: "SO-8821", soStep: "Controller replacement queued", owner: "Field dispatch", recommendation: "Hold publish-heavy schedule until controller replacement is complete." },
+      { component: "Cooling fan kit", quantity: "2", state: "Reserved for field team", stateTone: "good", po: "PO-4484", poEta: "04 Jul 2026", so: "SO-8828", soStep: "Technician dispatch", owner: "Maintenance team", recommendation: "Use reserved stock; avoid opening a new PO." },
+    ],
+  },
+  {
+    assetId: "AD-DWT-011",
+    assetName: "Downtown Retail Loop",
+    assetType: "Urban LED totem",
+    health: "Operational",
+    tone: "good",
+    openSos: 1,
+    openPos: 0,
+    nextPoEta: "N/A",
+    recommendation: "Dispatch technician after router arrives; keep asset in maintenance rotation until SO close-out.",
+    components: [
+      { component: "5G router", quantity: "1", state: "Warranty exchange", stateTone: "warn", po: "No PO required", poEta: "N/A", so: "SO-8816", soStep: "Awaiting vendor confirmation", owner: "O&M admin", recommendation: "Keep vendor replacement under warranty claim." },
+      { component: "Router antenna", quantity: "2", state: "Available in depot", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8816", soStep: "Part received", owner: "Field dispatch", recommendation: "Dispatch technician after router arrives." },
+      { component: "Media player", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8794", soStep: "Completed", owner: "Verification team", recommendation: "No action: keep in standard preventive cycle." },
+    ],
+  },
+  {
+    assetId: "AD-AIN-052",
+    assetName: "Al Ain Civic",
+    assetType: "Highway gateway billboard",
+    health: "Procurement risk",
+    tone: "danger",
+    openSos: 1,
+    openPos: 1,
+    nextPoEta: "15 Jul 2026",
+    recommendation: "Group power supply replacement with adjacent Al Ain asset to reduce truck roll.",
+    components: [
+      { component: "Power supply", quantity: "1", state: "Ordered from supplier", stateTone: "danger", po: "PO-4512", poEta: "15 Jul 2026", so: "SO-8837", soStep: "Awaiting vendor confirmation", owner: "O&M admin", recommendation: "Escalate PO confirmation if supplier does not acknowledge by 17:00." },
+      { component: "Main breaker", quantity: "1", state: "Reserved for field team", stateTone: "warn", po: "PO-4509", poEta: "09 Jul 2026", so: "SO-8837", soStep: "Technician dispatch", owner: "Field dispatch", recommendation: "Group power supply replacement with adjacent Al Ain asset to reduce truck roll." },
+      { component: "LED module batch", quantity: "4", state: "Available in depot", stateTone: "good", po: "PO-4471", poEta: "12 Jul 2026", so: "SO-8837", soStep: "Panel health inspection", owner: "Maintenance team", recommendation: "Use reserved stock; avoid opening a new PO." },
+    ],
+  },
+];
+
+function InventoryOperationsTable() {
+  const t = useT();
+  const [expandedIds, setExpandedIds] = useState<string[]>([assetSupplyRecords[0].assetId]);
+
+  function toggle(assetId: string) {
+    setExpandedIds((items) => (items.includes(assetId) ? items.filter((id) => id !== assetId) : [...items, assetId]));
+  }
+
   return (
-    <div className="inventory-stack">
-      <CompactTable
-        columns={["Item", "State", "PO"]}
-        rows={[
-          ["LED module batch", "Available", "PO-4471"],
-          ["Edge controller", "Ordered", "PO-4490"],
-          ["Power supply 48V", "Reserved", "PO-4452"],
-        ]}
-      />
-      <CompactTable
-        columns={["Order", "Asset", "Status"]}
-        rows={[
-          ["SO-8821", "AD-BRG-014", "Technician assigned"],
-          ["SO-8816", "AD-HWY-009", "Awaiting controller"],
-          ["SO-8794", "AD-DWT-011", "Completed"],
-        ]}
-      />
+    <div className="table-card asset-supply-table">
+      <table>
+        <thead>
+          <tr>
+            <th>{t("Asset")}</th>
+            <th>{t("Status")}</th>
+            <th>{t("BOM items")}</th>
+            <th>{t("Open SOs")}</th>
+            <th>{t("Open POs")}</th>
+            <th>{t("Next PO ETA")}</th>
+            <th>{t("AI recommendation")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {assetSupplyRecords.map((record) => {
+            const expanded = expandedIds.includes(record.assetId);
+            return (
+              <Fragment key={record.assetId}>
+                <tr className={`supply-asset-row ${expanded ? "expanded" : ""}`}>
+                  <td data-label={t("Asset")}>
+                    <button type="button" className="supply-toggle" aria-expanded={expanded} onClick={() => toggle(record.assetId)}>
+                      <ChevronRight size={16} />
+                      <span>
+                        <strong>{t(record.assetName)}</strong>
+                        <small>{record.assetId} / {t(record.assetType)}</small>
+                      </span>
+                    </button>
+                  </td>
+                  <td data-label={t("Status")}><StatusPill label={record.health} tone={record.tone} /></td>
+                  <td data-label={t("BOM items")}>{record.components.length}</td>
+                  <td data-label={t("Open SOs")}>{record.openSos}</td>
+                  <td data-label={t("Open POs")}>{record.openPos}</td>
+                  <td data-label={t("Next PO ETA")}>{record.nextPoEta}</td>
+                  <td data-label={t("AI recommendation")}><span className="ai-recommendation">{t(record.recommendation)}</span></td>
+                </tr>
+                {expanded ? (
+                  <tr className="supply-detail-row">
+                    <td colSpan={7}>
+                      <div className="supply-detail">
+                        <div className="supply-detail-heading">
+                          <strong>{t("Expanded BoM and work orders")}</strong>
+                          <span>{record.assetId}</span>
+                        </div>
+                        <table className="bom-detail-table">
+                          <thead>
+                            <tr>
+                              <th>{t("Component")}</th>
+                              <th>{t("Qty")}</th>
+                              <th>{t("State")}</th>
+                              <th>{t("PO / ETA")}</th>
+                              <th>{t("SO / step")}</th>
+                              <th>{t("Owner")}</th>
+                              <th>{t("AI recommendation")}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {record.components.map((component) => (
+                              <tr key={`${record.assetId}-${component.component}`}>
+                                <td data-label={t("Component")}><strong>{t(component.component)}</strong></td>
+                                <td data-label={t("Qty")}>{component.quantity}</td>
+                                <td data-label={t("State")}><StatusPill label={component.state} tone={component.stateTone} /></td>
+                                <td data-label={t("PO / ETA")}>
+                                  <strong>{t(component.po)}</strong>
+                                  <span>{t(component.poEta)}</span>
+                                </td>
+                                <td data-label={t("SO / step")}>
+                                  <strong>{component.so}</strong>
+                                  <span>{t(component.soStep)}</span>
+                                </td>
+                                <td data-label={t("Owner")}>{t(component.owner)}</td>
+                                <td data-label={t("AI recommendation")}><span className="ai-recommendation">{t(component.recommendation)}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 function KanbanBoard() {
   const t = useT();
-  const columns = ["Pending Assignment", "Pending Execution", "In Progress", "Completed", "Overdue"];
+  const columns: Array<{ label: string; states: Array<(typeof fieldTasks)[number]["column"]> }> = [
+    { label: "Pending Assignment", states: ["Pending Assignment"] },
+    { label: "Pending Execution", states: ["Pending Execution", "Overdue"] },
+    { label: "In Progress", states: ["In Progress"] },
+    { label: "Completed", states: ["Completed"] },
+  ];
   return (
     <div className="kanban">
       {columns.map((column) => (
-        <section key={column}>
-          <strong>{t(column)}</strong>
-          {fieldTasks.filter((task) => task.column === column).slice(0, 2).map((task) => (
+        <section key={column.label}>
+          <strong>{t(column.label)}</strong>
+          {fieldTasks.filter((task) => column.states.includes(task.column)).slice(0, 3).map((task) => (
             <article key={task.id}>
-              <span>{t(task.priority)}</span>
+              <span className={task.column === "Overdue" ? "danger" : ""}>{t(task.column === "Overdue" ? "Overdue" : task.priority)}</span>
               <p>{t(task.title)}</p>
               <small>{task.asset} / {t(task.owner)}</small>
             </article>
