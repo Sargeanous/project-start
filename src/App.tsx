@@ -1065,7 +1065,7 @@ function App() {
           {page === "financials" && <FinancialsPage t={t} />}
           {page === "lab" && <AiLabPage t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} t={t} />}
-          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} t={t} />}
+          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} t={t} />}
         </main>
         <MediaGptChatbot t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
