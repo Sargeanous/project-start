@@ -27,6 +27,12 @@ import {
   MonitorPlay,
   PlugZap,
   RadioTower,
+  RefreshCcw,
+  MessageSquare,
+  X,
+  Plus,
+  Palette,
+  Target,
   Search,
   Send,
   ShieldAlert,
@@ -75,7 +81,7 @@ type Lang = "en" | "ar";
 type Tone = "neutral" | "good" | "warn" | "danger" | "info";
 type CmsTab = "submissions" | "library" | "scheduling";
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
-type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting";
+type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
 interface Profile {
   id: ProfileId;
@@ -469,6 +475,98 @@ const marketplacePackages = [
 type Translator = (value: string) => string;
 
 const translations: Record<string, string> = {
+  // Persona flow additions
+  "Operator quick actions": "إجراءات المشغل السريعة",
+  "One-click operational controls. All actions are logged.": "أدوات تشغيلية بضغطة واحدة. يتم تسجيل كل الإجراءات.",
+  "Launch emergency alert": "إطلاق تنبيه طارئ",
+  "Refresh edge feeds": "تحديث بث الحافة",
+  "Dispatch technician": "إرسال فني",
+  "Freeze schedule": "تجميد الجدول",
+  "Refresh forced on all edge caches": "تم فرض التحديث على جميع ذواكر الحافة",
+  "Field team dispatched to open alarms": "تم إرسال الفريق الميداني للتنبيهات المفتوحة",
+  "Schedule frozen. New publishes are blocked.": "تم تجميد الجدول. النشر الجديد محظور.",
+  "Bid approvals queue": "قائمة اعتماد العروض",
+  "Amount": "المبلغ",
+  "Margin": "الهامش",
+  "Risk": "المخاطرة",
+  "Decision": "القرار",
+  "Approve": "اعتماد",
+  "Hold": "تعليق",
+  "Reject": "رفض",
+  "Re-open": "إعادة فتح",
+  "Pending": "قيد الانتظار",
+  "Approved": "معتمد",
+  "On hold": "معلّق",
+  "Rejected": "مرفوض",
+  "Low": "منخفض",
+  "Medium": "متوسط",
+  "Elevated": "مرتفع",
+  "Rate card overrides": "استثناءات بطاقة الأسعار",
+  "MediaGPT deep-scan": "الفحص العميق من ميديا جي بي تي",
+  "Re-run scan": "إعادة تشغيل الفحص",
+  "Brand safety": "أمان العلامة",
+  "Cultural sensitivity": "الحساسية الثقافية",
+  "Arabic accuracy": "دقة اللغة العربية",
+  "Legibility at 40m": "الوضوح على مسافة 40م",
+  "Copyright match": "مطابقة حقوق الملكية",
+  "No prohibited symbols detected": "لا توجد رموز محظورة",
+  "Arabic RTL punctuation validated": "تم التحقق من علامات الترقيم العربية",
+  "Contrast ratio 4.9:1 (min 4.5)": "نسبة التباين 4.9:1 (الحد الأدنى 4.5)",
+  "Suggested: enlarge CTA by 12% for highway assets": "مقترح: تكبير زر الإجراء بنسبة 12% لأصول الطرق السريعة",
+  "Reviewer notes": "ملاحظات المراجع",
+  "Add a note for the bidder or ops team": "أضف ملاحظة للمعلن أو فريق العمليات",
+  "Post note": "نشر الملاحظة",
+  "Return to intake": "إعادة إلى الاستقبال",
+  "Broadcast now": "بث الآن",
+  "Reset": "إعادة تعيين",
+  "Emergency alert live on network": "التنبيه الطارئ مباشر على الشبكة",
+  "Alert reset. Re-run checks.": "تم إعادة تعيين التنبيه. أعد تشغيل الفحوصات.",
+  "Live on network": "مباشر على الشبكة",
+  // Wizard
+  "Submit a complete bid packet to ADMO CMS": "إرسال ملف عرض متكامل إلى نظام إدارة المحتوى",
+  "Brand": "العلامة التجارية",
+  "Creative pack": "الحزمة الإبداعية",
+  "Targeting": "الاستهداف",
+  "Schedule and budget": "الجدولة والميزانية",
+  "Compliance": "الامتثال",
+  "Review": "المراجعة",
+  "Campaign name": "اسم الحملة",
+  "Vertical": "القطاع",
+  "Primary objective": "الهدف الرئيسي",
+  "Describe what success looks like for this campaign.": "صف كيف يبدو النجاح لهذه الحملة.",
+  "Contact": "جهة الاتصال",
+  "Email": "البريد الإلكتروني",
+  "Illustrations, motion, and static assets. Arabic + English required.": "الرسوم والحركة والأصول الثابتة. اللغتان العربية والإنجليزية مطلوبتان.",
+  "Add asset": "إضافة أصل",
+  "Remove": "إزالة",
+  "Preview illustration for CMS": "معاينة الرسم لنظام إدارة المحتوى",
+  "Languages": "اللغات",
+  "Target audience": "الجمهور المستهدف",
+  "Target zones": "المناطق المستهدفة",
+  "Daypart": "الفترة اليومية",
+  "Expected reach": "الوصول المتوقع",
+  "Package": "الحزمة",
+  "Total budget": "الميزانية الإجمالية",
+  "Start": "البداية",
+  "End": "النهاية",
+  "Priority": "الأولوية",
+  "UAE Media Council compliant": "متوافق مع مجلس الإعلام الإماراتي",
+  "Arabic copy proof-read by native reviewer": "تدقيق النص العربي من قبل مراجع أصلي",
+  "Music, imagery and talent rights cleared": "حقوق الموسيقى والصور والمواهب مصفاة",
+  "No political or restricted content": "لا يوجد محتوى سياسي أو مقيد",
+  "All items must be confirmed. ADMO will re-verify via MediaGPT deep-scan.": "يجب تأكيد جميع البنود. سيقوم أدمو بالتحقق مجدداً عبر الفحص العميق.",
+  "Cancel": "إلغاء",
+  "Back": "رجوع",
+  "Continue": "متابعة",
+  "Submit to ADMO": "إرسال إلى أدمو",
+  "Close": "إغلاق",
+  "Corniche": "الكورنيش",
+  "Downtown": "وسط المدينة",
+  "Yas Island": "جزيرة ياس",
+  "Al Ain gateways": "بوابات العين",
+  "Airport road": "طريق المطار",
+  "Reem Island": "جزيرة الريم",
+
   "Unified DOOH Platform": "منصة الإعلانات الخارجية الرقمية الموحدة",
   "DOOH": "الإعلانات الخارجية الرقمية",
   "Unified Platform": "المنصة الموحدة",
@@ -1113,6 +1211,7 @@ function App() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>(seedSchedule);
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
   const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [toast, setToast] = useState("");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
@@ -1132,21 +1231,21 @@ function App() {
     setPage(next);
   }
 
-  function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
+  function submitBrief(payload: BriefPayload) {
     const suffix = String(submissions.length + 1049);
     const submission: Submission = {
       id: `SUB-${suffix}`,
       campaign: payload.campaign,
       bidder: profile?.name ?? "Bidder",
       packageName: payload.packageName,
-      owner: profile?.name ?? "Bidder account",
-      requestedStart: "Jul 15, 2026",
+      owner: payload.contactName || profile?.name || "Bidder account",
+      requestedStart: payload.startDate || "Jul 15, 2026",
       budget: payload.budget,
-      priority: "Low",
+      priority: payload.priority === "High" ? "High" : "Medium",
       stage: "Submitted",
       creativeId: payload.creativeId,
-      language: "Arabic and English",
-      notes: "Submitted from the bidder marketplace and waiting for ADMO CMS review.",
+      language: payload.languages,
+      notes: payload.objective || "Submitted from the bidder workspace and waiting for ADMO CMS review.",
     };
     const campaign: BidderCampaign = {
       id: `CMP-${campaigns.length + 222}`,
@@ -1154,13 +1253,38 @@ function App() {
       packageName: payload.packageName,
       budget: payload.budget,
       status: "Submitted",
-      reach: "Pending ADMO estimate",
+      reach: payload.reach || "Pending ADMO estimate",
       nextStep: "ADMO content review",
     };
     setSubmissions((items) => [submission, ...items]);
     setCampaigns((items) => [campaign, ...items]);
+    setWizardOpen(false);
     notify("Campaign submitted to ADMO CMS");
     setPage("campaigns");
+  }
+
+  function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
+    submitBrief({
+      campaign: payload.campaign,
+      packageName: payload.packageName,
+      budget: payload.budget,
+      creativeId: payload.creativeId,
+      priority: "Standard",
+      brand: profile?.name ?? "Bidder",
+      vertical: "Retail",
+      audience: "Marketplace default",
+      targetZones: [],
+      daypart: "Full day rotation",
+      endDate: "Aug 15, 2026",
+      contactEmail: "campaigns@bidder.ae",
+      compliance: { uaeMedia: true, arabicProof: true, rightsCleared: true, noPolitical: true },
+      assets: [],
+      languages: "Arabic and English",
+      startDate: "Jul 15, 2026",
+      contactName: profile?.name ?? "Bidder account",
+      objective: "Submitted from the bidder marketplace and waiting for ADMO CMS review.",
+      reach: "Pending ADMO estimate",
+    });
   }
 
   function placeBid(payload: { lotId: string; amount: number; campaign: string }) {
@@ -1213,7 +1337,7 @@ function App() {
         <main className="workspace">
           <Topbar profile={profile} page={page} lang={lang} setLang={setLang} t={t} />
           {page === "control" && (
-            <ControlCentre submissions={submissions} published={published} t={t} />
+            <ControlCentre submissions={submissions} published={published} notify={notify} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
           )}
           {page === "cms" && (
             <CmsPage
@@ -1231,17 +1355,26 @@ function App() {
           {page === "alerts" && <AlertsPage notify={notify} t={t} />}
           {page === "network" && <NetworkPage t={t} />}
           {page === "mediagpt" && <MediaGptSuite t={t} />}
-          {page === "financials" && <FinancialsPage t={t} />}
+          {page === "financials" && <FinancialsPage submissions={submissions} notify={notify} t={t} />}
           {page === "lab" && <AiLabPage t={t} />}
-          {page === "campaigns" && <CampaignsPage campaigns={campaigns} t={t} />}
-          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} t={t} />}
+          {page === "campaigns" && <CampaignsPage campaigns={campaigns} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
         <MediaGptChatbot t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
+        {wizardOpen ? (
+          <NewCampaignWizard
+            defaultBidder={profile?.name ?? "Bidder account"}
+            onClose={() => setWizardOpen(false)}
+            onSubmit={submitBrief}
+            t={t}
+          />
+        ) : null}
       </div>
     </I18nContext.Provider>
   );
 }
+
 
 function LoginScreen({
   lang,
@@ -1379,10 +1512,14 @@ function Topbar({
 function ControlCentre({
   submissions,
   published,
+  notify,
+  goToAlerts,
   t,
 }: {
   submissions: Submission[];
   published: PublishedItem[];
+  notify: (message: string) => void;
+  goToAlerts: () => void;
   t: (value: string) => string;
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
@@ -1394,6 +1531,20 @@ function ControlCentre({
 
   return (
     <PageBody>
+      <div className="operator-actions">
+        <div>
+          <strong>{t("Operator quick actions")}</strong>
+          <small>{t("One-click operational controls. All actions are logged.")}</small>
+        </div>
+        <div className="operator-actions-row">
+          <Button icon={ShieldAlert} onClick={goToAlerts}>{t("Launch emergency alert")}</Button>
+          <Button icon={Send} variant="secondary" onClick={() => notify(t("Refresh forced on all edge caches"))}>{t("Refresh edge feeds")}</Button>
+          <Button icon={Wrench} variant="secondary" onClick={() => notify(t("Field team dispatched to open alarms"))}>{t("Dispatch technician")}</Button>
+          <Button icon={LockKeyhole} variant="secondary" onClick={() => notify(t("Schedule frozen. New publishes are blocked."))}>{t("Freeze schedule")}</Button>
+        </div>
+      </div>
+
+
       <MetricGrid>
         <Metric label={t("Assets live")} value={`${liveCount}/${estateAssets.length}`} helper="Screens currently playing" tone="good" />
         <Metric label={t("Proof-of-play")} value="99.4%" helper="Signed playback evidence" tone="good" />
@@ -1645,12 +1796,17 @@ function SubmissionDetail({ submission, onStage }: { submission: Submission; onS
         </article>
       </div>
 
+      <AiDeepScan submission={submission} />
+
+      <ReviewerNotes submissionId={submission.id} />
+
       <ActionRow>
         {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
         {submission.stage === "In review" && (
           <>
             <Button onClick={() => onStage(submission.id, "Approved")}>Approve</Button>
             <Button variant="secondary" onClick={() => onStage(submission.id, "Changes requested")}>Request changes</Button>
+            <Button variant="secondary" onClick={() => onStage(submission.id, "Submitted")}>Return to intake</Button>
           </>
         )}
         {submission.stage === "Approved" && <Button onClick={() => onStage(submission.id, "Scheduled")}>Add to schedule</Button>}
@@ -1661,6 +1817,84 @@ function SubmissionDetail({ submission, onStage }: { submission: Submission; onS
     </div>
   );
 }
+
+function AiDeepScan({ submission }: { submission: Submission }) {
+  const t = useT();
+  const seed = submission.id.length;
+  const scores = [
+    { label: "Brand safety", value: 92 + (seed % 5), tone: "good" as Tone },
+    { label: "Cultural sensitivity", value: 88 + (seed % 6), tone: "good" as Tone },
+    { label: "Arabic accuracy", value: 94 + (seed % 4), tone: "good" as Tone },
+    { label: "Legibility at 40m", value: 76 + (seed % 10), tone: "warn" as Tone },
+    { label: "Copyright match", value: 100, tone: "good" as Tone },
+  ];
+  const findings = [
+    { label: "No prohibited symbols detected", ok: true },
+    { label: "Arabic RTL punctuation validated", ok: true },
+    { label: "Contrast ratio 4.9:1 (min 4.5)", ok: true },
+    { label: "Suggested: enlarge CTA by 12% for highway assets", ok: false },
+  ];
+  const [rerun, setRerun] = useState(0);
+
+  return (
+    <Panel icon={Sparkles} title={t("MediaGPT deep-scan")} action={<Button variant="secondary" icon={RefreshCcw} onClick={() => setRerun((n) => n + 1)}>{t("Re-run scan")}</Button>}>
+      <div className="deepscan-grid">
+        <div className="deepscan-scores">
+          {scores.map((score) => (
+            <div key={score.label} className="deepscan-bar">
+              <div className="deepscan-bar-head">
+                <span>{t(score.label)}</span>
+                <strong>{Math.min(100, score.value + rerun)}%</strong>
+              </div>
+              <div className="deepscan-track"><div className={`deepscan-fill tone-${score.tone}`} style={{ width: `${Math.min(100, score.value + rerun)}%` }} /></div>
+            </div>
+          ))}
+        </div>
+        <ul className="deepscan-findings">
+          {findings.map((f) => (
+            <li key={f.label} className={f.ok ? "ok" : "warn"}>
+              {f.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              <span>{t(f.label)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Panel>
+  );
+}
+
+function ReviewerNotes({ submissionId }: { submissionId: string }) {
+  const t = useT();
+  const [note, setNote] = useState("");
+  const [notes, setNotes] = useState<Array<{ author: string; time: string; body: string }>>([
+    { author: "L. Fahim", time: "10:12", body: "Creative aligns with sovereign guidelines. Awaiting Arabic proof-read." },
+  ]);
+  function post() {
+    if (!note.trim()) return;
+    const now = new Date();
+    setNotes([{ author: "You", time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, body: note.trim() }, ...notes]);
+    setNote("");
+  }
+  return (
+    <Panel icon={MessageSquare} title={t("Reviewer notes")}>
+      <div className="reviewer-notes">
+        <div className="reviewer-composer">
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Add a note for the bidder or ops team")} />
+          <Button onClick={post} icon={Send}>{t("Post note")}</Button>
+        </div>
+        <ul className="reviewer-thread">
+          {notes.map((n, i) => (
+            <li key={`${submissionId}-${i}`}>
+              <div className="reviewer-avatar">{n.author.charAt(0)}</div>
+              <div><strong>{n.author}</strong> <span>{n.time}</span><p>{t(n.body)}</p></div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Panel>
+  );
+}
+
 
 function MediaLibrary({ t }: { t: (value: string) => string }) {
   const [category, setCategory] = useState<MediaAsset["type"] | "All">("All");
@@ -1768,6 +2002,18 @@ function AlertsPage({ notify, t }: { notify: (message: string) => void; t: (valu
     notify("Emergency broadcast queued");
   }
 
+  function broadcastNow() {
+    if (!checked) return;
+    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Live on network" } : item)));
+    notify("Emergency alert live on network");
+  }
+
+  function resetAlert() {
+    setAlerts((items) => items.map((item) => (item.id === selected.id ? { ...item, state: "Check required" } : item)));
+    notify("Alert reset. Re-run checks.");
+  }
+
+
   return (
     <PageBody>
       <MetricGrid>
@@ -1848,7 +2094,10 @@ function AlertsPage({ notify, t }: { notify: (message: string) => void; t: (valu
         <ActionRow>
           <Button onClick={runChecks}>{t("Run checks")}</Button>
           <Button variant="secondary" onClick={queueBroadcast}>{t("Queue broadcast")}</Button>
+          <Button variant="secondary" onClick={broadcastNow}>{t("Broadcast now")}</Button>
+          <Button variant="secondary" onClick={resetAlert}>{t("Reset")}</Button>
         </ActionRow>
+
       </Panel>
     </PageBody>
   );
@@ -2530,11 +2779,51 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
   );
 }
 
-function FinancialsPage({ t }: { t: (value: string) => string }) {
+function FinancialsPage({ submissions, notify, t }: { submissions: Submission[]; notify: (message: string) => void; t: (value: string) => string }) {
   const [budget, setBudget] = useState(420);
   const [demand, setDemand] = useState(68);
   const [discount, setDiscount] = useState(8);
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
+
+  const seedApprovals: FinanceApproval[] = useMemo(() => {
+    const base: FinanceApproval[] = submissions
+      .filter((s) => s.stage === "Submitted" || s.stage === "In review")
+      .slice(0, 4)
+      .map((s, i) => ({
+        id: `FIN-${1200 + i}`,
+        campaign: s.campaign,
+        bidder: s.bidder,
+        packageName: s.packageName,
+        amount: s.budget,
+        margin: `${18 + i * 3}%`,
+        risk: i === 0 ? "Elevated" : i === 1 ? "Low" : "Medium",
+        state: "Pending",
+      }));
+    if (base.length === 0) {
+      base.push({
+        id: "FIN-1200",
+        campaign: "Airport retail launch",
+        bidder: "Etihad Retail",
+        packageName: "Airport and premium roadside",
+        amount: "AED 420,000",
+        margin: "24%",
+        risk: "Low",
+        state: "Pending",
+      });
+    }
+    return base;
+  }, [submissions]);
+
+  const [approvals, setApprovals] = useState<FinanceApproval[]>(seedApprovals);
+  // reset when underlying submissions change (persona switch)
+  const approvalsKey = seedApprovals.map((a) => a.id).join("|");
+  useMemo(() => setApprovals(seedApprovals), [approvalsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function decide(id: string, state: FinanceApproval["state"]) {
+    setApprovals((items) => items.map((item) => (item.id === id ? { ...item, state } : item)));
+    const item = approvals.find((a) => a.id === id);
+    if (item) notify(`${t(item.campaign)}: ${t(state)}`);
+  }
 
   return (
     <PageBody>
@@ -2542,8 +2831,50 @@ function FinancialsPage({ t }: { t: (value: string) => string }) {
         <Metric label="Booked revenue" value="AED 18.4M" helper="Current quarter" tone="good" />
         <Metric label="Budget consumed" value="62%" helper="Against civic and commercial targets" tone="info" />
         <Metric label="Receivables" value="AED 3.1M" helper="Open invoices" tone="warn" />
-        <Metric label="Yield gap" value="7.8%" helper="Scenario target" tone="neutral" />
+        <Metric label="Pending approvals" value={String(approvals.filter((a) => a.state === "Pending").length)} helper="Finance sign-off" tone={approvals.filter((a) => a.state === "Pending").length ? "warn" : "good"} />
       </MetricGrid>
+
+      <Panel icon={ShieldCheck} title={t("Bid approvals queue")}>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("Campaign")}</th>
+                <th>{t("Bidder")}</th>
+                <th>{t("Amount")}</th>
+                <th>{t("Margin")}</th>
+                <th>{t("Risk")}</th>
+                <th>{t("Decision")}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {approvals.map((row) => (
+                <tr key={row.id}>
+                  <td data-label={t("Campaign")}><strong>{t(row.campaign)}</strong><span>{t(row.packageName)}</span></td>
+                  <td data-label={t("Bidder")}>{t(row.bidder)}</td>
+                  <td data-label={t("Amount")}>{t(row.amount)}</td>
+                  <td data-label={t("Margin")}>{row.margin}</td>
+                  <td data-label={t("Risk")}><StatusPill label={row.risk} tone={row.risk === "Low" ? "good" : row.risk === "Medium" ? "warn" : "danger"} /></td>
+                  <td data-label={t("Decision")}><StatusPill label={row.state} tone={row.state === "Approved" ? "good" : row.state === "Rejected" ? "danger" : row.state === "On hold" ? "warn" : "info"} /></td>
+                  <td>
+                    {row.state === "Pending" ? (
+                      <div className="row-actions">
+                        <Button onClick={() => decide(row.id, "Approved")}>{t("Approve")}</Button>
+                        <Button variant="secondary" onClick={() => decide(row.id, "On hold")}>{t("Hold")}</Button>
+                        <Button variant="secondary" onClick={() => decide(row.id, "Rejected")}>{t("Reject")}</Button>
+                      </div>
+                    ) : (
+                      <Button variant="secondary" onClick={() => decide(row.id, "Pending")}>{t("Re-open")}</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
       <div className="split-grid wide-left">
         <Panel icon={CircleDollarSign} title="Budget and revenue breakdown">
           <CompactTable
@@ -2568,9 +2899,23 @@ function FinancialsPage({ t }: { t: (value: string) => string }) {
           </div>
         </Panel>
       </div>
+
+      <Panel icon={WalletCards} title={t("Rate card overrides")}>
+        <CompactTable
+          columns={["Package", "Base rate", "Override", "Approver", "Expiry"]}
+          rows={[
+            ["Airport and premium roadside", "AED 32 CPM", "AED 28 CPM", "Finance director", "Jul 31, 2026"],
+            ["Downtown retail loop", "AED 24 CPM", "-", "-", "-"],
+            ["Civic emergency lane", "Non-billed", "Non-billed", "Policy", "Standing"],
+            ["Yas leisure loop", "AED 26 CPM", "AED 24 CPM", "Finance director", "Aug 15, 2026"],
+          ]}
+        />
+      </Panel>
     </PageBody>
   );
 }
+
+
 
 function AiLabPage({ t }: { t: (value: string) => string }) {
   return (
@@ -2619,7 +2964,7 @@ function AiLabPage({ t }: { t: (value: string) => string }) {
   );
 }
 
-function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (value: string) => string }) {
+function CampaignsPage({ campaigns, onNewBrief, t }: { campaigns: BidderCampaign[]; onNewBrief: () => void; t: (value: string) => string }) {
   return (
     <PageBody>
       <MetricGrid>
@@ -2628,7 +2973,11 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
         <Metric label="In review" value={String(campaigns.filter((item) => item.status === "Submitted" || item.status === "In review").length)} helper="ADMO action" tone="warn" />
         <Metric label="Active bids" value={String(campaigns.filter((item) => item.status === "Bidding").length)} helper="Auctions in progress" tone="info" />
       </MetricGrid>
-      <Panel icon={Megaphone} title={t("Campaigns")}>
+      <Panel
+        icon={Megaphone}
+        title={t("Campaigns")}
+        action={<Button icon={FileText} onClick={onNewBrief}>{t("New campaign brief")}</Button>}
+      >
         <div className="table-card">
           <table>
             <thead>
@@ -2658,15 +3007,18 @@ function CampaignsPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (valu
   );
 }
 
+
 function MarketplacePage({
   onSubmit,
   onBid,
   auctions,
+  onNewBrief,
   t,
 }: {
   onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string }) => void;
   onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
   auctions: AuctionLot[];
+  onNewBrief: () => void;
   t: (value: string) => string;
 }) {
   const [selected, setSelected] = useState(marketplacePackages[0]);
@@ -2698,14 +3050,18 @@ function MarketplacePage({
         <Metric label="Fixed-rate packages" value={String(marketplacePackages.length)} helper="Buy without bidding" tone="warn" />
       </MetricGrid>
 
-      <div className="segmented-tabs">
-        <button type="button" className={mode === "auction" ? "active" : ""} onClick={() => setMode("auction")}>
-          {t("Open auctions")}
-        </button>
-        <button type="button" className={mode === "fixed" ? "active" : ""} onClick={() => setMode("fixed")}>
-          {t("Fixed-rate packages")}
-        </button>
+      <div className="marketplace-toolbar">
+        <div className="segmented-tabs">
+          <button type="button" className={mode === "auction" ? "active" : ""} onClick={() => setMode("auction")}>
+            {t("Open auctions")}
+          </button>
+          <button type="button" className={mode === "fixed" ? "active" : ""} onClick={() => setMode("fixed")}>
+            {t("Fixed-rate packages")}
+          </button>
+        </div>
+        <Button icon={FileText} onClick={onNewBrief}>{t("New campaign brief")}</Button>
       </div>
+
 
       {mode === "auction" ? (
         <Panel icon={ShoppingBag} title={t("Open auctions")}>
@@ -3175,7 +3531,7 @@ function assetTone(status: Asset["status"]): Tone {
 }
 
 function alertTone(state: AlertState): Tone {
-  if (state === "Broadcasting" || state === "Checked") return "good";
+  if (state === "Broadcasting" || state === "Checked" || state === "Live on network") return "good";
   if (state === "Broadcast queued") return "info";
   if (state === "Approval required" || state === "Check required") return "warn";
   return "neutral";
@@ -3212,4 +3568,285 @@ function mediaCreative(index: number) {
   return ids[index % ids.length];
 }
 
+
+// ==================== Bidder brief types + wizard ====================
+
+interface BriefPayload {
+  campaign: string;
+  packageName: string;
+  budget: string;
+  creativeId: string;
+  languages: string;
+  startDate: string;
+  endDate: string;
+  priority: "Standard" | "High";
+  objective: string;
+  contactName: string;
+  contactEmail: string;
+  brand: string;
+  vertical: string;
+  audience: string;
+  targetZones: string[];
+  daypart: string;
+  reach: string;
+  compliance: { uaeMedia: boolean; arabicProof: boolean; rightsCleared: boolean; noPolitical: boolean };
+  assets: Array<{ name: string; type: string; size: string; illustration: string }>;
+}
+
+interface FinanceApproval {
+  id: string;
+  campaign: string;
+  bidder: string;
+  packageName: string;
+  amount: string;
+  margin: string;
+  risk: "Low" | "Medium" | "Elevated";
+  state: "Pending" | "Approved" | "On hold" | "Rejected";
+}
+
+const wizardCreativeIds = ["etihad-retail", "yas-tourism", "mall-footfall", "brand-guidelines", "compliance-pack", "live-slate"];
+const wizardZones = ["Corniche", "Downtown", "Yas Island", "Al Ain gateways", "Airport road", "Reem Island"];
+
+function NewCampaignWizard({
+  defaultBidder,
+  onClose,
+  onSubmit,
+  t,
+}: {
+  defaultBidder: string;
+  onClose: () => void;
+  onSubmit: (payload: BriefPayload) => void;
+  t: (v: string) => string;
+}) {
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState<BriefPayload>({
+    campaign: "",
+    packageName: "Downtown retail loop",
+    budget: "AED 320,000",
+    creativeId: wizardCreativeIds[0],
+    languages: "Arabic + English",
+    startDate: "Jul 15, 2026",
+    endDate: "Aug 15, 2026",
+    priority: "Standard",
+    objective: "",
+    contactName: defaultBidder,
+    contactEmail: "campaigns@bidder.ae",
+    brand: "",
+    vertical: "Retail",
+    audience: "Residents 25-45, premium spenders",
+    targetZones: ["Corniche", "Downtown"],
+    daypart: "Prime evening (17:00-22:00)",
+    reach: "Estimated 1.2M impressions / week",
+    compliance: { uaeMedia: false, arabicProof: false, rightsCleared: false, noPolitical: false },
+    assets: [
+      { name: "hero-landscape.mp4", type: "Video 1920x1080", size: "24 MB", illustration: wizardCreativeIds[0] },
+      { name: "hero-portrait.jpg", type: "Image 1080x1920", size: "3.1 MB", illustration: wizardCreativeIds[1] },
+    ],
+  });
+
+  const steps = [
+    t("Brand"),
+    t("Creative pack"),
+    t("Targeting"),
+    t("Schedule and budget"),
+    t("Compliance"),
+    t("Review"),
+  ];
+
+  function update<K extends keyof BriefPayload>(key: K, value: BriefPayload[K]) {
+    setData((d) => ({ ...d, [key]: value }));
+  }
+
+  function toggleZone(zone: string) {
+    setData((d) => ({
+      ...d,
+      targetZones: d.targetZones.includes(zone) ? d.targetZones.filter((z) => z !== zone) : [...d.targetZones, zone],
+    }));
+  }
+
+  function addAsset() {
+    const nextId = wizardCreativeIds[data.assets.length % wizardCreativeIds.length];
+    setData((d) => ({
+      ...d,
+      assets: [...d.assets, { name: `asset-${d.assets.length + 1}.mp4`, type: "Video 1920x1080", size: "18 MB", illustration: nextId }],
+    }));
+  }
+
+  function removeAsset(idx: number) {
+    setData((d) => ({ ...d, assets: d.assets.filter((_, i) => i !== idx) }));
+  }
+
+  const canNext =
+    (step === 0 && data.campaign.trim() && data.brand.trim()) ||
+    (step === 1 && data.assets.length > 0) ||
+    (step === 2 && data.targetZones.length > 0) ||
+    (step === 3 && data.budget.trim()) ||
+    (step === 4 && Object.values(data.compliance).every(Boolean)) ||
+    step === 5;
+
+  return (
+    <div className="wizard-backdrop" role="dialog" aria-modal="true">
+      <div className="wizard-shell">
+        <header className="wizard-header">
+          <div>
+            <strong>{t("New campaign brief")}</strong>
+            <small>{t("Submit a complete bid packet to ADMO CMS")}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}><X size={16} /></button>
+        </header>
+
+        <ol className="wizard-steps">
+          {steps.map((label, i) => (
+            <li key={label} className={i === step ? "active" : i < step ? "done" : ""}>
+              <span>{String(i + 1).padStart(2, "0")}</span>
+              <em>{label}</em>
+            </li>
+          ))}
+        </ol>
+
+        <div className="wizard-body">
+          {step === 0 && (
+            <div className="wizard-grid">
+              <label><span>{t("Campaign name")}</span><input value={data.campaign} onChange={(e) => update("campaign", e.target.value)} placeholder={t("Summer retail launch")} /></label>
+              <label><span>{t("Brand")}</span><input value={data.brand} onChange={(e) => update("brand", e.target.value)} placeholder={t("Etihad Retail")} /></label>
+              <label><span>{t("Vertical")}</span>
+                <select value={data.vertical} onChange={(e) => update("vertical", e.target.value)}>
+                  <option>Retail</option><option>Tourism</option><option>Government</option><option>Finance</option><option>Automotive</option><option>Real estate</option>
+                </select>
+              </label>
+              <label><span>{t("Primary objective")}</span><textarea value={data.objective} onChange={(e) => update("objective", e.target.value)} placeholder={t("Describe what success looks like for this campaign.")} /></label>
+              <label><span>{t("Contact")}</span><input value={data.contactName} onChange={(e) => update("contactName", e.target.value)} /></label>
+              <label><span>{t("Email")}</span><input value={data.contactEmail} onChange={(e) => update("contactEmail", e.target.value)} /></label>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="wizard-creative">
+              <div className="wizard-creative-head">
+                <div>
+                  <strong>{t("Creative pack")}</strong>
+                  <small>{t("Illustrations, motion, and static assets. Arabic + English required.")}</small>
+                </div>
+                <Button icon={Plus} variant="secondary" onClick={addAsset}>{t("Add asset")}</Button>
+              </div>
+              <div className="wizard-asset-grid">
+                {data.assets.map((asset, i) => (
+                  <article key={i} className="wizard-asset">
+                    <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(asset.illustration)}")` }} />
+                    <div className="wizard-asset-meta">
+                      <strong>{asset.name}</strong>
+                      <span>{asset.type} / {asset.size}</span>
+                    </div>
+                    <button type="button" className="icon-btn" onClick={() => removeAsset(i)} aria-label={t("Remove")}><X size={14} /></button>
+                  </article>
+                ))}
+              </div>
+              <label className="wizard-inline"><span>{t("Preview illustration for CMS")}</span>
+                <select value={data.creativeId} onChange={(e) => update("creativeId", e.target.value)}>
+                  {wizardCreativeIds.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </label>
+              <label className="wizard-inline"><span>{t("Languages")}</span>
+                <select value={data.languages} onChange={(e) => update("languages", e.target.value)}>
+                  <option>Arabic + English</option><option>Arabic only</option><option>English only</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="wizard-grid">
+              <label className="wizard-full"><span>{t("Target audience")}</span><input value={data.audience} onChange={(e) => update("audience", e.target.value)} /></label>
+              <div className="wizard-full">
+                <span className="wizard-label">{t("Target zones")}</span>
+                <div className="wizard-chips">
+                  {wizardZones.map((zone) => (
+                    <button key={zone} type="button" className={`wizard-chip ${data.targetZones.includes(zone) ? "on" : ""}`} onClick={() => toggleZone(zone)}>
+                      <MapPinned size={12} /> {t(zone)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label><span>{t("Daypart")}</span>
+                <select value={data.daypart} onChange={(e) => update("daypart", e.target.value)}>
+                  <option>Prime evening (17:00-22:00)</option><option>Morning commute (07:00-10:00)</option><option>Full day rotation</option><option>Weekend leisure</option>
+                </select>
+              </label>
+              <label><span>{t("Expected reach")}</span><input value={data.reach} onChange={(e) => update("reach", e.target.value)} /></label>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="wizard-grid">
+              <label><span>{t("Package")}</span>
+                <select value={data.packageName} onChange={(e) => update("packageName", e.target.value)}>
+                  <option>Downtown retail loop</option><option>Airport and premium roadside</option><option>Yas leisure loop</option><option>Civic bilingual pack</option>
+                </select>
+              </label>
+              <label><span>{t("Total budget")}</span><input value={data.budget} onChange={(e) => update("budget", e.target.value)} placeholder="AED 320,000" /></label>
+              <label><span>{t("Start")}</span><input value={data.startDate} onChange={(e) => update("startDate", e.target.value)} /></label>
+              <label><span>{t("End")}</span><input value={data.endDate} onChange={(e) => update("endDate", e.target.value)} /></label>
+              <label><span>{t("Priority")}</span>
+                <select value={data.priority} onChange={(e) => update("priority", e.target.value as "Standard" | "High")}>
+                  <option value="Standard">Standard</option><option value="High">High</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="wizard-compliance">
+              {([
+                ["uaeMedia", "UAE Media Council compliant"],
+                ["arabicProof", "Arabic copy proof-read by native reviewer"],
+                ["rightsCleared", "Music, imagery and talent rights cleared"],
+                ["noPolitical", "No political or restricted content"],
+              ] as const).map(([key, label]) => (
+                <label key={key} className="wizard-check">
+                  <input type="checkbox" checked={data.compliance[key]} onChange={(e) => update("compliance", { ...data.compliance, [key]: e.target.checked })} />
+                  <span>{t(label)}</span>
+                </label>
+              ))}
+              <p className="wizard-hint">{t("All items must be confirmed. ADMO will re-verify via MediaGPT deep-scan.")}</p>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="wizard-review">
+              <div className="wizard-review-grid">
+                <Detail label="Campaign" value={data.campaign || "-"} />
+                <Detail label="Brand" value={data.brand || "-"} />
+                <Detail label="Package" value={data.packageName} />
+                <Detail label="Budget" value={data.budget} />
+                <Detail label="Start" value={data.startDate} />
+                <Detail label="End" value={data.endDate} />
+                <Detail label="Languages" value={data.languages} />
+                <Detail label="Priority" value={data.priority} />
+                <Detail label="Zones" value={data.targetZones.join(", ") || "-"} />
+                <Detail label="Daypart" value={data.daypart} />
+                <Detail label="Assets" value={`${data.assets.length} files`} />
+                <Detail label="Compliance" value={Object.values(data.compliance).every(Boolean) ? "All confirmed" : "Incomplete"} />
+              </div>
+              <div className="creative-frame large" style={{ backgroundImage: `url("${creativeBackground(data.creativeId)}")` }} />
+            </div>
+          )}
+        </div>
+
+        <footer className="wizard-footer">
+          <Button variant="secondary" onClick={() => (step === 0 ? onClose() : setStep(step - 1))}>
+            {step === 0 ? t("Cancel") : t("Back")}
+          </Button>
+          <div className="wizard-progress">{step + 1} / {steps.length}</div>
+          {step < steps.length - 1 ? (
+            <Button onClick={() => canNext && setStep(step + 1)}>{t("Continue")}</Button>
+          ) : (
+            <Button icon={Send} onClick={() => onSubmit(data)}>{t("Submit to ADMO")}</Button>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 export default App;
+
