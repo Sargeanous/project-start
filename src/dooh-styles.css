@@ -3370,8 +3370,10 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
   color: var(--muted);
   letter-spacing: 0.02em;
 }
-.powered-by img { display: block; width: 14px; height: 14px; object-fit: contain; }
+.powered-by img { display: block; object-fit: contain; }
 .powered-by strong { font-weight: 600; color: var(--text); letter-spacing: 0.01em; }
+.powered-by--sidebar img { width: 16px; height: 16px; }
+.powered-by--login img { width: 18px; height: 18px; }
 .powered-by--login {
   position: absolute;
   bottom: 20px;
