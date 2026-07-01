@@ -2554,15 +2554,8 @@ input:focus, textarea:focus, select:focus {
 }
 .subsidebar button:hover:not(.active) { background: var(--surface-2); color: var(--ink); border-color: transparent; }
 
-/* ---- VERIFICATION ---- */
-.verification-step { padding: 14px; border-radius: 12px; background: var(--surface); }
-.verification-step > span {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: var(--sage-soft);
-  color: var(--primary-dark);
-  font-weight: 600;
-}
+
+
 
 /* ---- SCENARIO RESULT ---- */
 .scenario-result {
