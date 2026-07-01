@@ -943,6 +943,7 @@ function App() {
   const [campaigns, setCampaigns] = useState<BidderCampaign[]>(seedBidderCampaigns);
   const [schedule, setSchedule] = useState<ScheduleItem[]>(seedSchedule);
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
+  const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
   const [toast, setToast] = useState("");
 
   const t = (value: string) => (lang === "ar" ? translations[value] ?? value : value);
