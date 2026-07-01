@@ -1013,10 +1013,7 @@ const translations: Record<string, string> = {
   "Discover, Command, Create, Protect, Optimize, Safeguard": "الاكتشاف، التنفيذ، الإنشاء، الحماية، التحسين، الحراسة",
   "Arabic parity": "التكافؤ العربي",
   "Bilingual QA on outputs": "فحص ثنائي اللغة للمخرجات",
-  "Discover": "الاكتشاف",
-  "Command": "التنفيذ",
-  "Create": "الإنشاء",
-  "Protect": "الحماية",
+  
   "Optimize": "التحسين",
   "Safeguard": "الحراسة",
   "Natural-language search across campaigns, assets, and archives.": "بحث بلغة طبيعية عبر الحملات والأصول والأرشيف.",
