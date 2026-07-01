@@ -111,9 +111,26 @@ interface BidderCampaign {
   campaign: string;
   packageName: string;
   budget: string;
-  status: "Draft" | "Submitted" | "In review" | "Approved" | "Scheduled" | "Published";
+  status: "Draft" | "Bidding" | "Submitted" | "In review" | "Approved" | "Scheduled" | "Published";
   reach: string;
   nextStep: string;
+}
+
+interface AuctionLot {
+  id: string;
+  lotName: string;
+  packageName: string;
+  network: string;
+  flightWindow: string;
+  impressions: string;
+  floorPrice: number;
+  currentBid: number;
+  leadingBidder: string;
+  minIncrement: number;
+  bidCount: number;
+  closesAt: string;
+  creativeId: string;
+  currency: string;
 }
 
 interface ScheduleItem {
