@@ -989,7 +989,7 @@ const translations: Record<string, string> = {
   "Submission": "التقديم",
   "AI Screening": "الفحص بالذكاء الاصطناعي",
   "Human Moderation": "المراجعة البشرية",
-  "Scheduling": "الجدولة",
+  
   "Distribution": "التوزيع",
   "Edge Play": "التشغيل على الحافة",
   "Proof-of-Play": "إثبات التشغيل",
