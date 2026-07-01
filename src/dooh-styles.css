@@ -2196,6 +2196,10 @@ html[dir="rtl"] .panel-header h2 {
   object-fit: contain;
   display: block;
 }
+.login-brand .brand-mark {
+  width: 64px;
+  height: 64px;
+}
 .login-intro { color: var(--muted); font-size: 14px; line-height: 1.6; }
 .profile-card {
   min-height: 100px;
