@@ -367,7 +367,7 @@ const marketplacePackages = [
 type Translator = (value: string) => string;
 
 const translations: Record<string, string> = {
-  "ADMO Unified DOOH Platform": "منصة أبوظبي الموحدة للإعلانات الخارجية الرقمية",
+  "Unified DOOH Platform": "منصة الإعلانات الخارجية الرقمية الموحدة",
   "DOOH": "الإعلانات الخارجية الرقمية",
   "Unified Platform": "المنصة الموحدة",
   "Access profile": "ملف الدخول",
