@@ -3384,7 +3384,8 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
   border-top: 1px solid rgba(255,255,255,0.06);
   color: rgba(244,246,245,0.5);
 }
-.powered-by--sidebar strong { color: rgba(244,246,245,0.9); }
+.powered-by--sidebar, .powered-by--sidebar span { color: rgba(244,246,245,0.55); }
+.powered-by--sidebar strong { color: rgba(244,246,245,0.95); }
 .app.sidebar-collapsed .powered-by--sidebar span,
 .app.sidebar-collapsed .powered-by--sidebar strong { display: none; }
 .app.sidebar-collapsed .powered-by--sidebar { justify-content: center; padding: 8px 0 0; }
