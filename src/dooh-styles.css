@@ -2009,15 +2009,8 @@ input:focus, textarea:focus, select:focus {
   color: var(--ink);
 }
 
-/* ---- VERIFICATION ---- */
-.verification-step { padding: 12px; border-radius: 8px; }
-.verification-step > span {
-  width: 28px; height: 28px;
-  background: var(--primary-tint);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 700;
-}
+
+
 
 /* ---- SCENARIO / MEDIAGPT ---- */
 .scenario-result {
