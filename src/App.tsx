@@ -210,7 +210,7 @@ const profiles: Profile[] = [
   },
   {
     id: "bidder",
-    name: "Sample Advertiser",
+    name: "Advertiser",
     role: "Bidder account",
     organization: "External partner",
     pages: ["campaigns", "marketplace"],
@@ -270,7 +270,7 @@ const seedSubmissions: Submission[] = [
   {
     id: "SUB-1048",
     campaign: "Airport retail launch",
-    bidder: "Sample Advertiser",
+    bidder: "Advertiser",
     packageName: "Airport and premium roadside",
     owner: "Maya Haddad",
     requestedStart: "Jul 08, 2026",
@@ -599,7 +599,7 @@ const translations: Record<string, string> = {
   "Commercial finance": "المالية التجارية",
   "Platform Admin": "مدير المنصة",
   "Platform governance": "حوكمة المنصة",
-  "Sample Advertiser": "معلن نموذجي",
+  "Advertiser": "معلن",
   "Bidder account": "حساب مزايد",
 
   "Assets live": "الأصول النشطة",
@@ -2789,7 +2789,7 @@ function FinancialsPage({ submissions, notify, t }: { submissions: Submission[];
       base.push({
         id: "FIN-1200",
         campaign: "Airport retail launch",
-        bidder: "Sample Advertiser",
+        bidder: "Advertiser",
         packageName: "Airport and premium roadside",
         amount: "AED 420,000",
         margin: "24%",
@@ -3694,7 +3694,7 @@ function NewCampaignWizard({
           {step === 0 && (
             <div className="wizard-grid">
               <label><span>{t("Campaign name")}</span><input value={data.campaign} onChange={(e) => update("campaign", e.target.value)} placeholder={t("Summer retail launch")} /></label>
-              <label><span>{t("Brand")}</span><input value={data.brand} onChange={(e) => update("brand", e.target.value)} placeholder={t("Sample Advertiser")} /></label>
+              <label><span>{t("Brand")}</span><input value={data.brand} onChange={(e) => update("brand", e.target.value)} placeholder={t("Advertiser")} /></label>
               <label><span>{t("Vertical")}</span>
                 <select value={data.vertical} onChange={(e) => update("vertical", e.target.value)}>
                   <option>Retail</option><option>Tourism</option><option>Government</option><option>Finance</option><option>Automotive</option><option>Real estate</option>
