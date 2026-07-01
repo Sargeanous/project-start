@@ -1415,23 +1415,36 @@ function Sidebar({
   page,
   goTo,
   onSwitch,
+  collapsed,
+  onToggleCollapsed,
   t,
 }: {
   profile: Profile;
   page: Page;
   goTo: (page: Page) => void;
   onSwitch: () => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   t: (value: string) => string;
 }) {
   const allowed = new Set(profile.pages);
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
       <div className="sidebar-brand">
         <img className="brand-mark" src={admoLogo} alt="ADMO" />
-        <div>
+        <div className="sidebar-brand-text">
           <strong>{t("DOOH")}</strong>
           <span>{t("Unified Platform")}</span>
         </div>
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={onToggleCollapsed}
+          aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+          title={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
       <div className="current-profile">
         <small>{t("Access profile")}</small>
