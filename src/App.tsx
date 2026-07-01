@@ -1318,8 +1318,8 @@ function App() {
 
   return (
     <I18nContext.Provider value={t}>
-      <div className="app" dir={lang === "ar" ? "rtl" : "ltr"}>
-        <Sidebar profile={profile} page={page} goTo={goTo} onSwitch={() => setProfile(null)} t={t} />
+      <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} dir={lang === "ar" ? "rtl" : "ltr"}>
+        <Sidebar profile={profile} page={page} goTo={goTo} onSwitch={() => setProfile(null)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((v) => !v)} t={t} />
         <main className="workspace">
           <Topbar profile={profile} page={page} lang={lang} setLang={setLang} t={t} />
           {page === "control" && (
