@@ -1939,18 +1939,45 @@ function KanbanBoard() {
 
 type Boundary = "Read-only" | "Recommend" | "Execute with approval" | "Never modify";
 
-type MediaGptFamily = {
-  id: string;
+type AgentId = "discover" | "command" | "create" | "protect" | "optimize" | "safeguard";
+
+type AgentResult = {
+  summary: string;
+  columns?: string[];
+  rows?: string[][];
+  notes?: string[];
+  primaryAction?: string;
+  primaryTone?: Tone;
+};
+
+type AgentInputs = Record<string, string>;
+
+type AgentSpec = {
+  id: AgentId;
   name: string;
   icon: LucideIcon;
   tagline: string;
   boundary: Boundary;
   agents: string[];
-  prompt: string;
-  output: string;
+  fields: Array<
+    | { key: string; kind: "text"; label: string; placeholder: string; defaultValue: string }
+    | { key: string; kind: "textarea"; label: string; placeholder: string; defaultValue: string }
+    | { key: string; kind: "select"; label: string; options: string[]; defaultValue: string }
+  >;
+  run: (input: AgentInputs) => AgentResult;
 };
 
-const mediaGptFamilies: MediaGptFamily[] = [
+const zoneOptions = ["Abu Dhabi City", "Yas Island", "Airport route", "Downtown", "Al Ain", "Industrial Zone"];
+const daypartOptions = ["Morning peak", "Midday", "Evening peak", "Overnight"];
+const languageOptions = ["Arabic first", "English first", "Bilingual"];
+const toneOptions = ["Civic", "Commercial", "Cultural", "Emergency"];
+const windowOptions = ["Last 1 hour", "Last 24 hours", "Last 7 days"];
+
+function fmtAed(n: number): string {
+  return `AED ${n.toLocaleString("en-US")}`;
+}
+
+const mediaGptAgents: AgentSpec[] = [
   {
     id: "discover",
     name: "Discover",
@@ -1958,8 +1985,24 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Natural-language search across campaigns, assets, and archives.",
     boundary: "Read-only",
     agents: ["MediaGPT Insights", "Archive NLQ"],
-    prompt: "When did Coca-Cola last advertise on Yas Island, and what was the contract value?",
-    output: "Last Yas Island placement: Aug 2024. Contract value AED 268,500. Most recent estate placement: Mar 2025, Maqta Bridge.",
+    fields: [
+      { key: "q", kind: "text", label: "Query", placeholder: "e.g. Coca-Cola placements on Yas Island last year", defaultValue: "Coca-Cola placements on Yas Island last year" },
+      { key: "scope", kind: "select", label: "Scope", options: ["Campaigns", "Assets", "Archive"], defaultValue: "Campaigns" },
+    ],
+    run: (input) => {
+      const q = input.q.trim() || "recent placements";
+      return {
+        summary: `${input.scope} matching "${q}" - 3 results found.`,
+        columns: ["Campaign", "Advertiser", "Zone", "Ran", "Value"],
+        rows: [
+          ["Yas summer promo", "Coca-Cola", "Yas Island", "Aug 2024", "AED 268,500"],
+          ["Retail activation", "Coca-Cola", "Downtown", "Nov 2024", "AED 142,000"],
+          ["Airport refresh", "Coca-Cola", "Airport route", "Mar 2025", "AED 318,900"],
+        ],
+        primaryAction: "Export results",
+        primaryTone: "info",
+      };
+    },
   },
   {
     id: "command",
@@ -1968,8 +2011,30 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Compose workflows across scheduling, targeting, and distribution.",
     boundary: "Execute with approval",
     agents: ["Workflow Composer", "Targeting Assistant"],
-    prompt: "Select all parking assets within 1 km of ADNEC and push a weekday morning campaign.",
-    output: "Workflow prepared: resolve geography, select approved creative, set schedule, run governance check, save reusable task.",
+    fields: [
+      { key: "zone", kind: "select", label: "Zone", options: zoneOptions, defaultValue: "Airport route" },
+      { key: "daypart", kind: "select", label: "Daypart", options: daypartOptions, defaultValue: "Morning peak" },
+      { key: "creative", kind: "text", label: "Approved creative ID", placeholder: "CR-90421", defaultValue: "CR-90421" },
+    ],
+    run: (input) => {
+      const matches = estateAssets.filter((a) => a.zone === input.zone).slice(0, 6);
+      const count = matches.length || 4;
+      return {
+        summary: `Workflow prepared: ${count} assets in ${input.zone}, ${input.daypart}, creative ${input.creative || "CR-90421"}.`,
+        columns: ["Asset", "Type", "Status"],
+        rows: matches.length
+          ? matches.map((a) => [a.id, a.type ?? "Panel", a.status])
+          : [
+              ["AD-APT-003", "Roadside", "Live"],
+              ["AD-APT-007", "Roadside", "Live"],
+              ["AD-APT-011", "Roadside", "Standby"],
+              ["AD-APT-014", "Roadside", "Live"],
+            ],
+        notes: ["Governance check pending", "Requires named approver before push"],
+        primaryAction: "Queue for approval",
+        primaryTone: "warn",
+      };
+    },
   },
   {
     id: "create",
@@ -1978,8 +2043,26 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Generative studio for civic messaging in Arabic and English.",
     boundary: "Recommend",
     agents: ["MediaGPT Studio", "DCO Adapter"],
-    prompt: "Make-it-in-the-Emirates, desert sunrise, Arabic first, civic tone.",
-    output: "Three bilingual concepts generated and adapted to 6:1, 9:16, 1:1 and 3:4 panels.",
+    fields: [
+      { key: "brief", kind: "textarea", label: "Brief", placeholder: "e.g. Make-it-in-the-Emirates, desert sunrise, civic tone", defaultValue: "Make-it-in-the-Emirates, desert sunrise, civic tone" },
+      { key: "language", kind: "select", label: "Language", options: languageOptions, defaultValue: "Arabic first" },
+      { key: "tone", kind: "select", label: "Tone", options: toneOptions, defaultValue: "Civic" },
+    ],
+    run: (input) => {
+      const brief = input.brief.trim() || "civic campaign";
+      return {
+        summary: `3 concepts generated for "${brief.slice(0, 60)}" - ${input.language}, ${input.tone} tone.`,
+        columns: ["Concept", "Headline", "Formats"],
+        rows: [
+          ["Concept A", "Made here. Made for tomorrow.", "6:1, 9:16, 1:1"],
+          ["Concept B", "The future is manufactured here.", "6:1, 9:16, 3:4"],
+          ["Concept C", "From our sands, to the world.", "6:1, 1:1, 3:4"],
+        ],
+        notes: ["Arabic parity verified", "Awaiting reviewer sign-off before publish"],
+        primaryAction: "Send to CMS Library",
+        primaryTone: "info",
+      };
+    },
   },
   {
     id: "protect",
@@ -1988,8 +2071,26 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Content moderation, deepfake detection, and rights checks.",
     boundary: "Never modify",
     agents: ["MediaGPT Moderator", "MediaGPT Compliance Agent"],
-    prompt: "Check authenticity, rights and cultural soundness for CR-90421.",
-    output: "Integrity score 97%. No manipulation detected. Copyright match requires named approver review.",
+    fields: [
+      { key: "submission", kind: "select", label: "Submission", options: seedSubmissions.map((s) => `${s.id} - ${s.campaign}`), defaultValue: `${seedSubmissions[0].id} - ${seedSubmissions[0].campaign}` },
+      { key: "check", kind: "select", label: "Check depth", options: ["Standard", "Deep", "Cultural review"], defaultValue: "Deep" },
+    ],
+    run: (input) => {
+      const id = input.submission.split(" ")[0];
+      return {
+        summary: `${input.check} check complete for ${id}. Cleared with 1 flag.`,
+        columns: ["Check", "Result", "Confidence"],
+        rows: [
+          ["Integrity scan", "Pass", "97%"],
+          ["Deepfake detection", "No manipulation", "99%"],
+          ["Rights and licensing", "Match found - review", "84%"],
+          ["Cultural soundness", "Pass", "96%"],
+        ],
+        notes: ["Rights match requires named approver review"],
+        primaryAction: "Escalate to reviewer",
+        primaryTone: "warn",
+      };
+    },
   },
   {
     id: "optimize",
@@ -1998,8 +2099,26 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Yield, slot allocation, and dynamic pricing recommendations.",
     boundary: "Recommend",
     agents: ["MediaGPT Optimizer", "Yield Advisor"],
-    prompt: "Where can we lift airport-loop yield without cannibalising civic slots?",
-    output: "Reallocate 6 evening slots on AD-APT-{003,007} to premium retail. Projected uplift AED 42,000 / week. No civic conflict.",
+    fields: [
+      { key: "zone", kind: "select", label: "Asset group", options: zoneOptions, defaultValue: "Airport route" },
+      { key: "target", kind: "select", label: "Target uplift", options: ["+5%", "+10%", "+15%", "+20%"], defaultValue: "+10%" },
+    ],
+    run: (input) => {
+      const uplift = parseInt(input.target.replace(/[^0-9]/g, ""), 10) || 10;
+      const base = 32000 + uplift * 900;
+      return {
+        summary: `${input.zone}: ${input.target} uplift plan - projected ${fmtAed(base)} / week, no civic conflict.`,
+        columns: ["Action", "Asset", "Impact"],
+        rows: [
+          ["Reallocate 6 evening slots", "AD-APT-003", `+${fmtAed(Math.round(base * 0.4))}`],
+          ["Reallocate 4 evening slots", "AD-APT-007", `+${fmtAed(Math.round(base * 0.35))}`],
+          ["Raise floor CPM", "Airport-loop pool", `+${fmtAed(Math.round(base * 0.25))}`],
+        ],
+        notes: ["No civic slot cannibalisation detected"],
+        primaryAction: "Send to Financials",
+        primaryTone: "good",
+      };
+    },
   },
   {
     id: "safeguard",
@@ -2008,8 +2127,21 @@ const mediaGptFamilies: MediaGptFamily[] = [
     tagline: "Edge, CMS and network anomaly detection with audit trails.",
     boundary: "Read-only",
     agents: ["MediaGPT Sentinel", "Drift Monitor"],
-    prompt: "Anything unusual on the network in the last 24h?",
-    output: "2 anomalies: latency spike on AD-BRG-014 (23:04, resolved), signed model drift within tolerance on Moderator v1.4.",
+    fields: [
+      { key: "window", kind: "select", label: "Window", options: windowOptions, defaultValue: "Last 24 hours" },
+      { key: "surface", kind: "select", label: "Surface", options: ["All", "Edge", "CMS", "Network"], defaultValue: "All" },
+    ],
+    run: (input) => ({
+      summary: `${input.surface} surface, ${input.window}: 2 anomalies, 1 resolved.`,
+      columns: ["Time", "Signal", "Severity", "Status"],
+      rows: [
+        ["23:04", "Latency spike AD-BRG-014", "Medium", "Resolved"],
+        ["09:12", "Model drift - Moderator v1.4", "Low", "Within tolerance"],
+      ],
+      notes: ["Signed audit trail available for both events"],
+      primaryAction: "Open audit log",
+      primaryTone: "info",
+    }),
   },
 ];
 
@@ -2020,39 +2152,169 @@ function boundaryTone(boundary: Boundary): Tone {
   return "danger";
 }
 
+type RunLogEntry = {
+  id: string;
+  agent: string;
+  boundary: Boundary;
+  summary: string;
+  at: string;
+};
+
 function MediaGptSuite({ t }: { t: (value: string) => string }) {
+  const [activeId, setActiveId] = useState<AgentId>("discover");
+  const active = mediaGptAgents.find((a) => a.id === activeId)!;
+  const [inputs, setInputs] = useState<AgentInputs>(() => {
+    const seed: AgentInputs = {};
+    active.fields.forEach((f) => (seed[f.key] = f.defaultValue));
+    return seed;
+  });
+  const [result, setResult] = useState<AgentResult | null>(null);
+  const [log, setLog] = useState<RunLogEntry[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function selectAgent(id: AgentId) {
+    const spec = mediaGptAgents.find((a) => a.id === id)!;
+    const seed: AgentInputs = {};
+    spec.fields.forEach((f) => (seed[f.key] = f.defaultValue));
+    setActiveId(id);
+    setInputs(seed);
+    setResult(null);
+  }
+
+  function updateInput(key: string, value: string) {
+    setInputs((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function runAgent() {
+    const out = active.run(inputs);
+    setResult(out);
+    const now = new Date();
+    const at = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setLog((prev) => [
+      { id: `${active.id}-${Date.now()}`, agent: active.name, boundary: active.boundary, summary: out.summary, at },
+      ...prev,
+    ].slice(0, 6));
+  }
+
+  function performPrimary() {
+    if (!result?.primaryAction) return;
+    setToast(`${t(result.primaryAction)} - ${t("submitted for governance")}`);
+    setTimeout(() => setToast(null), 2400);
+  }
+
+  const ActiveIcon = active.icon;
+
   return (
     <PageBody>
       <MetricGrid>
-        <Metric label="Agents active" value="12" helper="Governed platform agents" tone="good" />
-        <Metric label="Families" value="6" helper="Discover, Command, Create, Protect, Optimize, Safeguard" tone="info" />
+        <Metric label="Agents active" value={String(mediaGptAgents.length)} helper="Governed platform agents" tone="good" />
+        <Metric label="Runs today" value={String(log.length)} helper="This session" tone="info" />
         <Metric label="Human approvals" value="11" helper="Required before execution" tone="warn" />
         <Metric label="Arabic parity" value="98%" helper="Bilingual QA on outputs" tone="good" />
       </MetricGrid>
 
-      <div className="family-grid">
-        {mediaGptFamilies.map((family) => {
-          const Icon = family.icon;
-          return (
-            <article key={family.id} className="family-card">
-              <header>
-                <span className="family-icon"><Icon size={18} /></span>
-                <div>
-                  <strong>{t(family.name)}</strong>
-                  <small>{t(family.tagline)}</small>
-                </div>
-                <span className={`boundary-badge tone-${boundaryTone(family.boundary)}`}>{t(family.boundary)}</span>
-              </header>
-              <div className="family-agents">
-                {family.agents.map((agent) => (
-                  <span key={agent} className="agent-chip">{t(agent)}</span>
-                ))}
+      <div className="workbench-grid">
+        <aside className="agent-rail" aria-label={t("Agents")}>
+          <div className="agent-rail-title">{t("Agent families")}</div>
+          {mediaGptAgents.map((a) => {
+            const Icon = a.icon;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                className={`agent-rail-item ${a.id === activeId ? "active" : ""}`}
+                onClick={() => selectAgent(a.id)}
+              >
+                <span className="family-icon"><Icon size={16} /></span>
+                <span className="agent-rail-body">
+                  <strong>{t(a.name)}</strong>
+                  <small>{t(a.tagline)}</small>
+                </span>
+              </button>
+            );
+          })}
+        </aside>
+
+        <section className="workbench">
+          <header className="workbench-header">
+            <div className="workbench-title">
+              <span className="family-icon"><ActiveIcon size={18} /></span>
+              <div>
+                <strong>{t(active.name)}</strong>
+                <small>{active.agents.map((a) => t(a)).join(" - ")}</small>
               </div>
-              <MediaGptPrompt prompt={family.prompt} output={family.output} />
-            </article>
-          );
-        })}
+            </div>
+            <span className={`boundary-badge tone-${boundaryTone(active.boundary)}`}>{t(active.boundary)}</span>
+          </header>
+
+          <div className="workbench-form">
+            {active.fields.map((field) => (
+              <label key={field.key} className="workbench-field">
+                <span>{t(field.label)}</span>
+                {field.kind === "text" && (
+                  <input
+                    type="text"
+                    value={inputs[field.key] ?? ""}
+                    placeholder={t(field.placeholder)}
+                    onChange={(e) => updateInput(field.key, e.target.value)}
+                  />
+                )}
+                {field.kind === "textarea" && (
+                  <textarea
+                    rows={3}
+                    value={inputs[field.key] ?? ""}
+                    placeholder={t(field.placeholder)}
+                    onChange={(e) => updateInput(field.key, e.target.value)}
+                  />
+                )}
+                {field.kind === "select" && (
+                  <select value={inputs[field.key] ?? ""} onChange={(e) => updateInput(field.key, e.target.value)}>
+                    {field.options.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                )}
+              </label>
+            ))}
+          </div>
+
+          <ActionRow>
+            <Button icon={Zap} onClick={runAgent}>Run agent</Button>
+            {result?.primaryAction ? (
+              <Button icon={Send} variant="secondary" onClick={performPrimary}>{result.primaryAction}</Button>
+            ) : null}
+          </ActionRow>
+
+          {result ? (
+            <div className="workbench-result">
+              <div className="workbench-summary">{t(result.summary)}</div>
+              {result.columns && result.rows ? (
+                <CompactTable columns={result.columns} rows={result.rows} />
+              ) : null}
+              {result.notes?.length ? (
+                <ul className="workbench-notes">
+                  {result.notes.map((note) => <li key={note}>{t(note)}</li>)}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <div className="workbench-empty">{t("Set the inputs above and run the agent to see governed output.")}</div>
+          )}
+        </section>
       </div>
+
+      <Panel icon={Activity} title="Recent runs">
+        {log.length === 0 ? (
+          <div className="workbench-empty">{t("No runs in this session yet.")}</div>
+        ) : (
+          <CompactTable
+            columns={["Time", "Agent", "Boundary", "Result"]}
+            rows={log.map((entry) => [entry.at, entry.agent, entry.boundary, entry.summary])}
+          />
+        )}
+      </Panel>
+
+      {toast ? <Toast>{toast}</Toast> : null}
     </PageBody>
   );
 }
