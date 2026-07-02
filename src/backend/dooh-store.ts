@@ -2,9 +2,11 @@ type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "P
 type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
 type Priority = "Low" | "Medium" | "High";
-type CampaignStatus = "Draft" | "Bidding" | "Submitted" | "In review" | "Approved" | "Scheduled" | "Published";
+type CampaignStatus = "Draft" | "Bidding" | "Submitted" | "In review" | "Changes requested" | "Approved" | "Scheduled" | "Published";
 type ScheduleState = "Playing" | "Queued" | "Scheduled";
 type FinanceState = "Pending" | "Approved" | "On hold" | "Rejected";
+type NotificationRecipient = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
+type NotificationTone = "info" | "action" | "success" | "warning" | "critical";
 
 export interface Submission {
   id: string;
@@ -29,6 +31,20 @@ export interface BidderCampaign {
   status: CampaignStatus;
   reach: string;
   nextStep: string;
+  revisionMessage?: string;
+  revisionRequestedAt?: string;
+  revisionFrom?: string;
+}
+
+export interface BidderCommunication {
+  id: string;
+  submissionId: string;
+  campaign: string;
+  bidder: string;
+  from: string;
+  message: string;
+  sentAt: string;
+  status: "Unread" | "Read";
 }
 
 export interface AuctionLot {
@@ -114,9 +130,22 @@ export interface ActivityItem {
   at: string;
 }
 
+export interface PlatformNotification {
+  id: string;
+  title: string;
+  body: string;
+  subject: string;
+  recipients: NotificationRecipient[];
+  page: string;
+  tone: NotificationTone;
+  createdAt: string;
+  readBy: NotificationRecipient[];
+}
+
 export interface DoohState {
   submissions: Submission[];
   campaigns: BidderCampaign[];
+  bidderMessages: BidderCommunication[];
   schedule: ScheduleItem[];
   published: PublishedItem[];
   auctions: AuctionLot[];
@@ -125,6 +154,7 @@ export interface DoohState {
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
   activity: ActivityItem[];
+  notifications: PlatformNotification[];
 }
 
 export interface BriefPayload {
@@ -242,6 +272,7 @@ const initialState: DoohState = {
       nextStep: "Proof-of-play reconciliation",
     },
   ],
+  bidderMessages: [],
   schedule: [
     { id: "SCH-001", time: "08:00", asset: "AD-HWY-001", campaign: "Road safety rotation", owner: "ADMO", state: "Playing" },
     { id: "SCH-002", time: "09:30", asset: "AD-BUS-022", campaign: "Yas summer promotion", owner: "Yas Tourism", state: "Queued" },
@@ -345,6 +376,41 @@ const initialState: DoohState = {
   activity: [
     { id: "ACT-001", actor: "System", action: "Seeded demo state", subject: "DOOH platform", at: new Date().toISOString() },
   ],
+  notifications: [
+    {
+      id: "NOT-001",
+      title: "CMS review waiting",
+      body: "Airport retail launch is ready for ADMO content review.",
+      subject: "Airport retail launch",
+      recipients: ["reviewer", "admin"],
+      page: "cms",
+      tone: "action",
+      createdAt: new Date().toISOString(),
+      readBy: [],
+    },
+    {
+      id: "NOT-002",
+      title: "Emergency checks required",
+      body: "Weather alert broadcast must pass MediaGPT checks before queueing.",
+      subject: "Weather alert broadcast",
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "critical",
+      createdAt: new Date().toISOString(),
+      readBy: [],
+    },
+    {
+      id: "NOT-003",
+      title: "Finance approval pending",
+      body: "Airport retail launch needs finance sign-off.",
+      subject: "Airport retail launch",
+      recipients: ["finance", "admin"],
+      page: "financials",
+      tone: "action",
+      createdAt: new Date().toISOString(),
+      readBy: [],
+    },
+  ],
 };
 
 declare global {
@@ -358,6 +424,18 @@ function cloneState(state: DoohState): DoohState {
 
 function cloneInitialState(): DoohState {
   return cloneState(initialState);
+}
+
+function normalizeState(state: DoohState): DoohState {
+  return {
+    ...state,
+    bidderMessages: state.bidderMessages ?? [],
+    notifications: (state.notifications?.length ? state.notifications : cloneState(initialState).notifications).map((notification) => ({
+      ...notification,
+      readBy: notification.readBy ?? [],
+    })),
+    campaigns: state.campaigns.map((campaign) => ({ ...campaign })),
+  };
 }
 
 function formatNow() {
@@ -377,6 +455,21 @@ function addActivity(state: DoohState, actor: string, action: string, subject: s
   ].slice(0, 80);
 }
 
+function addNotification(
+  state: DoohState,
+  notification: Omit<PlatformNotification, "id" | "createdAt" | "readBy">,
+) {
+  state.notifications = [
+    {
+      id: nextId("NOT", state.notifications ?? []),
+      createdAt: formatNow(),
+      readBy: [],
+      ...notification,
+    },
+    ...(state.notifications ?? []),
+  ].slice(0, 120);
+}
+
 function nextId(prefix: string, items: Array<{ id: string }>) {
   const highest = items.reduce((max, item) => {
     const numeric = Number.parseInt(item.id.replace(/\D/g, ""), 10);
@@ -386,6 +479,7 @@ function nextId(prefix: string, items: Array<{ id: string }>) {
 }
 
 function campaignStatusFromStage(stage: SubmissionStage): CampaignStatus {
+  if (stage === "Changes requested") return "Changes requested";
   if (stage === "In review") return "In review";
   if (stage === "Approved") return "Approved";
   if (stage === "Scheduled") return "Scheduled";
@@ -429,9 +523,10 @@ async function writePersistedState(state: DoohState) {
 
 export async function getState(): Promise<DoohState> {
   if (!globalThis.__doohBackendState) {
-    globalThis.__doohBackendState = (await readPersistedState()) ?? cloneInitialState();
+    globalThis.__doohBackendState = normalizeState((await readPersistedState()) ?? cloneInitialState());
     await writePersistedState(globalThis.__doohBackendState);
   }
+  globalThis.__doohBackendState = normalizeState(globalThis.__doohBackendState);
   return cloneState(globalThis.__doohBackendState);
 }
 
@@ -448,6 +543,24 @@ export async function resetState(): Promise<DoohState> {
   globalThis.__doohBackendState = cloneState(state);
   await writePersistedState(state);
   return cloneState(state);
+}
+
+export async function markNotificationRead(id: string, profileId: NotificationRecipient): Promise<DoohState> {
+  return commit((draft) => {
+    const notification = draft.notifications.find((item) => item.id === id);
+    if (!notification) throw new Error("Notification not found");
+    if (!notification.readBy.includes(profileId)) notification.readBy = [...notification.readBy, profileId];
+  });
+}
+
+export async function markAllNotificationsRead(profileId: NotificationRecipient): Promise<DoohState> {
+  return commit((draft) => {
+    draft.notifications = draft.notifications.map((notification) =>
+      notification.recipients.includes(profileId) && !notification.readBy.includes(profileId)
+        ? { ...notification, readBy: [...notification.readBy, profileId] }
+        : notification,
+    );
+  });
 }
 
 export async function createSubmission(payload: BriefPayload, actor: string): Promise<{ state: DoohState; submission: Submission }> {
@@ -493,6 +606,30 @@ export async function createSubmission(payload: BriefPayload, actor: string): Pr
       },
       ...draft.financeApprovals,
     ];
+    addNotification(draft, {
+      title: "New CMS submission",
+      body: `${created.campaign} from ${created.bidder} is ready for content review.`,
+      subject: created.campaign,
+      recipients: ["reviewer", "admin"],
+      page: "cms",
+      tone: "action",
+    });
+    addNotification(draft, {
+      title: "Finance approval pending",
+      body: `${created.campaign} needs finance sign-off for ${created.budget}.`,
+      subject: created.campaign,
+      recipients: ["finance", "admin"],
+      page: "financials",
+      tone: "action",
+    });
+    addNotification(draft, {
+      title: "Campaign submitted",
+      body: `${created.campaign} was submitted to ADMO CMS.`,
+      subject: created.campaign,
+      recipients: ["bidder"],
+      page: "campaigns",
+      tone: "info",
+    });
     addActivity(draft, actor, "Submitted campaign brief", created.campaign);
   });
   return { state, submission: created };
@@ -549,6 +686,22 @@ export async function placeBid(payload: { lotId: string; amount: number; campaig
       },
       ...draft.financeApprovals,
     ];
+    addNotification(draft, {
+      title: "Auction bid submitted",
+      body: `${bid.bidder} placed ${bid.currency} ${bid.amount.toLocaleString("en-US")} on ${lot.lotName}.`,
+      subject: bid.campaign,
+      recipients: ["finance", "admin"],
+      page: "financials",
+      tone: "action",
+    });
+    addNotification(draft, {
+      title: "Bid recorded",
+      body: `${bid.campaign} is now leading on ${lot.lotName}.`,
+      subject: bid.campaign,
+      recipients: ["bidder"],
+      page: "campaigns",
+      tone: "success",
+    });
     addActivity(draft, actor, "Placed bid", lot.lotName);
   });
   return { state, bid };
@@ -563,7 +716,12 @@ export async function updateSubmissionStage(id: string, stage: SubmissionStage, 
     submission = { ...item };
     draft.campaigns = draft.campaigns.map((campaign) =>
       campaign.campaign === item.campaign
-        ? { ...campaign, status: campaignStatusFromStage(stage), nextStep: campaignNextStep(stage) }
+        ? {
+            ...campaign,
+            status: campaignStatusFromStage(stage),
+            nextStep: campaignNextStep(stage),
+            ...(stage === "Changes requested" ? {} : { revisionMessage: undefined, revisionRequestedAt: undefined, revisionFrom: undefined }),
+          }
         : campaign,
     );
     if (stage === "Scheduled" && !draft.schedule.some((slot) => slot.campaign === item.campaign)) {
@@ -591,9 +749,125 @@ export async function updateSubmissionStage(id: string, stage: SubmissionStage, 
         ...draft.published,
       ];
     }
+    if (stage === "In review") {
+      addNotification(draft, {
+        title: "ADMO review started",
+        body: `${item.campaign} is now under CMS review.`,
+        subject: item.campaign,
+        recipients: ["bidder"],
+        page: "campaigns",
+        tone: "info",
+      });
+    }
+    if (stage === "Approved") {
+      addNotification(draft, {
+        title: "Campaign approved",
+        body: `${item.campaign} was approved by ADMO CMS and is ready for scheduling.`,
+        subject: item.campaign,
+        recipients: ["bidder", "admin"],
+        page: "campaigns",
+        tone: "success",
+      });
+    }
+    if (stage === "Scheduled") {
+      addNotification(draft, {
+        title: "Campaign scheduled",
+        body: `${item.campaign} is queued for playback on the network.`,
+        subject: item.campaign,
+        recipients: ["control-room", "reviewer", "admin"],
+        page: "control",
+        tone: "info",
+      });
+      addNotification(draft, {
+        title: "Campaign scheduled",
+        body: `${item.campaign} is queued for playback on the network.`,
+        subject: item.campaign,
+        recipients: ["bidder"],
+        page: "campaigns",
+        tone: "info",
+      });
+    }
+    if (stage === "Published") {
+      addNotification(draft, {
+        title: "Campaign live",
+        body: `${item.campaign} is now published to the DOOH estate.`,
+        subject: item.campaign,
+        recipients: ["control-room", "admin"],
+        page: "control",
+        tone: "success",
+      });
+      addNotification(draft, {
+        title: "Campaign live",
+        body: `${item.campaign} is now published to the DOOH estate.`,
+        subject: item.campaign,
+        recipients: ["bidder"],
+        page: "campaigns",
+        tone: "success",
+      });
+    }
     addActivity(draft, actor, `Moved submission to ${stage}`, item.campaign);
   });
   return { state, submission };
+}
+
+export async function requestSubmissionChanges(
+  id: string,
+  message: string,
+  actor: string,
+): Promise<{ state: DoohState; submission: Submission; communication: BidderCommunication }> {
+  let submission!: Submission;
+  let communication!: BidderCommunication;
+  const cleanMessage = message.trim();
+  if (!cleanMessage) throw new Error("Revision message is required");
+
+  const state = await commit((draft) => {
+    const item = draft.submissions.find((entry) => entry.id === id);
+    if (!item) throw new Error("Submission not found");
+    item.stage = "Changes requested";
+    submission = { ...item };
+    const sentAt = formatNow();
+    communication = {
+      id: nextId("MSG", draft.bidderMessages ?? []),
+      submissionId: item.id,
+      campaign: item.campaign,
+      bidder: item.bidder,
+      from: actor || "ADMO Content Reviewer",
+      message: cleanMessage,
+      sentAt,
+      status: "Unread",
+    };
+    draft.bidderMessages = [communication, ...(draft.bidderMessages ?? [])].slice(0, 80);
+    draft.campaigns = draft.campaigns.map((campaign) =>
+      campaign.campaign === item.campaign
+        ? {
+            ...campaign,
+            status: "Changes requested",
+            nextStep: "Review ADMO message and upload revised creative",
+            revisionMessage: cleanMessage,
+            revisionRequestedAt: sentAt,
+            revisionFrom: actor || "ADMO Content Reviewer",
+          }
+        : campaign,
+    );
+    addNotification(draft, {
+      title: "Revision requested",
+      body: `ADMO sent required changes for ${item.campaign}. Open the campaign and upload the revised pack.`,
+      subject: item.campaign,
+      recipients: ["bidder"],
+      page: "campaigns",
+      tone: "warning",
+    });
+    addNotification(draft, {
+      title: "Bidder revision requested",
+      body: `${item.campaign} is waiting for advertiser changes.`,
+      subject: item.campaign,
+      recipients: ["reviewer", "admin"],
+      page: "cms",
+      tone: "info",
+    });
+    addActivity(draft, actor, "Sent bidder revision request", item.campaign);
+  });
+  return { state, submission, communication };
 }
 
 export async function playScheduleItem(id: string, actor: string): Promise<DoohState> {
@@ -614,6 +888,14 @@ export async function playScheduleItem(id: string, actor: string): Promise<DoohS
         ...draft.published,
       ];
     }
+    addNotification(draft, {
+      title: "Schedule item playing",
+      body: `${slot.campaign} started on ${slot.asset}.`,
+      subject: slot.campaign,
+      recipients: ["control-room", "reviewer", "admin"],
+      page: "control",
+      tone: "success",
+    });
     addActivity(draft, actor, "Started scheduled campaign", slot.campaign);
   });
 }
@@ -634,6 +916,14 @@ export async function createAlert(payload: AlertDraft, actor: string): Promise<{
     };
     draft.alerts = [alert, ...draft.alerts];
     draft.verificationSteps = cloneState({ ...initialState, verificationSteps: initialVerificationSteps }).verificationSteps;
+    addNotification(draft, {
+      title: "Emergency alert created",
+      body: `${alert.title} is waiting for MediaGPT verification.`,
+      subject: alert.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: alert.criticality === "Critical" ? "critical" : "warning",
+    });
     addActivity(draft, actor, "Created emergency alert", alert.title);
   });
   return { state, alert };
@@ -645,6 +935,14 @@ export async function runEmergencyChecks(id: string, actor: string): Promise<Doo
     if (!alert) throw new Error("Alert not found");
     draft.verificationSteps = draft.verificationSteps.map((step) => ({ ...step, state: "Checked" }));
     alert.state = "Approval required";
+    addNotification(draft, {
+      title: "Emergency checks complete",
+      body: `${alert.title} is ready for queueing or broadcast approval.`,
+      subject: alert.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "action",
+    });
     addActivity(draft, actor, "Completed emergency checks", alert.title);
   });
 }
@@ -656,6 +954,14 @@ export async function queueEmergencyBroadcast(id: string, actor: string): Promis
     const checked = draft.verificationSteps.every((step) => step.state === "Checked");
     if (!checked) throw new Error("Checks must be completed before broadcast queue");
     alert.state = "Broadcast queued";
+    addNotification(draft, {
+      title: "Emergency broadcast queued",
+      body: `${alert.title} is queued for the selected network scope.`,
+      subject: alert.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "warning",
+    });
     addActivity(draft, actor, "Queued emergency broadcast", alert.title);
   });
 }
@@ -677,6 +983,14 @@ export async function broadcastEmergencyNow(id: string, actor: string): Promise<
       },
       ...draft.published,
     ];
+    addNotification(draft, {
+      title: "Emergency live",
+      body: `${alert.title} is live on the DOOH network.`,
+      subject: alert.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "critical",
+    });
     addActivity(draft, actor, "Broadcast emergency alert", alert.title);
   });
 }
@@ -687,6 +1001,14 @@ export async function resetEmergencyAlert(id: string, actor: string): Promise<Do
     if (!alert) throw new Error("Alert not found");
     alert.state = "Check required";
     draft.verificationSteps = initialVerificationSteps.map((step) => ({ ...step }));
+    addNotification(draft, {
+      title: "Emergency checks reset",
+      body: `${alert.title} must be checked again before broadcast.`,
+      subject: alert.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "warning",
+    });
     addActivity(draft, actor, "Reset emergency checks", alert.title);
   });
 }
@@ -696,7 +1018,14 @@ export async function decideFinanceApproval(id: string, state: FinanceState, act
     const approval = draft.financeApprovals.find((item) => item.id === id);
     if (!approval) throw new Error("Finance approval not found");
     approval.state = state;
+    addNotification(draft, {
+      title: "Finance decision posted",
+      body: `${approval.campaign} is now ${state}.`,
+      subject: approval.campaign,
+      recipients: ["bidder", "admin"],
+      page: "campaigns",
+      tone: state === "Approved" ? "success" : state === "Rejected" ? "warning" : "info",
+    });
     addActivity(draft, actor, `Finance decision: ${state}`, approval.campaign);
   });
 }
-

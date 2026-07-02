@@ -5,11 +5,14 @@ import {
   createSubmission,
   decideFinanceApproval,
   getState,
+  markAllNotificationsRead,
+  markNotificationRead,
   placeBid,
   playScheduleItem,
   queueEmergencyBroadcast,
   resetEmergencyAlert,
   resetState,
+  requestSubmissionChanges,
   runEmergencyChecks,
   updateSubmissionStage,
   type AlertDraft,
@@ -36,6 +39,18 @@ export const Route = createFileRoute("/api/dooh/$")({
             return Response.json({ state: await resetState() });
           }
 
+          if (segments[0] === "notifications" && segments[1] === "read-all") {
+            const profileId = stringValue(body.profileId, "");
+            if (!profileId) return jsonError("Profile is required", 422);
+            return Response.json({ state: await markAllNotificationsRead(profileId as never) });
+          }
+
+          if (segments[0] === "notifications" && segments[2] === "read") {
+            const profileId = stringValue(body.profileId, "");
+            if (!profileId) return jsonError("Profile is required", 422);
+            return Response.json({ state: await markNotificationRead(segments[1], profileId as never) });
+          }
+
           if (segments[0] === "submissions" && segments.length === 1) {
             const payload = body.payload as BriefPayload | undefined;
             if (!payload?.campaign?.trim()) return jsonError("Campaign name is required", 422);
@@ -46,6 +61,12 @@ export const Route = createFileRoute("/api/dooh/$")({
             const stage = stringValue(body.stage, "");
             if (!stage) return jsonError("Stage is required", 422);
             return Response.json(await updateSubmissionStage(segments[1], stage as never, actor));
+          }
+
+          if (segments[0] === "submissions" && segments[2] === "request-changes") {
+            const message = stringValue(body.message, "");
+            if (!message) return jsonError("Revision message is required", 422);
+            return Response.json(await requestSubmissionChanges(segments[1], message, actor));
           }
 
           if (segments[0] === "bids") {
@@ -109,4 +130,3 @@ function stringValue(value: unknown, fallback: string) {
 function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
-
