@@ -80,7 +80,13 @@ export const agentTools: AgentTool[] = [
     const state = await getState();
     const submission = state.submissions.find((item) => item.id === stringValue(args.id));
     if (!submission) throw new Error("Submission not found");
-    return submission;
+    return {
+      ...submission,
+      // The agent never receives the creative binary; make that explicit so
+      // visual checks are reported as "na" instead of inferred from metadata.
+      creativeFileAnalyzed: false,
+      creativeNote: `Creative reference ${submission.creativeId} is metadata only. No image or video file is available to the agent, so any Creative/visual check must be reported as na (no creative analyzed).`,
+    };
   }),
   readTool("listAlarms", "List active emergency alerts and alarm state.", objectSchema({}), async () => {
     const state = await getState();
@@ -163,7 +169,7 @@ export const agentTools: AgentTool[] = [
       tags: arrayValue(filter.tags),
     });
   }),
-  writeTool("createTicket", "Create a maintenance ticket for an asset or component.", opsRoles, objectSchema({
+  writeTool("createTicket", "Create a maintenance ticket for a physical asset or component fault. Only for maintenance and field work, never for CMS submission stage changes, approvals or scheduling.", opsRoles, objectSchema({
     assetId: stringSchema("Asset ID"),
     componentId: stringSchema("Optional component ID"),
     title: stringSchema("Ticket title"),

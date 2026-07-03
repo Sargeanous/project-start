@@ -1411,6 +1411,8 @@ const translations: Record<string, string> = {
   "Type": "النوع",
 
   "Ask MediaGPT": "اسأل MediaGPT",
+  "Live AI": "ذكاء اصطناعي مباشر",
+  "Offline fallback": "إجابة احتياطية دون اتصال",
   "Send": "إرسال",
   "Save output": "حفظ المخرج",
   "Export": "تصدير",
@@ -3123,6 +3125,15 @@ function SubmissionDetail({
   const [tagLoading, setTagLoading] = useState(false);
   const [triage, setTriage] = useState<SubmissionTriageResponse | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
+
+  // Triage/tag results belong to one submission; clear them when the reviewer
+  // switches items so a stale proposal can never be acted on against the wrong one.
+  useEffect(() => {
+    setTriage(null);
+    setTriageLoading(false);
+    setTags(null);
+    setTagLoading(false);
+  }, [submission.id]);
 
   function sendRevisionRequest(message: string) {
     onRequestChanges(submission.id, message);
@@ -6775,6 +6786,9 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
       <div className="chat-log">
         {messages.map((message, index) => (
           <article key={`${message.role}-${index}`} className={message.role}>
+            {message.role === "assistant" && message.source === "openai" ? (
+              <small className="chat-source live">{t("Live AI")}</small>
+            ) : null}
             <p>{t(message.body)}</p>
             {message.table ? (
               <table>

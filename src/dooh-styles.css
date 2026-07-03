@@ -1877,7 +1877,8 @@ body { font-size: 13.5px; letter-spacing: -0.003em; color: var(--ink); }
 .profile-card:hover {
   border-color: var(--primary);
   background: var(--primary-tint);
-  transform: translateY(-1px);
+  /* no transform on hover: the card moving between mousedown and mouseup
+     swallowed the first click (profile selection needed two clicks) */
   box-shadow: 0 4px 14px -6px rgba(11, 74, 58, 0.22);
 }
 .profile-card strong { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
@@ -2382,7 +2383,7 @@ html[dir="rtl"] .panel-header h2 {
 .profile-card:hover {
   border-color: var(--primary);
   background: var(--surface-3);
-  transform: translateY(-2px);
+  /* no transform on hover: movement between mousedown and mouseup swallowed the first click */
   box-shadow: 0 12px 28px -14px rgba(31, 74, 61, 0.30);
 }
 .profile-card strong { font-family: var(--font-serif); font-weight: 500; font-size: 18px; letter-spacing: -0.01em; }
@@ -5040,6 +5041,15 @@ html[dir="rtl"] .network-tabs button.active {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.chat-source.live {
+  display: inline-block;
+  margin: 0 0 5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e7f4ec;
+  color: #15803d;
 }
 
 .chat-chart {
