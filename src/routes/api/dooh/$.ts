@@ -545,7 +545,7 @@ function jsonData(result: Awaited<ReturnType<typeof callOpenAI>>, fallback: Reco
   if (result.ok && "data" in result) {
     return Response.json({ ...(result.data as Record<string, unknown>), ok: true, source: result.source, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
   }
-  return Response.json({ ...fallback, ok: false, source: "offline", reason: result.reason, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
+  return Response.json({ ...fallback, ok: false, source: "offline", reason: result.ok ? "no_data" : result.reason, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
 }
 
 function jsonAskData(result: Awaited<ReturnType<typeof callOpenAI>>, fallback: Record<string, unknown>) {
@@ -557,7 +557,7 @@ function jsonAskData(result: Awaited<ReturnType<typeof callOpenAI>>, fallback: R
     }
     return Response.json({ ...data, ok: true, source: result.source, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
   }
-  return Response.json({ ...fallback, ok: false, source: "offline", reason: result.reason, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
+  return Response.json({ ...fallback, ok: false, source: "offline", reason: result.ok ? "no_data" : result.reason, model: result.model, tokens: result.tokens, latencyMs: result.latencyMs });
 }
 
 function buildPlatformContext(state: Awaited<ReturnType<typeof getState>>) {

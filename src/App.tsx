@@ -695,14 +695,6 @@ const translations: Record<string, string> = {
   // Knowledge and rules governance
   "Ontology entities": "كيانات النموذج المفاهيمي",
   "Shared DOOH vocabulary": "قاموس موحد للإعلانات الخارجية الرقمية",
-  "Knowledge bases": "قواعد المعرفة",
-  "MediaGPT source corpora": "مصادر MediaGPT المعرفية",
-  "Documents": "المستندات",
-  "Uploaded or connected": "مرفوعة أو متصلة",
-  "Indexed chunks": "المقاطع المفهرسة",
-  "Retrieval-ready passages": "مقاطع جاهزة للاسترجاع",
-  "Pending indexing": "بانتظار الفهرسة",
-  "Queued or processing": "في القائمة أو قيد المعالجة",
   "Show coverage": "إظهار التغطية",
   "Hide coverage": "إخفاء التغطية",
   "Show ontology": "إظهار النموذج المفاهيمي",
@@ -716,11 +708,7 @@ const translations: Record<string, string> = {
   "Scenario library": "مكتبة السيناريوهات",
   "DOOH ontology": "النموذج المفاهيمي للمنصة",
   "Blocks 1-2": "الكتلتان 1-2",
-  "Add source": "إضافة مصدر",
   "Search sources, tags, owners": "البحث في المصادر والوسوم والمالكين",
-  "documents": "مستندات",
-  "chunks": "مقاطع",
-  "Re-index selected": "إعادة فهرسة المحدد",
   "Sensitivity": "الحساسية",
   "Linked entities": "الكيانات المرتبطة",
   "Citations": "الاستشهادات",
@@ -731,7 +719,6 @@ const translations: Record<string, string> = {
   "Summary AR": "الملخص بالعربية",
   "Save source": "حفظ المصدر",
   "Index source": "فهرسة المصدر",
-  "Rule packs": "حزم القواعد",
   "Rule families": "عائلات القواعد",
   "Enabled rules": "القواعد المفعلة",
   "Drafts": "المسودات",
@@ -741,9 +728,6 @@ const translations: Record<string, string> = {
   "Rule title EN": "عنوان القاعدة بالإنجليزية",
   "Rule title AR": "عنوان القاعدة بالعربية",
   "Family": "العائلة",
-  "Scope": "النطاق",
-  "Mode": "الوضع",
-  "Source": "المصدر",
   "Condition EN": "الشرط بالإنجليزية",
   "Condition AR": "الشرط بالعربية",
   "Action EN": "الإجراء بالإنجليزية",
@@ -773,7 +757,6 @@ const translations: Record<string, string> = {
   "Premium package bid below floor": "عرض الحزمة المميزة أقل من الحد الأدنى",
   "Finance review": "مراجعة مالية",
   "Two perfume brands on same highway loop 18:00": "علامتا عطور على مسار الطريق نفسه الساعة 18:00",
-  "Recommend alternate slot": "التوصية بخانة بديلة",
   "Alert has scope but no authority": "التنبيه له نطاق من دون جهة مخولة",
   "Block broadcast": "منع البث",
   "Major alert with no expiry": "تنبيه رئيسي من دون وقت انتهاء",
@@ -803,7 +786,6 @@ const translations: Record<string, string> = {
   "No telemetry for 25 minutes on live asset": "لا توجد قياسات لمدة 25 دقيقة على أصل يعمل",
   "Low confidence and refresh": "ثقة منخفضة وتحديث مطلوب",
   "5G router failed under warranty": "تعطل راوتر 5G وهو ضمن الضمان",
-  "Warranty exchange": "استبدال بموجب الضمان",
   "97% proof coverage against 99% contract": "تغطية إثبات 97% مقابل عقد 99%",
   "ERP changes PO ETA": "نظام ERP يغير موعد وصول أمر الشراء",
   "Notify O&M admin": "إخطار مسؤول التشغيل والصيانة",
@@ -851,7 +833,6 @@ const translations: Record<string, string> = {
   "Not mapped yet": "غير مربوط بعد",
   "Rule coverage by workflow": "تغطية القواعد حسب سير العمل",
   "Workflow stage": "مرحلة سير العمل",
-  "Rules": "القواعد",
   "Enforced": "إلزامية",
   "Recommended": "توصية",
   "Monitored": "مراقبة",
@@ -887,7 +868,6 @@ const translations: Record<string, string> = {
   "Re-run scan": "إعادة تشغيل الفحص",
   "Open deep scan": "فتح الفحص العميق",
   "Hide deep scan": "إخفاء الفحص العميق",
-  "AI recommendation": "توصية الذكاء الاصطناعي",
   "Request bidder changes": "طلب تعديلات من المعلن",
   "Prepare bidder message": "إعداد رسالة للمعلن",
   "Send revision request": "إرسال طلب تعديل",
@@ -897,7 +877,6 @@ const translations: Record<string, string> = {
   "This will mark the campaign as Changes requested and make the bidder action visible in Campaigns.": "سيتم تغيير حالة الحملة إلى طلب تعديلات وإظهار الإجراء المطلوب في صفحة الحملات.",
   "Revision request sent": "تم إرسال طلب التعديل",
   "ADMO message": "رسالة مكتب أبوظبي الإعلامي",
-  "ADMO messages": "رسائل مكتب أبوظبي الإعلامي",
   "action required": "إجراء مطلوب",
   "Review request": "مراجعة الطلب",
   "Upload revision": "رفع التعديل",
@@ -910,8 +889,6 @@ const translations: Record<string, string> = {
   "From ADMO CMS": "من نظام إدارة المحتوى في مكتب أبوظبي الإعلامي",
   "Current status": "الحالة الحالية",
   "Bidder": "المعلن",
-  "Changes requested": "تعديلات مطلوبة",
-  "Waiting for bidder revision": "بانتظار تعديل المعلن",
   "Review ADMO message and upload revised creative": "مراجعة رسالة مكتب أبوظبي الإعلامي ورفع التصميم المعدل",
   "Approve with AI clearance": "اعتماد بناءً على فحص الذكاء الاصطناعي",
   "Issue detected": "تم رصد ملاحظة",
@@ -938,8 +915,6 @@ const translations: Record<string, string> = {
   "Show AI details": "إظهار تفاصيل الذكاء",
   "Hide AI details": "إخفاء تفاصيل الذكاء",
   "Run MediaGPT check": "تشغيل فحص MediaGPT",
-  "Add to schedule": "إضافة إلى الجدول",
-  "Publish": "نشر",
   "View proof status": "عرض حالة الإثبات",
   "Scheduling recommendation": "توصية الجدولة",
   "Distribution readiness": "جاهزية التوزيع",
@@ -1003,7 +978,6 @@ const translations: Record<string, string> = {
   "Schedule item playing": "تم تشغيل عنصر الجدولة",
   "Emergency alert created": "تم إنشاء تنبيه طارئ",
   "Emergency checks complete": "اكتملت فحوصات الطوارئ",
-  "Emergency broadcast queued": "تم وضع بث الطوارئ في القائمة",
   "Emergency live": "الطوارئ مباشرة",
   "Emergency checks reset": "تمت إعادة فحوصات الطوارئ",
   "Finance decision posted": "تم نشر القرار المالي",
@@ -1115,9 +1089,7 @@ const translations: Record<string, string> = {
   "Technical layers": "الطبقات التقنية",
   "Advertiser": "معلن",
   "Bidder account": "حساب مزايد",
-  "Operational": "الطبقة التشغيلية",
   "Intelligence / Agentic": "الذكاء / الوكلاء",
-  "Skills": "المهارات",
   "Models": "النماذج",
   "Infrastructure": "البنية التحتية",
   "Knowledge": "المعرفة",
@@ -1127,7 +1099,6 @@ const translations: Record<string, string> = {
   "Skill Workflows": "سير عمل المهارات",
   "Skill Runs": "تشغيلات المهارات",
   "Model Center": "مركز النماذج",
-  "Integrations": "التكاملات",
   "Access & Roles": "الصلاحيات والأدوار",
   "Audit Log": "سجل التدقيق",
   "Edge & Compute": "الحافة والحوسبة",
@@ -1197,8 +1168,6 @@ const translations: Record<string, string> = {
   "Upload media": "رفع وسائط",
   "Uploaded creative pack": "حزمة إبداعية مرفوعة",
   "Media upload staged for CMS review.": "تم تجهيز الوسائط المرفوعة لمراجعة إدارة المحتوى.",
-  "Just now": "الآن",
-  "ADMO CMS": "إدارة محتوى أدمو",
   "Pending Review": "بانتظار المراجعة",
   "Play now": "تشغيل الآن",
   "Queued": "في الانتظار",
@@ -1451,11 +1420,8 @@ const translations: Record<string, string> = {
   "Financial scenario from current demand and bid pressure.": "سيناريو مالي بناءً على الطلب الحالي وضغط العروض.",
   "There are two active alerts. The weather broadcast needs checks before it can move to approval.": "يوجد تنبيهان نشطان. يحتاج بث تنبيه الطقس إلى فحوصات قبل الانتقال إلى الاعتماد.",
   "The estate is mostly healthy: 3 of 5 assets are live, one is under maintenance, and one is offline.": "الشبكة بحالة جيدة عموماً: 3 من 5 أصول نشطة، أصل واحد تحت الصيانة، وأصل واحد غير متصل.",
-  "Zone": "المنطقة",
-  "Action": "الإجراء",
   "Dispatch field technician": "إرسال فني ميداني",
   "Re-route emergency content": "إعادة توجيه محتوى الطوارئ",
-  "No action": "لا إجراء",
   "Recommended bid": "العرض المقترح",
   "Expected margin": "الهامش المتوقع",
   "Budget guardrail": "حد الميزانية",
@@ -1753,10 +1719,7 @@ const translations: Record<string, string> = {
   "Stage": "المرحلة",
   "2.2M": "2.2 مليون",
   "Live GIS dispatch": "إرسال الخريطة الحية",
-  "Waiting for ADMO review": "بانتظار مراجعة مكتب أبوظبي الإعلامي",
-  "Content screening": "فحص المحتوى",
   "Awaiting publish": "بانتظار النشر",
-  "Revise creative pack": "تعديل حزمة التصميم",
 
   "Content lifecycle": "دورة حياة المحتوى",
   "AI Screening": "الفحص بالذكاء الاصطناعي",
@@ -2106,7 +2069,7 @@ function translateArabicDate(value: string) {
     );
 }
 
-function translateArabic(value: string) {
+function translateArabic(value: string): string {
   if (!value) return value;
   const direct = translations[value];
   if (direct) return direct;
@@ -3516,6 +3479,7 @@ function AiDeepScan({
   if (!review) return null;
 
   function runPrimaryAction() {
+    if (!review) return;
     if (review.action === "requestChanges") {
       onRequestChanges();
       return;

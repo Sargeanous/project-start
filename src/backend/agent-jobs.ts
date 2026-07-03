@@ -410,7 +410,7 @@ async function writeJobs(jobs: AgentJob[]) {
 async function withJobLock<T>(task: () => Promise<T>): Promise<T> {
   const previous = jobLock;
   let release!: () => void;
-  jobLock = new Promise((resolve) => {
+  jobLock = new Promise<void>((resolve) => {
     release = resolve;
   });
   await previous.catch(() => undefined);
