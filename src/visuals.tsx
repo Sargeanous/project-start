@@ -3,11 +3,10 @@ import { useEffect, useRef, useState } from "react";
 /**
  * Native, code-rendered visuals for the DOOH platform.
  *
- * Everything here is drawn with SVG/CSS - there are no pasted screenshots,
- * cropped dashboards or stock photos. The artwork represents real platform
- * content: the live estate map, the creatives that play on the screens, and
- * the camera feeds that watch those screens. This keeps every visual asset
- * "operational" and on-brand rather than borrowed.
+ * The platform prefers real demo visuals when they are available in
+ * /public/demo-visuals, then falls back to generated SVG artwork. This keeps
+ * the CMS library, marketplace previews, asset board and live views visually
+ * credible while still allowing new mock creative IDs to render safely.
  */
 
 function enc(svg: string): string {
@@ -63,54 +62,73 @@ function motifPath(motif: CreativeSpec["motif"], color: string): string {
 export const creativeCatalog: Record<string, CreativeSpec> = {
   "road-safety": {
     from: "#063129", to: "#148455", ink: "#ffffff", accent: "#7ff0c0",
-    kicker: "ABU DHABI POLICE · CIVIC", titleEn: "ARRIVE SAFELY", titleAr: "السلامة أولاً",
-    brand: "DMT · ROAD SAFETY NETWORK", motif: "shield",
+    kicker: "ABU DHABI POLICE | CIVIC", titleEn: "ARRIVE SAFELY", titleAr: "السلامة أولاً",
+    brand: "DMT | ROAD SAFETY NETWORK", motif: "shield",
   },
   "weather-alert": {
     from: "#7a1a12", to: "#c0571a", ink: "#ffffff", accent: "#ffd98a",
-    kicker: "NCEMA · EMERGENCY BROADCAST", titleEn: "WEATHER ALERT", titleAr: "تنبيه جوي",
-    brand: "CAP-UAE · PROTECTED CACHE", motif: "alert",
+    kicker: "NCEMA | EMERGENCY BROADCAST", titleEn: "WEATHER ALERT", titleAr: "تنبيه جوي",
+    brand: "CAP-UAE | PROTECTED CACHE", motif: "alert",
   },
   "holiday-notice": {
     from: "#0b4d3c", to: "#0f8f86", ink: "#ffffff", accent: "#ffe6a3",
-    kicker: "DMT COMMUNICATIONS · PUBLIC", titleEn: "EID HOLIDAY NOTICE", titleAr: "إجازة العيد المبارك",
-    brand: "BILINGUAL · ARABIC-FIRST", motif: "calendar",
+    kicker: "DMT COMMUNICATIONS | PUBLIC", titleEn: "EID HOLIDAY NOTICE", titleAr: "إجازة العيد المبارك",
+    brand: "BILINGUAL | ARABIC-FIRST", motif: "calendar",
   },
   "yas-tourism": {
     from: "#0f6f86", to: "#e0913a", ink: "#ffffff", accent: "#ffe2b0",
-    kicker: "YAS TOURISM · LEISURE", titleEn: "DISCOVER YAS ISLAND", titleAr: "اكتشف جزيرة ياس",
+    kicker: "YAS TOURISM | LEISURE", titleEn: "DISCOVER YAS ISLAND", titleAr: "اكتشف جزيرة ياس",
     brand: "TOURISM LIVE STREAM", motif: "palm",
   },
   "etihad-retail": {
     from: "#16263a", to: "#27485f", ink: "#ffffff", accent: "#d8b46a",
-    kicker: "ETIHAD GUEST · AIRPORT RETAIL", titleEn: "DUTY-FREE REWARDS", titleAr: "عروض المطار الحصرية",
+    kicker: "ETIHAD GUEST | AIRPORT RETAIL", titleEn: "DUTY-FREE REWARDS", titleAr: "عروض المطار الحصرية",
     brand: "AIRPORT → DOWNTOWN PREMIUM", motif: "bag",
   },
   "mall-footfall": {
     from: "#4a1d7a", to: "#a23bb0", ink: "#ffffff", accent: "#ffd1f2",
-    kicker: "RETAIL MAJLIS · COMMERCIAL", titleEn: "DOWNTOWN SEASON SALE", titleAr: "تخفيضات وسط المدينة",
+    kicker: "RETAIL MAJLIS | COMMERCIAL", titleEn: "DOWNTOWN SEASON SALE", titleAr: "تخفيضات وسط المدينة",
     brand: "DOWNTOWN COMMERCE LOOP", motif: "tag",
   },
   "live-slate": {
     from: "#101a26", to: "#1c3a4a", ink: "#ffffff", accent: "#7fd0ff",
-    kicker: "MEDIA OPS · HLS STREAM", titleEn: "LIVE STREAM SLATE", titleAr: "شارة البث المباشر",
-    brand: "YAS ISLAND · LIVE", motif: "broadcast",
+    kicker: "MEDIA OPS | HLS STREAM", titleEn: "LIVE STREAM SLATE", titleAr: "شارة البث المباشر",
+    brand: "YAS ISLAND | LIVE", motif: "broadcast",
   },
   "industrial-notice": {
     from: "#1d2a33", to: "#37606e", ink: "#ffffff", accent: "#9fe0d6",
-    kicker: "MUSSAFAH · WAYFINDING", titleEn: "INDUSTRIAL SAFETY", titleAr: "سلامة المنطقة الصناعية",
-    brand: "DMT · WAYFINDING NETWORK", motif: "shield",
+    kicker: "MUSSAFAH | WAYFINDING", titleEn: "INDUSTRIAL SAFETY", titleAr: "سلامة المنطقة الصناعية",
+    brand: "DMT | WAYFINDING NETWORK", motif: "shield",
   },
   "compliance-pack": {
     from: "#0b3a33", to: "#15605a", ink: "#ffffff", accent: "#aee9d6",
-    kicker: "SECURITY PMO · GOVERNANCE", titleEn: "COMPLIANCE PACK", titleAr: "حزمة الامتثال",
-    brand: "UAE IA v2.1 · EVIDENCE", motif: "doc",
+    kicker: "SECURITY PMO | GOVERNANCE", titleEn: "COMPLIANCE PACK", titleAr: "حزمة الامتثال",
+    brand: "UAE IA v2.1 | EVIDENCE", motif: "doc",
   },
   "brand-guidelines": {
     from: "#15324a", to: "#2f6f9e", ink: "#ffffff", accent: "#bfe0ff",
-    kicker: "BRAND STUDIO · REFERENCE", titleEn: "BRAND GUIDELINES", titleAr: "دليل الهوية البصرية",
+    kicker: "BRAND STUDIO | REFERENCE", titleEn: "BRAND GUIDELINES", titleAr: "دليل الهوية البصرية",
     brand: "CREATIVE STANDARDS", motif: "doc",
   },
+};
+
+const demoCreativeBackgrounds: Record<string, string> = {
+  "road-safety": "/demo-visuals/road-safety-incident.avif",
+  "weather-alert": "/demo-visuals/road-safety-incident.avif",
+  "holiday-notice": "/demo-visuals/eid-adha-mubarak.webp",
+  "yas-tourism": "/demo-visuals/yas-island-rollercoaster.webp",
+  "etihad-retail": "/demo-visuals/abu-dhabi-duty-free.png",
+  "mall-footfall": "/demo-visuals/coca-cola-noor.png",
+  "live-slate": "/demo-visuals/saadiyat-beach.webp",
+  "industrial-notice": "/demo-visuals/experience-abu-dhabi.webp",
+  "compliance-pack": "/demo-visuals/coca-cola-national-day.jpg",
+  "brand-guidelines": "/demo-visuals/ramadan-kareem.jpg",
+  "eid-family-retail": "/demo-visuals/eid-family-retail.jpg",
+  "royal-safari": "/demo-visuals/royal-safari.jpg",
+  "experience-abu-dhabi": "/demo-visuals/experience-abu-dhabi.webp",
+  "ramadan-kareem": "/demo-visuals/ramadan-kareem.jpg",
+  "coca-cola-national-day": "/demo-visuals/coca-cola-national-day.jpg",
+  "saadiyat-beach": "/demo-visuals/saadiyat-beach.webp",
 };
 
 function creativeSvg(spec: CreativeSpec): string {
@@ -136,6 +154,8 @@ function creativeSvg(spec: CreativeSpec): string {
 const creativeUriCache = new Map<string, string>();
 
 export function creativeBackground(id: string): string {
+  const demoVisual = demoCreativeBackgrounds[id];
+  if (demoVisual) return demoVisual;
   const spec = creativeCatalog[id];
   if (!spec) return "";
   let uri = creativeUriCache.get(id);
@@ -164,6 +184,13 @@ export const feedCatalog: Record<string, FeedSpec> = {
   "vf-2": { scene: "busStop", creative: "yas-tourism" },
   "vf-3": { scene: "bridge", creative: "industrial-notice" },
   "vf-4": { scene: "mall", creative: "mall-footfall" },
+};
+
+const demoFeedBackgrounds: Record<string, string> = {
+  "vf-1": "/demo-visuals/road-safety-incident.avif",
+  "vf-2": "/demo-visuals/yas-island-rollercoaster.webp",
+  "vf-3": "/demo-visuals/experience-abu-dhabi.webp",
+  "vf-4": "/demo-visuals/coca-cola-noor.png",
 };
 
 function sceneLayers(scene: FeedScene): { sky: [string, string]; ground: string; structures: string } {
@@ -221,7 +248,7 @@ function feedSvg(spec: FeedSpec): string {
        <rect x='414' y='150' width='12' height='96' fill='#1c2026'/>
        <rect x='196' y='66' width='256' height='104' rx='6' fill='#11151a'/>
        <rect x='204' y='74' width='240' height='88' rx='3' fill='url(#cr)'/>
-       <text x='324' y='112' fill='${cr.accent}' font-size='10' font-weight='700' letter-spacing='2' text-anchor='middle' font-family='Segoe UI, Arial, sans-serif'>${cr.kicker.split(" · ")[0]}</text>
+       <text x='324' y='112' fill='${cr.accent}' font-size='10' font-weight='700' letter-spacing='2' text-anchor='middle' font-family='Segoe UI, Arial, sans-serif'>${cr.kicker.split(" | ")[0]}</text>
        <text x='324' y='134' fill='#ffffff' font-size='17' font-weight='800' text-anchor='middle' font-family='Segoe UI, Arial, sans-serif'>${cr.titleEn}</text>
        <text x='324' y='152' fill='#ffffff' font-size='13' font-weight='600' text-anchor='middle' direction='rtl' font-family='Segoe UI, Arial, sans-serif'>${cr.titleAr}</text>`
     : "";
@@ -241,6 +268,8 @@ function feedSvg(spec: FeedSpec): string {
 const feedUriCache = new Map<string, string>();
 
 export function feedBackground(id: string): string {
+  const demoVisual = demoFeedBackgrounds[id];
+  if (demoVisual) return demoVisual;
   const spec = feedCatalog[id];
   if (!spec) return "";
   let uri = feedUriCache.get(id);
@@ -404,7 +433,7 @@ export function EstateMap({ assets, selectedAssetId, onSelect, mode, openAlarmAs
             onClick={() => onSelect(asset.id)}
             aria-label={`${asset.name} - ${t(asset.status)}`}
             aria-pressed={isSelected}
-            title={`${asset.id} · ${t(asset.zone)}`}
+            title={`${asset.id} | ${t(asset.zone)}`}
           >
             <span className="estate-pin-dot" />
             {hasAlarm && <span className="estate-pin-alarm" />}

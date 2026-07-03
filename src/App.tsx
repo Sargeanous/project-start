@@ -38,6 +38,7 @@ import {
   Target,
   Search,
   Send,
+  Settings,
   ShieldAlert,
   ShieldCheck,
   Eye,
@@ -56,7 +57,8 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   assets as estateAssets,
   fieldTasks,
@@ -67,6 +69,53 @@ import {
   type MediaAsset,
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
+import {
+  demoScenarios,
+  doohOntology,
+  knowledgeCollections,
+  ruleSimulationContexts,
+  seedDoohRules,
+  seedKnowledgeSources,
+  type DoohRule,
+  type DoohRuleMode,
+  type DoohRuleStatus,
+  type KnowledgeCollectionId,
+  type KnowledgeSource,
+  type LocalizedText,
+} from "./intelligence-content";
+import {
+  extendedDemoScenarios,
+  extendedDoohOntology,
+  extendedDoohRules,
+  extendedKnowledgeSources,
+  extendedRuleSimulationContexts,
+} from "./intelligence-extensions";
+import {
+  aiStatus,
+  askMediaGPT as aiAskMediaGPT,
+  approveAgentAction as aiApproveAgentAction,
+  draftTicket as aiDraftTicket,
+  explainYield as aiExplainYield,
+  generateBroadcast as aiGenerateBroadcast,
+  generateCreativeCopy as aiGenerateCreativeCopy,
+  listAgentActions as aiListAgentActions,
+  opsDigest as aiOpsDigest,
+  parseEstateQuery as aiParseEstateQuery,
+  rejectAgentAction as aiRejectAgentAction,
+  runMediaGPTAgent as aiRunMediaGPTAgent,
+  summarizeReport as aiSummarizeReport,
+  tagSubmission as aiTagSubmission,
+  triageSubmission as aiTriageSubmission,
+  type CreativeCopy,
+  type ChatAnswer,
+  type EstateFilter,
+  type AgentToolTrace,
+  type PendingAgentAction,
+  type SubmissionTriageResponse,
+  type SubmissionTags,
+  type TicketDraft,
+} from "./ai-client";
+import { ClientOnlyBillboardTwin } from "./ClientOnlyBillboardTwin";
 import admoLogo from "./assets/admo-logo.png";
 import origenGreenIcon from "./assets/origen-green-icon.png";
 import "./dooh-styles.css";
@@ -94,7 +143,10 @@ type Page =
 type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
 type Lang = "en" | "ar";
 type Tone = "neutral" | "good" | "warn" | "danger" | "info";
+type NotificationPreferenceKey = Page | "critical";
+type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 type CmsTab = "submissions" | "library" | "scheduling";
+type NetworkTab = "assetOperations" | "maintenanceWorkbench" | "supplyChain";
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
@@ -240,6 +292,36 @@ interface PlatformNotification {
   readBy: ProfileId[];
 }
 
+interface ServiceOrder {
+  id: string;
+  assetId: string;
+  assetName: string;
+  componentId: string;
+  title: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  status: "Pending Assignment" | "Pending Execution" | "In Progress" | "Completed" | "Overdue";
+  owner: string;
+  due: string;
+  summary: string;
+  partsNeeded: string[];
+  linkedPo: string;
+  createdAt: string;
+}
+
+interface PurchaseOrder {
+  id: string;
+  assetId: string;
+  assetName: string;
+  componentId: string;
+  item: string;
+  quantity: number;
+  vendor: string;
+  status: "Draft" | "Submitted" | "Confirmed" | "Received";
+  eta: string;
+  linkedServiceOrder?: string;
+  createdAt: string;
+}
+
 interface DoohStatePayload {
   submissions: Submission[];
   campaigns: BidderCampaign[];
@@ -251,6 +333,8 @@ interface DoohStatePayload {
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
+  serviceOrders: ServiceOrder[];
+  purchaseOrders: PurchaseOrder[];
   activity: ActivityItem[];
   notifications: PlatformNotification[];
 }
@@ -320,6 +404,33 @@ const navItems: Record<Page, NavItem> = {
   campaigns: { id: "campaigns", label: "Campaigns", icon: Megaphone },
   marketplace: { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
 };
+
+const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; label: string; helper: string }> = [
+  { key: "critical", label: "Critical alerts", helper: "Safety, emergency, and urgent operator action" },
+  { key: "control", label: "Control Centre", helper: "Live estate, proof-of-play, and schedule operations" },
+  { key: "cms", label: "CMS", helper: "Submissions, moderation, scheduling, and bidder revisions" },
+  { key: "alerts", label: "Alerts and Emergencies", helper: "Emergency checks, approvals, and broadcasts" },
+  { key: "network", label: "Network and Devices", helper: "Asset health, service orders, and purchase orders" },
+  { key: "financials", label: "Financials", helper: "Approvals, budget risks, and commercial decisions" },
+  { key: "mediagpt", label: "MediaGPT", helper: "Agent outputs and approved AI actions" },
+  { key: "knowledge", label: "Knowledge", helper: "Source ingestion and knowledge-base changes" },
+  { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
+  { key: "campaigns", label: "Campaigns", helper: "Bidder campaign status and ADMO messages" },
+  { key: "marketplace", label: "Marketplace", helper: "Bid lots, bids, and auction changes" },
+  { key: "skillsCatalogue", label: "Skills Catalogue", helper: "MediaGPT skill coverage changes" },
+  { key: "skillWorkflows", label: "Skill Workflows", helper: "Workflow design and approval updates" },
+  { key: "skillRuns", label: "Skill Runs", helper: "Agent run completion and failures" },
+  { key: "modelCenter", label: "Model Center", helper: "Model usage, cost, and routing changes" },
+  { key: "integrations", label: "Integrations", helper: "API, ERP, and file-source health" },
+  { key: "accessRoles", label: "Access & Roles", helper: "Access changes and role governance" },
+  { key: "auditLog", label: "Audit Log", helper: "High-risk audit events" },
+  { key: "edgeCompute", label: "Edge & Compute", helper: "Edge nodes, compute health, and capacity" },
+];
+
+const defaultNotificationPreferences = notificationPreferenceOptions.reduce((preferences, option) => {
+  preferences[option.key] = true;
+  return preferences;
+}, {} as NotificationPreferences);
 
 const navGroups: NavGroup[] = [
   { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials"] },
@@ -444,7 +555,7 @@ const seedAuctions: AuctionLot[] = [
     id: "LOT-4411",
     lotName: "Corniche prime - evening rotation",
     packageName: "Airport and premium roadside",
-    network: "12 panels · Corniche, Airport Road",
+    network: "12 panels | Corniche, Airport Road",
     flightWindow: "Jul 20 - Aug 03, 2026",
     impressions: "1.4M weekly",
     floorPrice: 380000,
@@ -452,7 +563,7 @@ const seedAuctions: AuctionLot[] = [
     leadingBidder: "Yas Tourism",
     minIncrement: 5000,
     bidCount: 7,
-    closesAt: "Jul 04, 2026 · 18:00",
+    closesAt: "Jul 04, 2026 | 18:00",
     creativeId: "etihad-retail",
     currency: "AED",
   },
@@ -468,7 +579,7 @@ const seedAuctions: AuctionLot[] = [
     leadingBidder: "Retail Majlis",
     minIncrement: 2500,
     bidCount: 4,
-    closesAt: "Jul 03, 2026 · 12:00",
+    closesAt: "Jul 03, 2026 | 12:00",
     creativeId: "mall-footfall",
     currency: "AED",
   },
@@ -476,7 +587,7 @@ const seedAuctions: AuctionLot[] = [
     id: "LOT-4402",
     lotName: "Yas leisure loop - summer flight",
     packageName: "Yas leisure loop",
-    network: "9 panels · Yas Island & hotel corridor",
+    network: "9 panels | Yas Island & hotel corridor",
     flightWindow: "Jul 15 - Aug 15, 2026",
     impressions: "620k weekly",
     floorPrice: 210000,
@@ -484,7 +595,7 @@ const seedAuctions: AuctionLot[] = [
     leadingBidder: "No bids yet",
     minIncrement: 5000,
     bidCount: 0,
-    closesAt: "Jul 05, 2026 · 20:00",
+    closesAt: "Jul 05, 2026 | 20:00",
     creativeId: "yas-tourism",
     currency: "AED",
   },
@@ -581,6 +692,170 @@ const marketplacePackages = [
 type Translator = (value: string) => string;
 
 const translations: Record<string, string> = {
+  // Knowledge and rules governance
+  "Ontology entities": "كيانات النموذج المفاهيمي",
+  "Shared DOOH vocabulary": "قاموس موحد للإعلانات الخارجية الرقمية",
+  "Knowledge bases": "قواعد المعرفة",
+  "MediaGPT source corpora": "مصادر MediaGPT المعرفية",
+  "Documents": "المستندات",
+  "Uploaded or connected": "مرفوعة أو متصلة",
+  "Indexed chunks": "المقاطع المفهرسة",
+  "Retrieval-ready passages": "مقاطع جاهزة للاسترجاع",
+  "Pending indexing": "بانتظار الفهرسة",
+  "Queued or processing": "في القائمة أو قيد المعالجة",
+  "Show coverage": "إظهار التغطية",
+  "Hide coverage": "إخفاء التغطية",
+  "Show ontology": "إظهار النموذج المفاهيمي",
+  "Hide ontology": "إخفاء النموذج المفاهيمي",
+  "Show details": "إظهار التفاصيل",
+  "Hide details": "إخفاء التفاصيل",
+  "Show tests": "إظهار الاختبارات",
+  "Hide tests": "إخفاء الاختبارات",
+  "Show simulator": "إظهار المحاكي",
+  "Hide simulator": "إخفاء المحاكي",
+  "Scenario library": "مكتبة السيناريوهات",
+  "DOOH ontology": "النموذج المفاهيمي للمنصة",
+  "Blocks 1-2": "الكتلتان 1-2",
+  "Add source": "إضافة مصدر",
+  "Search sources, tags, owners": "البحث في المصادر والوسوم والمالكين",
+  "documents": "مستندات",
+  "chunks": "مقاطع",
+  "Re-index selected": "إعادة فهرسة المحدد",
+  "Sensitivity": "الحساسية",
+  "Linked entities": "الكيانات المرتبطة",
+  "Citations": "الاستشهادات",
+  "Tags": "الوسوم",
+  "Title EN": "العنوان بالإنجليزية",
+  "Title AR": "العنوان بالعربية",
+  "Summary EN": "الملخص بالإنجليزية",
+  "Summary AR": "الملخص بالعربية",
+  "Save source": "حفظ المصدر",
+  "Index source": "فهرسة المصدر",
+  "Rule packs": "حزم القواعد",
+  "Rule families": "عائلات القواعد",
+  "Enabled rules": "القواعد المفعلة",
+  "Drafts": "المسودات",
+  "Simulation scenarios": "سيناريوهات المحاكاة",
+  "Ready to test rule firing": "جاهزة لاختبار تفعيل القواعد",
+  "Create rule": "إنشاء قاعدة",
+  "Rule title EN": "عنوان القاعدة بالإنجليزية",
+  "Rule title AR": "عنوان القاعدة بالعربية",
+  "Family": "العائلة",
+  "Scope": "النطاق",
+  "Mode": "الوضع",
+  "Source": "المصدر",
+  "Condition EN": "الشرط بالإنجليزية",
+  "Condition AR": "الشرط بالعربية",
+  "Action EN": "الإجراء بالإنجليزية",
+  "Save rule": "حفظ القاعدة",
+  "Delete rule": "حذف القاعدة",
+  "Rule simulator": "محاكي القواعد",
+  "Simulation input": "مدخل المحاكاة",
+  "Test input": "مدخل الاختبار",
+  "Expected result": "النتيجة المتوقعة",
+  "Recommendation": "التوصية",
+  "Demo scenarios": "سيناريوهات العرض",
+  "Rules fired": "القواعد المفعلة",
+  "Knowledge cited": "المعرفة المستشهد بها",
+  "Allowed action": "الإجراء المسموح",
+  "Save changes": "حفظ التغييرات",
+  "MediaGPT governance": "حوكمة MediaGPT",
+  "Block": "منع",
+  "Pass": "اجتياز",
+  "English headline present, Arabic headline missing": "العنوان الإنجليزي موجود والعنوان العربي مفقود",
+  "Arabic and English same message, same visual weight": "العربية والإنجليزية تحملان الرسالة نفسها وبالوزن البصري نفسه",
+  "CTA 12% below highway threshold": "دعوة الإجراء أقل من حد الطريق السريع بنسبة 12%",
+  "CTA passes 40m threshold": "دعوة الإجراء تتجاوز معيار الوضوح على 40 متراً",
+  "Recommend bidder revision": "التوصية بطلب تعديل من المزايد",
+  "No issue": "لا توجد مشكلة",
+  "Motion pack without music license": "حزمة حركة من دون ترخيص موسيقى",
+  "Hold approval": "تعليق الاعتماد",
+  "Premium package bid below floor": "عرض الحزمة المميزة أقل من الحد الأدنى",
+  "Finance review": "مراجعة مالية",
+  "Two perfume brands on same highway loop 18:00": "علامتا عطور على مسار الطريق نفسه الساعة 18:00",
+  "Recommend alternate slot": "التوصية بخانة بديلة",
+  "Alert has scope but no authority": "التنبيه له نطاق من دون جهة مخولة",
+  "Block broadcast": "منع البث",
+  "Major alert with no expiry": "تنبيه رئيسي من دون وقت انتهاء",
+  "Generate default expiry": "توليد وقت انتهاء افتراضي",
+  "PSU degraded on live highway asset": "مزود الطاقة متدهور على أصل طريق سريع يعمل حالياً",
+  "Urgent SO recommendation": "توصية أمر خدمة عاجل",
+  "PO ETA after service SLA": "موعد وصول أمر الشراء بعد مستوى خدمة الإصلاح",
+  "Escalate PO": "تصعيد أمر الشراء",
+  "Schedule played but edge ledger missing": "تم تشغيل الجدول لكن سجل الحافة مفقود",
+  "Audit exception": "استثناء تدقيق",
+  "Recommendation without source citation": "توصية من دون استشهاد بالمصدر",
+  "Hide action": "إخفاء الإجراء",
+  "Video with strobe effect on 100 km/h corridor": "فيديو بتأثير وميض على ممر سرعة 100 كم/س",
+  "Block highway playback": "منع التشغيل على الطريق السريع",
+  "Image has no rights expiry": "الصورة لا تحتوي تاريخ انتهاء الحقوق",
+  "Block scheduling": "منع الجدولة",
+  "Bidder tries to approve emergency broadcast": "المزايد يحاول اعتماد بث طارئ",
+  "Road closure message says limited-time now": "رسالة إغلاق الطريق تستخدم صياغة تجارية عاجلة",
+  "Recommend rewrite": "التوصية بإعادة الصياغة",
+  "Bid has budget but no creative rights declaration": "العرض يتضمن ميزانية من دون تصريح حقوق للتصميم",
+  "Draft only": "مسودة فقط",
+  "Recommended target AED 300k with no objective": "هدف مقترح 300 ألف درهم من دون هدف واضح",
+  "Authority contact not updated for 120 days": "جهة الاتصال المخولة غير محدثة منذ 120 يوماً",
+  "Manual validation": "تحقق يدوي",
+  "Critical alert shown in minor template": "تنبيه حرج معروض في قالب منخفض الأهمية",
+  "Apply critical template": "تطبيق قالب حرج",
+  "No telemetry for 25 minutes on live asset": "لا توجد قياسات لمدة 25 دقيقة على أصل يعمل",
+  "Low confidence and refresh": "ثقة منخفضة وتحديث مطلوب",
+  "5G router failed under warranty": "تعطل راوتر 5G وهو ضمن الضمان",
+  "Warranty exchange": "استبدال بموجب الضمان",
+  "97% proof coverage against 99% contract": "تغطية إثبات 97% مقابل عقد 99%",
+  "ERP changes PO ETA": "نظام ERP يغير موعد وصول أمر الشراء",
+  "Notify O&M admin": "إخطار مسؤول التشغيل والصيانة",
+  "Playback event has no signature": "حدث التشغيل لا يحتوي توقيعاً",
+  "Reject proof event": "رفض حدث الإثبات",
+  "Skill output has no model version": "مخرج المهارة لا يحتوي إصدار النموذج",
+  "Route to approver": "توجيه إلى المعتمد",
+  "Rewrite copy": "إعادة صياغة النص",
+  "Complete bid packet": "استكمال ملف العرض",
+  "Regenerate scenario": "إعادة توليد السيناريو",
+  "Validate authority": "التحقق من الجهة",
+  "Apply emergency template": "تطبيق قالب الطوارئ",
+  "Refresh edge telemetry": "تحديث قياسات الحافة",
+  "Use warranty exchange": "استخدام استبدال الضمان",
+  "Open telemetry exception": "فتح استثناء قياس",
+  "Notify owner": "إخطار المالك",
+  "Complete AI run metadata": "استكمال بيانات تشغيل الذكاء",
+  "Complete media metadata": "استكمال بيانات الأصل الإعلامي",
+  "Proof-of-play settlement controls": "ضوابط تسوية إثبات التشغيل",
+  "Proof coverage": "تغطية الإثبات",
+  "Exception": "الاستثناء",
+  "Settlement state": "حالة التسوية",
+  "Ready to settle": "جاهز للتسوية",
+  "Make-good recommended": "تعويض إعلاني مقترح",
+  "Not yet published": "لم ينشر بعد",
+  "Not started": "لم يبدأ",
+  "Offer make-good": "تقديم تعويض إعلاني",
+  "Send finance review": "إرسال مراجعة مالية",
+  "Adjust schedule": "تعديل الجدول",
+  "Create service order": "إنشاء أمر خدمة",
+  "assets need action": "أصول تحتاج إلى إجراء",
+  "Standard cycle": "الدورة القياسية",
+  "AI actions": "إجراءات الذكاء الاصطناعي",
+  "Create SO": "إنشاء أمر خدمة",
+  "Notify supplier": "إخطار المورد",
+  "service order drafted": "تم إعداد مسودة أمر الخدمة",
+  "supplier notification queued": "تم إدراج إخطار المورد",
+  "Knowledge coverage": "تغطية المعرفة",
+  "Knowledge base": "قاعدة المعرفة",
+  "Indexed sources": "المصادر المفهرسة",
+  "Rules linked": "القواعد المرتبطة",
+  "MediaGPT consumers": "مستهلكو MediaGPT",
+  "Indexing queue": "قائمة الفهرسة",
+  "No pending sources": "لا توجد مصادر معلقة",
+  "Not mapped yet": "غير مربوط بعد",
+  "Rule coverage by workflow": "تغطية القواعد حسب سير العمل",
+  "Workflow stage": "مرحلة سير العمل",
+  "Rules": "القواعد",
+  "Enforced": "إلزامية",
+  "Recommended": "توصية",
+  "Monitored": "مراقبة",
+  "Sources linked": "المصادر المرتبطة",
   // Persona flow additions
   "Operator quick actions": "إجراءات المشغل السريعة",
   "One-click operational controls. All actions are logged.": "أدوات تشغيلية بضغطة واحدة. يتم تسجيل كل الإجراءات.",
@@ -622,6 +897,12 @@ const translations: Record<string, string> = {
   "This will mark the campaign as Changes requested and make the bidder action visible in Campaigns.": "سيتم تغيير حالة الحملة إلى طلب تعديلات وإظهار الإجراء المطلوب في صفحة الحملات.",
   "Revision request sent": "تم إرسال طلب التعديل",
   "ADMO message": "رسالة مكتب أبوظبي الإعلامي",
+  "ADMO messages": "رسائل مكتب أبوظبي الإعلامي",
+  "action required": "إجراء مطلوب",
+  "Review request": "مراجعة الطلب",
+  "Upload revision": "رفع التعديل",
+  "Opened request": "تم فتح الطلب",
+  "Revision staged": "تم تجهيز التعديل",
   "Action required": "إجراء مطلوب",
   "Needs revision": "يتطلب تعديلاً",
   "ADMO messages": "رسائل مكتب أبوظبي الإعلامي",
@@ -638,6 +919,31 @@ const translations: Record<string, string> = {
   "Low-risk change": "تعديل منخفض المخاطر",
   "MediaGPT recommends requesting a CTA-size adjustment before approval.": "يوصي MediaGPT بطلب تعديل حجم زر الدعوة للإجراء قبل الاعتماد.",
   "No blocking issue detected.": "لم يتم رصد مانع للاعتماد.",
+  "MediaGPT recommends requesting rights evidence and a bilingual copy correction before approval.": "يوصي MediaGPT بطلب إثبات الحقوق وتصحيح النص ثنائي اللغة قبل الاعتماد.",
+  "MediaGPT recommends moving this approved campaign into the Yas evening leisure slot.": "يوصي MediaGPT بنقل هذه الحملة المعتمدة إلى خانة ياس المسائية الترفيهية.",
+  "MediaGPT confirms the public notice is ready for protected edge distribution.": "يؤكد MediaGPT أن الإشعار العام جاهز للتوزيع المحمي على الحافة.",
+  "MediaGPT is reconciling proof-of-play before final settlement.": "يطابق MediaGPT إثبات التشغيل قبل التسوية النهائية.",
+  "Rights declaration missing for one image": "تصريح الحقوق مفقود لصورة واحدة",
+  "Arabic copy is weaker than English headline": "النص العربي أضعف من العنوان الإنجليزي",
+  "Suggested: add talent and image rights evidence": "مقترح: إضافة إثبات حقوق الصور والمواهب",
+  "Yas Island inventory has clean category separation": "مخزون جزيرة ياس يحقق الفصل التصنيفي",
+  "Best slot: 19:00-22:00 leisure traffic peak": "أفضل خانة: 19:00-22:00 ذروة حركة الترفيه",
+  "No finance floor conflict detected": "لم يتم رصد تعارض مع حد المالية",
+  "CAP-style payload complete": "حمولة بصيغة CAP مكتملة",
+  "Protected edge route is available": "مسار الحافة المحمي متاح",
+  "Publish window is still inside SLA": "نافذة النشر ما زالت ضمن مستوى الخدمة",
+  "Signed playback events are arriving": "أحداث التشغيل الموقعة تصل",
+  "One proof bundle pending reconciliation": "حزمة إثبات واحدة بانتظار المطابقة",
+  "Settlement remains blocked until ledger closes": "تبقى التسوية معلقة حتى إغلاق السجل",
+  "Show AI details": "إظهار تفاصيل الذكاء",
+  "Hide AI details": "إخفاء تفاصيل الذكاء",
+  "Run MediaGPT check": "تشغيل فحص MediaGPT",
+  "Add to schedule": "إضافة إلى الجدول",
+  "Publish": "نشر",
+  "View proof status": "عرض حالة الإثبات",
+  "Scheduling recommendation": "توصية الجدولة",
+  "Distribution readiness": "جاهزية التوزيع",
+  "Proof reconciliation": "مطابقة إثبات التشغيل",
   "Detailed MediaGPT scan": "الفحص التفصيلي من MediaGPT",
   "AI-assisted": "مدعوم بالذكاء الاصطناعي",
   "Brand safety": "أمان العلامة",
@@ -645,6 +951,16 @@ const translations: Record<string, string> = {
   "Arabic accuracy": "دقة اللغة العربية",
   "Legibility at 40m": "الوضوح على مسافة 40م",
   "Copyright match": "مطابقة حقوق الملكية",
+  "Rights evidence": "إثبات الحقوق",
+  "Audience fit": "ملاءمة الجمهور",
+  "Package fit": "ملاءمة الحزمة",
+  "Budget floor": "الحد الأدنى للميزانية",
+  "Category separation": "الفصل بين الفئات",
+  "Authority match": "مطابقة الجهة المعتمدة",
+  "SLA readiness": "جاهزية مستوى الخدمة",
+  "Edge route": "مسار الحافة",
+  "Ledger integrity": "سلامة السجل",
+  "Playback match": "مطابقة التشغيل",
   "No prohibited symbols detected": "لا توجد رموز محظورة",
   "Arabic RTL punctuation validated": "تم التحقق من علامات الترقيم العربية",
   "Contrast ratio 4.9:1 (min 4.5)": "نسبة التباين 4.9:1 (الحد الأدنى 4.5)",
@@ -934,12 +1250,20 @@ const translations: Record<string, string> = {
   "Workbench load": "حمل منصة العمل",
   "Service tasks": "مهام الخدمة",
   "Spare parts": "قطع الغيار",
+  "Open purchase orders": "أوامر شراء مفتوحة",
   "14 POs": "14 أمر شراء",
   "Tracked procurement": "مشتريات متتبعة",
   "Asset registry": "سجل الأصول",
+  "Asset digital twin (3D)": "التوأم الرقمي للأصل (ثلاثي الأبعاد)",
+  "Asset operations": "عمليات الأصول",
+  "Registry and 3D digital twin": "السجل والتوأم الرقمي ثلاثي الأبعاد",
   "Maintenance workbench": "منصة عمل الصيانة",
+  "Field tasks and repair lanes": "مهام الميدان ومسارات الإصلاح",
+  "Supply chain": "سلسلة الإمداد",
+  "BoM, POs and SOs": "قائمة المواد وأوامر الشراء وأوامر الخدمة",
   "BoM, service orders and POs": "قائمة المواد وأوامر الخدمة وأوامر الشراء",
   "AI recommendations enabled": "توصيات الذكاء الاصطناعي مفعلة",
+  "service tasks": "مهام خدمة",
   "BOM items": "عناصر قائمة المواد",
   "Open SOs": "أوامر الخدمة المفتوحة",
   "Open POs": "أوامر الشراء المفتوحة",
@@ -1084,18 +1408,18 @@ const translations: Record<string, string> = {
   "Corniche prime - evening rotation": "الكورنيش الرئيسي - دورة المساء",
   "Downtown retail loop - weekend": "مسار التجزئة في وسط المدينة - نهاية الأسبوع",
   "Yas leisure loop - summer flight": "مسار ياس الترفيهي - الرحلة الصيفية",
-  "12 panels · Corniche, Airport Road": "12 شاشة · الكورنيش، طريق المطار",
+  "12 panels | Corniche, Airport Road": "12 شاشة | الكورنيش، طريق المطار",
   "18 mall & urban panels": "18 شاشة في المولات والمناطق الحضرية",
-  "9 panels · Yas Island & hotel corridor": "9 شاشات · جزيرة ياس وممر الفنادق",
+  "9 panels | Yas Island & hotel corridor": "9 شاشات | جزيرة ياس وممر الفنادق",
   "Jul 20 - Aug 03, 2026": "20 يوليو - 3 أغسطس 2026",
   "Jul 12 - Jul 26, 2026": "12 يوليو - 26 يوليو 2026",
   "Jul 15 - Aug 15, 2026": "15 يوليو - 15 أغسطس 2026",
   "1.4M weekly": "1.4 مليون أسبوعياً",
   "790k weekly": "790 ألف أسبوعياً",
   "620k weekly": "620 ألف أسبوعياً",
-  "Jul 04, 2026 · 18:00": "4 يوليو 2026 · 18:00",
-  "Jul 03, 2026 · 12:00": "3 يوليو 2026 · 12:00",
-  "Jul 05, 2026 · 20:00": "5 يوليو 2026 · 20:00",
+  "Jul 04, 2026 | 18:00": "4 يوليو 2026 | 18:00",
+  "Jul 03, 2026 | 12:00": "3 يوليو 2026 | 12:00",
+  "Jul 05, 2026 | 20:00": "5 يوليو 2026 | 20:00",
 
 
 
@@ -1326,6 +1650,10 @@ const translations: Record<string, string> = {
 
   "Agent families": "عائلات الوكلاء",
   "Run agent": "تشغيل الوكيل",
+  "Common asks": "طلبات شائعة",
+  "Find campaign history": "البحث في تاريخ الحملات",
+  "Prepare a governed schedule": "إعداد جدول محكوم",
+  "Review a submitted creative": "مراجعة تصميم مقدم",
   "Set the inputs above and run the agent to see governed output.": "حدد المدخلات أعلاه وشغل الوكيل لعرض المخرجات المحكومة.",
   "No runs in this session yet.": "لا توجد عمليات تشغيل في هذه الجلسة بعد.",
   "Recent runs": "أحدث العمليات",
@@ -1794,7 +2122,7 @@ function translateArabic(value: string) {
     .replace(/\b(\d+(?:\.\d+)?)M\s+impressions\s*\/\s*week\b/g, "$1 مليون ظهور أسبوعياً")
     .replace(/\b(\d+(?:\.\d+)?)M\s+weekly\b/g, "$1 مليون أسبوعياً")
     .replace(/\b(\d+)k\s+weekly\b/g, "$1 ألف أسبوعياً")
-    .replace(/\s+Â·\s+/g, " · ")
+    .replace(/\s+\|\s+/g, " | ")
     .replace(/\s+and\s+/g, " و ")
     .replace(/\s+&\s+/g, " و ");
 
@@ -1807,6 +2135,29 @@ function translateArabic(value: string) {
 
 function useT() {
   return useContext(I18nContext);
+}
+
+function isArabicInterface(t: Translator) {
+  return t("Notifications") === "الإشعارات";
+}
+
+function localized(value: LocalizedText | string, t: Translator) {
+  if (typeof value === "string") return t(value);
+  return isArabicInterface(t) ? value.ar : value.en;
+}
+
+const ontologyCatalogue = [...doohOntology, ...extendedDoohOntology];
+const knowledgeSourceCatalogue = [...seedKnowledgeSources, ...extendedKnowledgeSources];
+const ruleCatalogue = [...seedDoohRules, ...extendedDoohRules];
+const simulationCatalogue = [...ruleSimulationContexts, ...extendedRuleSimulationContexts];
+const scenarioCatalogue = [...demoScenarios, ...extendedDemoScenarios];
+
+function sourceById(id: string) {
+  return knowledgeSourceCatalogue.find((source) => source.id === id);
+}
+
+function ruleById(id: string) {
+  return ruleCatalogue.find((rule) => rule.id === id);
 }
 
 function translateNode(node: ReactNode, t: Translator): ReactNode {
@@ -1846,6 +2197,32 @@ async function parseDoohResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
+function notificationPreferenceStorageKey(profileId: ProfileId) {
+  return `dooh-notification-preferences:${profileId}`;
+}
+
+function loadNotificationPreferences(profileId: ProfileId): NotificationPreferences {
+  if (typeof window === "undefined") return defaultNotificationPreferences;
+  try {
+    const raw = window.localStorage.getItem(notificationPreferenceStorageKey(profileId));
+    if (!raw) return defaultNotificationPreferences;
+    const parsed = JSON.parse(raw) as Partial<NotificationPreferences>;
+    return { ...defaultNotificationPreferences, ...parsed };
+  } catch {
+    return defaultNotificationPreferences;
+  }
+}
+
+function saveNotificationPreferences(profileId: ProfileId, preferences: NotificationPreferences) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(notificationPreferenceStorageKey(profileId), JSON.stringify(preferences));
+}
+
+function isNotificationAllowed(notification: PlatformNotification, preferences: NotificationPreferences) {
+  if (notification.tone === "critical") return preferences.critical;
+  return preferences[notification.page] ?? true;
+}
+
 function App() {
   const [lang, setLang] = useState<Lang>("en");
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -1860,12 +2237,16 @@ function App() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
   const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<PlatformNotification[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toast, setToast] = useState("");
   const [backendStatus, setBackendStatus] = useState<"syncing" | "online" | "offline">("syncing");
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(defaultNotificationPreferences);
 
   const t = (value: string) => (lang === "ar" ? translateArabic(value) : value);
 
@@ -1887,6 +2268,21 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    aiStatus().then((status) => {
+      if (active) setAiAvailable(Boolean(status.available));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    setNotificationPreferences(loadNotificationPreferences(profile.id));
+  }, [profile?.id]);
+
   function notify(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
@@ -1903,6 +2299,8 @@ function App() {
     setAlerts(next.alerts);
     setVerificationSteps(next.verificationSteps);
     setFinanceApprovals(next.financeApprovals);
+    setServiceOrders(next.serviceOrders ?? []);
+    setPurchaseOrders(next.purchaseOrders ?? []);
     setActivity(next.activity);
     setNotifications(next.notifications ?? []);
   }
@@ -1931,9 +2329,18 @@ function App() {
     setPage(next);
   }
 
+  function updateNotificationPreference(key: NotificationPreferenceKey, enabled: boolean) {
+    if (!profile) return;
+    setNotificationPreferences((previous) => {
+      const next = { ...previous, [key]: enabled };
+      saveNotificationPreferences(profile.id, next);
+      return next;
+    });
+  }
+
   const visibleNotifications = useMemo(
-    () => (profile ? notifications.filter((item) => item.recipients.includes(profile.id)) : []),
-    [notifications, profile],
+    () => (profile ? notifications.filter((item) => item.recipients.includes(profile.id) && isNotificationAllowed(item, notificationPreferences)) : []),
+    [notifications, notificationPreferences, profile],
   );
 
   async function markNotificationRead(id: string) {
@@ -2077,6 +2484,41 @@ function App() {
     }
   }
 
+  async function createServiceOrder(payload: {
+    assetId: string;
+    assetName: string;
+    componentId: string;
+    title: string;
+    severity: ServiceOrder["severity"];
+    summary: string;
+    partsNeeded: string[];
+  }) {
+    const result = await syncMutation<{ state: DoohStatePayload; serviceOrder: ServiceOrder }>("service-orders", {
+      actor: profile?.name ?? "Maintenance operator",
+      payload,
+    });
+    if (result) notify(`${t("Service order created")}: ${result.serviceOrder.id}`);
+    return result?.serviceOrder ?? null;
+  }
+
+  async function createPurchaseOrder(payload: {
+    assetId: string;
+    assetName: string;
+    componentId: string;
+    item: string;
+    quantity: number;
+    vendor?: string;
+    eta?: string;
+    linkedServiceOrder?: string;
+  }) {
+    const result = await syncMutation<{ state: DoohStatePayload; purchaseOrder: PurchaseOrder }>("purchase-orders", {
+      actor: profile?.name ?? "O&M procurement",
+      payload,
+    });
+    if (result) notify(`${t("Purchase order submitted")}: ${result.purchaseOrder.id}`);
+    return result?.purchaseOrder ?? null;
+  }
+
   if (!profile) {
     return (
       <I18nContext.Provider value={t}>
@@ -2102,13 +2544,15 @@ function App() {
             lang={lang}
             setLang={setLang}
             notifications={visibleNotifications}
+            notificationPreferences={notificationPreferences}
+            onToggleNotificationPreference={updateNotificationPreference}
             onOpenNotification={openNotification}
             onMarkNotification={markNotificationRead}
             onMarkAllNotifications={markAllNotificationsRead}
             t={t}
           />
           {page === "control" && (
-            <ControlCentre submissions={submissions} published={published} notify={notify} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
+            <ControlCentre submissions={submissions} published={published} aiAvailable={aiAvailable} notify={notify} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
           )}
           {page === "cms" && (
             <CmsPage
@@ -2118,6 +2562,7 @@ function App() {
               onStage={updateSubmissionStage}
               onRequestChanges={requestBidderChanges}
               onPlaySchedule={playSchedule}
+              aiAvailable={aiAvailable}
               t={t}
             />
           )}
@@ -2130,11 +2575,21 @@ function App() {
               onQueueBroadcast={queueAlertBroadcast}
               onBroadcastNow={broadcastAlertNow}
               onResetAlert={resetAlertChecks}
+              aiAvailable={aiAvailable}
               t={t}
             />
           )}
-          {page === "network" && <NetworkPage t={t} />}
-          {page === "mediagpt" && <MediaGptSuite t={t} />}
+          {page === "network" && (
+            <NetworkPage
+              aiAvailable={aiAvailable}
+              serviceOrders={serviceOrders}
+              purchaseOrders={purchaseOrders}
+              onCreateServiceOrder={createServiceOrder}
+              onCreatePurchaseOrder={createPurchaseOrder}
+              t={t}
+            />
+          )}
+          {page === "mediagpt" && <MediaGptSuite aiAvailable={aiAvailable} t={t} />}
           {page === "knowledge" && <KnowledgeBasePage t={t} />}
           {page === "rules" && <RulesPage t={t} />}
           {page === "skillsCatalogue" && <SkillsCataloguePage t={t} />}
@@ -2145,11 +2600,11 @@ function App() {
           {page === "accessRoles" && <AccessRolesPage t={t} />}
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
-          {page === "financials" && <FinancialsPage approvals={financeApprovals} onDecision={decideFinance} t={t} />}
+          {page === "financials" && <FinancialsPage approvals={financeApprovals} aiAvailable={aiAvailable} onDecision={decideFinance} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
-        <MediaGptChatbot t={t} />
+        <MediaGptChatbot profile={profile} t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
         {wizardOpen ? (
           <NewCampaignWizard
@@ -2296,6 +2751,8 @@ function Topbar({
   lang,
   setLang,
   notifications,
+  notificationPreferences,
+  onToggleNotificationPreference,
   onOpenNotification,
   onMarkNotification,
   onMarkAllNotifications,
@@ -2306,6 +2763,8 @@ function Topbar({
   lang: Lang;
   setLang: (lang: Lang) => void;
   notifications: PlatformNotification[];
+  notificationPreferences: NotificationPreferences;
+  onToggleNotificationPreference: (key: NotificationPreferenceKey, enabled: boolean) => void;
   onOpenNotification: (notification: PlatformNotification) => void;
   onMarkNotification: (id: string) => void;
   onMarkAllNotifications: () => void;
@@ -2338,6 +2797,8 @@ function Topbar({
             <NotificationDrawer
               profile={profile}
               notifications={notifications}
+              preferences={notificationPreferences}
+              onTogglePreference={onToggleNotificationPreference}
               onOpen={(notification) => {
                 onOpenNotification(notification);
                 setNotificationOpen(false);
@@ -2359,19 +2820,25 @@ function Topbar({
 function NotificationDrawer({
   profile,
   notifications,
+  preferences,
+  onTogglePreference,
   onOpen,
   onMarkRead,
   onMarkAll,
 }: {
   profile: Profile;
   notifications: PlatformNotification[];
+  preferences: NotificationPreferences;
+  onTogglePreference: (key: NotificationPreferenceKey, enabled: boolean) => void;
   onOpen: (notification: PlatformNotification) => void;
   onMarkRead: (id: string) => void;
   onMarkAll: () => void;
 }) {
   const t = useT();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const unreadCount = notifications.filter((notification) => !notification.readBy.includes(profile.id)).length;
   const sortedNotifications = [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const scopedPreferenceOptions = notificationPreferenceOptions.filter((option) => option.key === "critical" || profile.pages.includes(option.key as Page));
 
   return (
     <div className="notification-drawer" role="dialog" aria-label={t("Notification center")}>
@@ -2380,10 +2847,32 @@ function NotificationDrawer({
           <span>{t("Notification center")}</span>
           <strong>{unreadCount ? `${unreadCount} ${t("unread")}` : t("All caught up")}</strong>
         </div>
-        <button type="button" onClick={onMarkAll} disabled={!unreadCount}>
-          {t("Mark all read")}
-        </button>
+        <div className="notification-header-actions">
+          <button type="button" onClick={() => setSettingsOpen((open) => !open)}>
+            <Settings size={14} /> {t("Settings")}
+          </button>
+          <button type="button" onClick={onMarkAll} disabled={!unreadCount}>
+            {t("Mark all read")}
+          </button>
+        </div>
       </header>
+      {settingsOpen ? (
+        <section className="notification-settings" aria-label={t("Notification settings")}>
+          {scopedPreferenceOptions.map((option) => (
+            <label key={option.key}>
+              <input
+                type="checkbox"
+                checked={preferences[option.key]}
+                onChange={(event) => onTogglePreference(option.key, event.currentTarget.checked)}
+              />
+              <span>
+                <strong>{t(option.label)}</strong>
+                <small>{t(option.helper)}</small>
+              </span>
+            </label>
+          ))}
+        </section>
+      ) : null}
       <div className="notification-list">
         {sortedNotifications.length ? (
           sortedNotifications.map((notification) => {
@@ -2428,18 +2917,22 @@ function NotificationDrawer({
 function ControlCentre({
   submissions,
   published,
+  aiAvailable,
   notify,
   goToAlerts,
   t,
 }: {
   submissions: Submission[];
   published: PublishedItem[];
+  aiAvailable: boolean;
   notify: (message: string) => void;
   goToAlerts: () => void;
   t: (value: string) => string;
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
   const [liveViewFullscreen, setLiveViewFullscreen] = useState(false);
+  const [digest, setDigest] = useState<{ en: string; ar: string; source?: string } | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
   const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? estateAssets[0];
   const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
   const queuedCount = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled").length;
@@ -2462,6 +2955,14 @@ function ControlCentre({
     };
   }, [liveViewFullscreen]);
 
+  async function summarizeEstate() {
+    setDigestLoading(true);
+    const result = await aiOpsDigest();
+    setDigest({ en: result.en, ar: result.ar, source: result.source });
+    setDigestLoading(false);
+    if (result.source === "offline") notify(t("MediaGPT is offline. Showing fallback summary."));
+  }
+
   return (
     <PageBody>
       <div className="operator-actions">
@@ -2474,8 +2975,22 @@ function ControlCentre({
           <Button icon={Send} variant="secondary" onClick={() => notify(t("Refresh forced on all edge caches"))}>{t("Refresh edge feeds")}</Button>
           <Button icon={Wrench} variant="secondary" onClick={() => notify(t("Field team dispatched to open alarms"))}>{t("Dispatch technician")}</Button>
           <Button icon={LockKeyhole} variant="secondary" onClick={() => notify(t("Schedule frozen. New publishes are blocked."))}>{t("Freeze schedule")}</Button>
+          <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}>{digestLoading ? t("Summarizing") : t("Summarize")}</Button>
         </div>
       </div>
+      {digest ? (
+        <section className="ai-review-card clear">
+          <div className="ai-review-summary">
+            <div className="ai-review-icon"><Sparkles size={18} /></div>
+            <div>
+              <span>{t("MediaGPT shift handover")}</span>
+              <strong>{isArabicInterface(t) ? digest.ar : digest.en}</strong>
+              <small>{digest.source === "openai" ? t("Generated from live platform state") : t("Offline fallback from platform state")}</small>
+            </div>
+            <StatusPill label={digest.source === "openai" ? "OpenAI" : "Offline"} tone={digest.source === "openai" ? "good" : "warn"} />
+          </div>
+        </section>
+      ) : null}
 
 
       <MetricGrid>
@@ -2566,6 +3081,7 @@ function CmsPage({
   onStage,
   onRequestChanges,
   onPlaySchedule,
+  aiAvailable,
   t,
 }: {
   submissions: Submission[];
@@ -2574,10 +3090,11 @@ function CmsPage({
   onStage: (id: string, next: SubmissionStage) => void;
   onRequestChanges: (id: string, message: string) => void;
   onPlaySchedule: (id: string) => void;
+  aiAvailable: boolean;
   t: (value: string) => string;
 }) {
   const [tab, setTab] = useState<CmsTab>("submissions");
-  const [selectedId, setSelectedId] = useState(submissions[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(submissions[0]?.id || "");
   const selected = submissions.find((item) => item.id === selectedId) ?? submissions[0];
   const approved = submissions.filter((item) => ["Approved", "Scheduled", "Published"].includes(item.stage)).length;
   const pending = submissions.filter((item) => item.stage === "Submitted" || item.stage === "In review").length;
@@ -2615,7 +3132,7 @@ function CmsPage({
             </div>
           </Panel>
           <Panel icon={ClipboardCheck} title={t(selected.campaign)} action={selected.id}>
-            <SubmissionDetail submission={selected} onStage={onStage} onRequestChanges={onRequestChanges} />
+            <SubmissionDetail submission={selected} aiAvailable={aiAvailable} onStage={onStage} onRequestChanges={onRequestChanges} />
           </Panel>
         </div>
       ) : null}
@@ -2628,27 +3145,99 @@ function CmsPage({
 
 function SubmissionDetail({
   submission,
+  aiAvailable,
   onStage,
   onRequestChanges,
 }: {
   submission: Submission;
+  aiAvailable: boolean;
   onStage: (id: string, stage: SubmissionStage) => void;
   onRequestChanges: (id: string, message: string) => void;
 }) {
+  const t = useT();
   const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+  const [tags, setTags] = useState<SubmissionTags | null>(null);
+  const [tagLoading, setTagLoading] = useState(false);
+  const [triage, setTriage] = useState<SubmissionTriageResponse | null>(null);
+  const [triageLoading, setTriageLoading] = useState(false);
 
   function sendRevisionRequest(message: string) {
     onRequestChanges(submission.id, message);
     setRevisionDialogOpen(false);
   }
 
+  async function runTagging() {
+    setTagLoading(true);
+    const result = await aiTagSubmission({ submission });
+    setTags(result);
+    setTagLoading(false);
+  }
+
+  async function runTriage() {
+    setTriageLoading(true);
+    const result = await aiTriageSubmission({ submissionId: submission.id, actor: "ADMO CMS", role: "reviewer" });
+    if ("proposal" in result) setTriage(result);
+    setTriageLoading(false);
+  }
+
+  async function decideTriageAction(action: PendingAgentAction, decision: "approve" | "reject") {
+    const result = decision === "approve"
+      ? await aiApproveAgentAction({ id: action.id, actor: "ADMO CMS", role: "reviewer" })
+      : await aiRejectAgentAction({ id: action.id, actor: "ADMO CMS", role: "reviewer", reason: "Rejected from CMS triage" });
+    if ("action" in result && triage) setTriage({ ...triage, action: result.action });
+  }
+
   return (
     <div className="detail-stack">
       <StageTracker stage={submission.stage} />
+      <section className="ai-mini-panel">
+        <div>
+          <span>{tags ? "MediaGPT routing" : "MediaGPT tagging"}</span>
+          <strong>
+            {tags
+              ? `${tags.industry} | ${tags.riskTier} risk | ${tags.suggestedApprover}`
+              : "Classify submission risk, route and review window"}
+          </strong>
+          {tags ? (
+            <small>{tags.suggestedWindow}</small>
+          ) : (
+            <small>{aiAvailable ? "Uses submission metadata and platform rules." : "AI key unavailable."}</small>
+          )}
+        </div>
+        <div className="chip-row">
+          {tags?.tags.map((tag) => <span key={tag}>{tag}</span>)}
+          <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || tagLoading} onClick={runTagging}>{tagLoading ? "Tagging" : "Auto-tag"}</Button>
+          <Button icon={Workflow} variant="secondary" disabled={!aiAvailable || triageLoading} onClick={runTriage}>{triageLoading ? "Triaging" : "Run agent triage"}</Button>
+        </div>
+      </section>
+      {triage ? (
+        <section className="ai-mini-panel agent-triage-panel">
+          <div>
+            <span>MediaGPT triage</span>
+            <strong>{triage.proposal.summary}</strong>
+            <small>{triage.proposal.reasons?.slice(0, 2).join(" | ")}</small>
+            {triage.proposal.citations?.length ? (
+              <div className="citation-row">
+                {triage.proposal.citations.slice(0, 4).map((citation) => <span key={citation}>{citation}</span>)}
+              </div>
+            ) : null}
+          </div>
+          {triage.action ? (
+            <AgentActionCard
+              action={triage.action}
+              onApprove={() => decideTriageAction(triage.action as PendingAgentAction, "approve")}
+              onReject={() => decideTriageAction(triage.action as PendingAgentAction, "reject")}
+              t={t}
+            />
+          ) : (
+            <StatusPill label="No stage change proposed" tone="neutral" />
+          )}
+        </section>
+      ) : null}
       <AiDeepScan
         submission={submission}
         onRequestChanges={() => setRevisionDialogOpen(true)}
-        onApprove={() => onStage(submission.id, "Approved")}
+        onStage={(stage) => onStage(submission.id, stage)}
       />
       <div className="submission-hero">
         <div className="creative-frame large" style={{ backgroundImage: `url("${creativeBackground(submission.creativeId)}")` }} />
@@ -2690,14 +3279,18 @@ function SubmissionDetail({
 }
 
 function defaultRevisionMessage(submission: Submission) {
-  return [
-    `Hello ${submission.bidder} team,`,
-    "",
-    `ADMO reviewed "${submission.campaign}" and MediaGPT flagged one required adjustment before approval:`,
-    "",
+  const review = getSubmissionAiReview(submission);
+  const findings = review?.findings.filter((finding) => !finding.ok).map((finding) => `- ${finding.label}`) || [
     "- Enlarge the CTA by 12% for highway assets.",
     "- Keep Arabic and English copy aligned.",
     "- Re-upload the revised creative pack for CMS review.",
+  ];
+  return [
+    `Hello ${submission.bidder} team,`,
+    "",
+    `ADMO reviewed "${submission.campaign}" and MediaGPT flagged the following before approval:`,
+    "",
+    ...findings,
     "",
     "This campaign will remain in Changes requested until the revised pack is submitted.",
     "",
@@ -2761,64 +3354,221 @@ function RevisionRequestDialog({
   );
 }
 
+type SubmissionAiAction = "requestChanges" | "approve" | "schedule" | "publish" | "proof";
+
+interface SubmissionAiReview {
+  tone: Tone;
+  status: string;
+  title: string;
+  helper: string;
+  action: SubmissionAiAction;
+  actionLabel: string;
+  ruleIds: string[];
+  sourceIds: string[];
+  scores: Array<{ label: string; value: number; tone: Tone }>;
+  findings: Array<{ label: string; ok: boolean }>;
+}
+
+function getSubmissionAiReview(submission: Submission): SubmissionAiReview | null {
+  if (submission.stage === "Submitted" || submission.stage === "Changes requested") return null;
+
+  if (submission.stage === "In review") {
+    if (submission.id === "SUB-1048") {
+      return {
+        tone: "warn",
+        status: "Issue detected",
+        title: "MediaGPT recommends requesting rights evidence and a bilingual copy correction before approval.",
+        helper: "Rights declaration missing for one image",
+        action: "requestChanges",
+        actionLabel: "Prepare bidder message",
+        ruleIds: ["RULE-CMS-001", "RULE-CMS-003", "RULE-AI-001"],
+        sourceIds: ["KB-CRE-002", "KB-CRE-003", "KB-AI-001"],
+        scores: [
+          { label: "Brand safety", value: 96, tone: "good" },
+          { label: "Cultural sensitivity", value: 91, tone: "good" },
+          { label: "Arabic accuracy", value: 78, tone: "warn" },
+          { label: "Rights evidence", value: 62, tone: "warn" },
+          { label: "Legibility at 40m", value: 88, tone: "good" },
+        ],
+        findings: [
+          { label: "No prohibited symbols detected", ok: true },
+          { label: "Arabic copy is weaker than English headline", ok: false },
+          { label: "Suggested: add talent and image rights evidence", ok: false },
+          { label: "Contrast ratio 4.9:1 (min 4.5)", ok: true },
+        ],
+      };
+    }
+
+    return {
+      tone: "warn",
+      status: "Issue detected",
+      title: "MediaGPT recommends requesting a CTA-size adjustment before approval.",
+      helper: "Suggested: enlarge CTA by 12% for highway assets",
+      action: "requestChanges",
+      actionLabel: "Prepare bidder message",
+      ruleIds: ["RULE-CMS-002", "RULE-AI-001"],
+      sourceIds: ["KB-CRE-001", "KB-AI-001"],
+      scores: [
+        { label: "Brand safety", value: 94, tone: "good" },
+        { label: "Cultural sensitivity", value: 92, tone: "good" },
+        { label: "Arabic accuracy", value: 95, tone: "good" },
+        { label: "Legibility at 40m", value: 76, tone: "warn" },
+        { label: "Copyright match", value: 100, tone: "good" },
+      ],
+      findings: [
+        { label: "No prohibited symbols detected", ok: true },
+        { label: "Arabic RTL punctuation validated", ok: true },
+        { label: "Contrast ratio 4.9:1 (min 4.5)", ok: true },
+        { label: "Suggested: enlarge CTA by 12% for highway assets", ok: false },
+      ],
+    };
+  }
+
+  if (submission.stage === "Approved") {
+    return {
+      tone: "info",
+      status: "Scheduling recommendation",
+      title: "MediaGPT recommends moving this approved campaign into the Yas evening leisure slot.",
+      helper: "Best slot: 19:00-22:00 leisure traffic peak",
+      action: "schedule",
+      actionLabel: "Add to schedule",
+      ruleIds: ["RULE-COM-002", "RULE-AI-001"],
+      sourceIds: ["KB-COM-002", "KB-AI-001"],
+      scores: [
+        { label: "Audience fit", value: 94, tone: "good" },
+        { label: "Package fit", value: 97, tone: "good" },
+        { label: "Budget floor", value: 91, tone: "good" },
+        { label: "Category separation", value: 96, tone: "good" },
+      ],
+      findings: [
+        { label: "Yas Island inventory has clean category separation", ok: true },
+        { label: "Best slot: 19:00-22:00 leisure traffic peak", ok: true },
+        { label: "No finance floor conflict detected", ok: true },
+      ],
+    };
+  }
+
+  if (submission.stage === "Scheduled") {
+    return {
+      tone: "good",
+      status: "Distribution readiness",
+      title: "MediaGPT confirms the public notice is ready for protected edge distribution.",
+      helper: "Publish window is still inside SLA",
+      action: "publish",
+      actionLabel: "Publish",
+      ruleIds: ["RULE-EMG-002", "RULE-EMG-004", "RULE-AI-001"],
+      sourceIds: ["KB-EMG-002", "KB-EMG-004", "KB-AI-001"],
+      scores: [
+        { label: "Authority match", value: 99, tone: "good" },
+        { label: "SLA readiness", value: 97, tone: "good" },
+        { label: "Edge route", value: 95, tone: "good" },
+        { label: "Arabic accuracy", value: 93, tone: "good" },
+      ],
+      findings: [
+        { label: "CAP-style payload complete", ok: true },
+        { label: "Protected edge route is available", ok: true },
+        { label: "Publish window is still inside SLA", ok: true },
+      ],
+    };
+  }
+
+  if (submission.stage === "Published") {
+    return {
+      tone: "warn",
+      status: "Proof reconciliation",
+      title: "MediaGPT is reconciling proof-of-play before final settlement.",
+      helper: "One proof bundle pending reconciliation",
+      action: "proof",
+      actionLabel: "View proof status",
+      ruleIds: ["RULE-POP-001", "RULE-POP-002", "RULE-AI-001"],
+      sourceIds: ["KB-POP-001", "KB-POP-002", "KB-AI-001"],
+      scores: [
+        { label: "Proof coverage", value: 84, tone: "warn" },
+        { label: "Ledger integrity", value: 98, tone: "good" },
+        { label: "Playback match", value: 91, tone: "good" },
+        { label: "Settlement state", value: 72, tone: "warn" },
+      ],
+      findings: [
+        { label: "Signed playback events are arriving", ok: true },
+        { label: "One proof bundle pending reconciliation", ok: false },
+        { label: "Settlement remains blocked until ledger closes", ok: false },
+      ],
+    };
+  }
+
+  return null;
+}
+
 function AiDeepScan({
   submission,
   onRequestChanges,
-  onApprove,
+  onStage,
 }: {
   submission: Submission;
   onRequestChanges: () => void;
-  onApprove: () => void;
+  onStage: (stage: SubmissionStage) => void;
 }) {
   const t = useT();
-  const seed = submission.id.length;
-  const [open, setOpen] = useState(false);
+  const review = getSubmissionAiReview(submission);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [rerun, setRerun] = useState(0);
-  const scores = [
-    { label: "Brand safety", value: 92 + (seed % 5), tone: "good" as Tone },
-    { label: "Cultural sensitivity", value: 88 + (seed % 6), tone: "good" as Tone },
-    { label: "Arabic accuracy", value: 94 + (seed % 4), tone: "good" as Tone },
-    { label: "Legibility at 40m", value: 76 + (seed % 10), tone: "warn" as Tone },
-    { label: "Copyright match", value: 100, tone: "good" as Tone },
-  ];
-  const findings = [
-    { label: "No prohibited symbols detected", ok: true },
-    { label: "Arabic RTL punctuation validated", ok: true },
-    { label: "Contrast ratio 4.9:1 (min 4.5)", ok: true },
-    { label: "Suggested: enlarge CTA by 12% for highway assets", ok: false },
-  ];
-  const issue = findings.find((finding) => !finding.ok);
-  const recommendation = issue
-    ? "MediaGPT recommends requesting a CTA-size adjustment before approval."
-    : "No blocking issue detected.";
+
+  if (!review) return null;
+
+  function runPrimaryAction() {
+    if (review.action === "requestChanges") {
+      onRequestChanges();
+      return;
+    }
+    if (review.action === "schedule") {
+      onStage("Scheduled");
+      return;
+    }
+    if (review.action === "publish") {
+      onStage("Published");
+      return;
+    }
+    if (review.action === "approve") {
+      onStage("Approved");
+    }
+  }
+
+  const hasPrimaryAction = review.action !== "proof";
 
   return (
-    <section className={`ai-review-card ${issue ? "has-issue" : "clear"}`}>
+    <section className={`ai-review-card ${review.tone === "warn" || review.tone === "danger" ? "has-issue" : "clear"}`}>
       <div className="ai-review-summary">
         <div className="ai-review-icon"><Sparkles size={18} /></div>
         <div>
           <span>{t("AI recommendation")}</span>
-          <strong>{t(recommendation)}</strong>
-          <small>{issue ? t(issue.label) : t("No blocking issue detected.")}</small>
+          <strong>{t(review.title)}</strong>
+          <small>{t(review.helper)}</small>
         </div>
-        <StatusPill label={issue ? "Issue detected" : "Cleared"} tone={issue ? "warn" : "good"} />
+        <StatusPill label={review.status} tone={review.tone} />
       </div>
       <div className="ai-review-actions">
-        {issue ? (
-          <Button icon={Send} onClick={onRequestChanges}>{t("Prepare bidder message")}</Button>
+        {hasPrimaryAction ? (
+          <Button icon={review.action === "requestChanges" ? Send : CheckCircle2} onClick={runPrimaryAction}>
+            {t(review.actionLabel)}
+          </Button>
         ) : (
-          <Button icon={CheckCircle2} onClick={onApprove}>{t("Approve with AI clearance")}</Button>
+          <Button variant="secondary" icon={FileCheck2} onClick={() => setDetailsOpen(true)}>{t(review.actionLabel)}</Button>
         )}
-        <Button variant="secondary" icon={RefreshCcw} onClick={() => setRerun((n) => n + 1)}>{t("Re-run scan")}</Button>
-        <Button variant="secondary" icon={open ? X : Sparkles} onClick={() => setOpen((value) => !value)}>
-          {open ? t("Hide deep scan") : t("Open deep scan")}
+        <Button variant="secondary" icon={RefreshCcw} onClick={() => setRerun((n) => n + 1)}>{t("Run MediaGPT check")}</Button>
+        <Button variant="secondary" icon={detailsOpen ? X : Sparkles} onClick={() => setDetailsOpen((value) => !value)}>
+          {detailsOpen ? t("Hide AI details") : t("Show AI details")}
         </Button>
       </div>
-      {open ? (
+      {detailsOpen ? (
         <div className="deepscan-panel" aria-label={t("Detailed MediaGPT scan")}>
+          <IntelligenceCitations
+            ruleIds={review.ruleIds}
+            sourceIds={review.sourceIds}
+            action={review.actionLabel}
+          />
           <div className="deepscan-grid">
             <div className="deepscan-scores">
-              {scores.map((score) => (
+              {review.scores.map((score) => (
                 <div key={score.label} className="deepscan-bar">
                   <div className="deepscan-bar-head">
                     <span>{t(score.label)}</span>
@@ -2829,7 +3579,7 @@ function AiDeepScan({
               ))}
             </div>
             <ul className="deepscan-findings">
-              {findings.map((f) => (
+              {review.findings.map((f) => (
                 <li key={f.label} className={f.ok ? "ok" : "warn"}>
                   {f.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
                   <span>{t(f.label)}</span>
@@ -2963,6 +3713,7 @@ function AlertsPage({
   onQueueBroadcast,
   onBroadcastNow,
   onResetAlert,
+  aiAvailable,
   t,
 }: {
   alerts: EmergencyAlert[];
@@ -2972,10 +3723,12 @@ function AlertsPage({
   onQueueBroadcast: (id: string) => void;
   onBroadcastNow: (id: string) => void;
   onResetAlert: (id: string) => void;
+  aiAvailable: boolean;
   t: (value: string) => string;
 }) {
   const [selectedAlertId, setSelectedAlertId] = useState(alerts[0]?.id ?? "");
   const [draft, setDraft] = useState({ title: "", scope: "", content: "", criticality: "Major" });
+  const [drafting, setDrafting] = useState(false);
   const selected = alerts.find((alert) => alert.id === selectedAlertId) ?? alerts[0];
   const checked = steps.every((step) => step.state === "Checked");
 
@@ -2998,6 +3751,21 @@ function AlertsPage({
     setDraft({ title: "", scope: "", content: "", criticality: "Major" });
   }
 
+  async function draftWithAi() {
+    setDrafting(true);
+    const result = await aiGenerateBroadcast({
+      brief: draft.content || draft.title || "Traffic safety notice for affected road users",
+      severity: draft.criticality,
+      zones: [draft.scope || selected?.scope || "Abu Dhabi City"],
+    });
+    setDraft((item) => ({
+      ...item,
+      title: item.title || "MediaGPT public notice",
+      content: [result.en, result.ar].filter(Boolean).join("\n\n"),
+    }));
+    setDrafting(false);
+  }
+
 
   if (!selected) return null;
 
@@ -3009,19 +3777,6 @@ function AlertsPage({
         <Metric label="Time to display" value="00:42" helper="Average last 24h" tone="info" />
         <Metric label="Awaiting checks" value={String(alerts.filter((alert) => alert.state === "Check required").length)} helper="Needs action" tone="warn" />
       </MetricGrid>
-
-      <div className="ai-intervention-box emergency-ai-summary">
-        <div>
-          <strong>{t("MediaGPT emergency verification")}</strong>
-          <span>{t("Checks bilingual payload, authority, SLA, and edge route before broadcast.")}</span>
-        </div>
-        <div className="ai-action-set">
-          <StatusPill label={checked ? "Ready for approval" : "Check required"} tone={checked ? "good" : "warn"} />
-          <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button>
-          <Button variant="secondary" disabled={!checked} onClick={() => onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button>
-          <Button variant="secondary" disabled={!checked} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now")}</Button>
-        </div>
-      </div>
 
       <div className="split-grid wide-left">
         <Panel icon={Bell} title="Active alerts">
@@ -3073,12 +3828,33 @@ function AlertsPage({
                 <option value="Minor">{t("Minor")}</option>
               </select>
             </label>
-            <Button type="submit">{t("Create alert")}</Button>
+            <ActionRow>
+              <Button type="button" icon={Sparkles} variant="secondary" disabled={!aiAvailable || drafting} onClick={draftWithAi}>{drafting ? t("Drafting") : t("Draft with AI")}</Button>
+              <Button type="submit">{t("Create alert")}</Button>
+            </ActionRow>
           </form>
         </Panel>
       </div>
 
-      <Panel icon={ShieldAlert} title={selected.title} action={<StatusPill label={selected.state} tone={alertTone(selected.state)} />}>
+      <Panel icon={ShieldAlert} title={selected.title} action={<StatusPill label={checked ? "Ready for approval" : selected.state} tone={checked ? "good" : alertTone(selected.state)} />}>
+        <div className="selected-alert-summary">
+          <div>
+            <span>{t("Scope")}</span>
+            <strong>{t(selected.scope)}</strong>
+          </div>
+          <div>
+            <span>{t("Authority")}</span>
+            <strong>{t(selected.authority)}</strong>
+          </div>
+          <div>
+            <span>{t("SLA")}</span>
+            <strong>{t(selected.sla)}</strong>
+          </div>
+          <div>
+            <span>{t("Audience")}</span>
+            <strong>{t(selected.audience)}</strong>
+          </div>
+        </div>
         <div className="verification-grid ai-intervention-box">
           {steps.map((step, index) => (
             <article key={step.label} className="verification-step">
@@ -3092,22 +3868,137 @@ function AlertsPage({
           ))}
         </div>
         <ActionRow>
-          <Button onClick={() => onRunChecks(selected.id)}>{t("Run checks")}</Button>
-          <Button variant="secondary" onClick={() => checked && onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button>
-          <Button variant="secondary" onClick={() => checked && onBroadcastNow(selected.id)}>{t("Broadcast now")}</Button>
+          <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button>
+          <Button variant="secondary" disabled={!checked} onClick={() => onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button>
+          <Button variant="secondary" disabled={!checked} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now")}</Button>
           <Button variant="secondary" onClick={() => onResetAlert(selected.id)}>{t("Reset")}</Button>
         </ActionRow>
+        <CollapsibleIntelligenceCitations
+          ruleIds={["RULE-EMG-001", "RULE-EMG-002", "RULE-AI-001"]}
+          sourceIds={["KB-EMG-001", "KB-EMG-002", "KB-AI-001"]}
+          action={checked ? "Queue broadcast" : "Run MediaGPT checks"}
+        />
 
       </Panel>
     </PageBody>
   );
 }
 
-function NetworkPage({ t }: { t: (value: string) => string }) {
+function NetworkPage({
+  aiAvailable,
+  serviceOrders,
+  purchaseOrders,
+  onCreateServiceOrder,
+  onCreatePurchaseOrder,
+  t,
+}: {
+  aiAvailable: boolean;
+  serviceOrders: ServiceOrder[];
+  purchaseOrders: PurchaseOrder[];
+  onCreateServiceOrder: (payload: {
+    assetId: string;
+    assetName: string;
+    componentId: string;
+    title: string;
+    severity: ServiceOrder["severity"];
+    summary: string;
+    partsNeeded: string[];
+  }) => Promise<ServiceOrder | null>;
+  onCreatePurchaseOrder: (payload: {
+    assetId: string;
+    assetName: string;
+    componentId: string;
+    item: string;
+    quantity: number;
+    vendor?: string;
+    eta?: string;
+    linkedServiceOrder?: string;
+  }) => Promise<PurchaseOrder | null>;
+  t: (value: string) => string;
+}) {
   const [selectedId, setSelectedId] = useState(estateAssets[1].id);
-  const selected = estateAssets.find((asset) => asset.id === selectedId) ?? estateAssets[0];
+  const [networkTab, setNetworkTab] = useState<NetworkTab>("assetOperations");
+  const [twinFullscreen, setTwinFullscreen] = useState(false);
+  const [estateQuery, setEstateQuery] = useState("");
+  const [estateFilter, setEstateFilter] = useState<EstateFilter | null>(null);
+  const [estateFiltering, setEstateFiltering] = useState(false);
+  const [ticketDraft, setTicketDraft] = useState<TicketDraft | null>(null);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const selected = estateAssets.find((asset) => asset.id === selectedId) || estateAssets[0];
+  const visibleAssets = useMemo(() => applyEstateFilter(estateAssets, estateFilter), [estateFilter]);
   const live = estateAssets.filter((asset) => asset.status === "Live").length;
   const connectivity = Math.round((live / estateAssets.length) * 100);
+  const openPurchaseOrders = assetSupplyRecords.reduce((sum, record) => sum + record.openPos, 0) + purchaseOrders.filter((order) => order.status !== "Received").length;
+  const existingServiceOrder = serviceOrders.find((order) => order.assetId === selected.id && order.status !== "Completed");
+  const linkedPurchaseOrders = purchaseOrders.filter((order) => order.assetId === selected.id && order.status !== "Received");
+  const orderableItem = ticketDraft?.partsNeeded.find(Boolean) || existingServiceOrder?.partsNeeded.find(Boolean) || defaultProcurementItem(selected);
+  const hasOpenPoForItem = linkedPurchaseOrders.some((order) => order.item.toLowerCase() === orderableItem.toLowerCase());
+  const networkTabs: Array<{ id: NetworkTab; label: string }> = [
+    { id: "assetOperations", label: "Asset operations" },
+    { id: "maintenanceWorkbench", label: "Maintenance workbench" },
+    { id: "supplyChain", label: "Supply chain" },
+  ];
+
+  useEffect(() => {
+    setTicketDraft(null);
+  }, [selectedId]);
+
+  async function askEstateFilter() {
+    if (!estateQuery.trim()) {
+      setEstateFilter(null);
+      return;
+    }
+    setEstateFiltering(true);
+    const result = await aiParseEstateQuery({ query: estateQuery });
+    setEstateFilter(result);
+    setEstateFiltering(false);
+  }
+
+  async function createTicketDraft() {
+    setTicketLoading(true);
+    const result = await aiDraftTicket({
+      asset: `${selected.id} | ${selected.name}`,
+      componentId: selected.controller,
+      symptom: `${selected.status} status, temperature ${selected.tempC}`,
+      severity: selected.status === "Offline" ? "Critical" : selected.status === "Warning" ? "High" : "Medium",
+    });
+    setTicketDraft(result);
+    setTicketLoading(false);
+  }
+
+  async function createOrderFromDraft() {
+    if (existingServiceOrder) return;
+    const severity: ServiceOrder["severity"] = selected.status === "Offline" ? "Critical" : selected.status === "Warning" ? "High" : "Medium";
+    const fallbackTitle = selected.status === "Warning" ? "Thermal inspection and component check" : "Asset health follow-up";
+    const created = await onCreateServiceOrder({
+      assetId: selected.id,
+      assetName: selected.name,
+      componentId: selected.controller,
+      title: ticketDraft?.title || fallbackTitle,
+      severity,
+      summary: ticketDraft?.summary || `${selected.name} requires operational follow-up from the digital twin.`,
+      partsNeeded: ticketDraft?.partsNeeded || [],
+    });
+    if (created) {
+      setNetworkTab("maintenanceWorkbench");
+      setTicketDraft(null);
+    }
+  }
+
+  async function createPurchaseOrderFromIssue(linkedServiceOrder?: ServiceOrder) {
+    const created = await onCreatePurchaseOrder({
+      assetId: selected.id,
+      assetName: selected.name,
+      componentId: linkedServiceOrder?.componentId || selected.controller,
+      item: orderableItem,
+      quantity: orderableItem.toLowerCase().includes("filter") || orderableItem.toLowerCase().includes("gasket") ? 4 : 1,
+      linkedServiceOrder: linkedServiceOrder?.id,
+    });
+    if (created) {
+      setNetworkTab("supplyChain");
+      setTicketDraft(null);
+    }
+  }
 
   return (
     <PageBody>
@@ -3115,36 +4006,164 @@ function NetworkPage({ t }: { t: (value: string) => string }) {
         <Metric label="Assets" value={String(estateAssets.length)} helper="Registered devices" tone="info" />
         <Metric label="Connectivity" value={`${connectivity}%`} helper="Live or reachable" tone={connectivity > 80 ? "good" : "warn"} />
         <Metric label="Workbench load" value={String(fieldTasks.length)} helper="Service tasks" tone="warn" />
-        <Metric label="Spare parts" value="14 POs" helper="Tracked procurement" tone="neutral" />
+        <Metric label="Spare parts" value={String(openPurchaseOrders)} helper="Open purchase orders" tone="neutral" />
       </MetricGrid>
 
-      <div className="split-grid network-grid">
-        <Panel icon={RadioTower} title="Asset registry">
-          <div className="asset-registry">
-            {estateAssets.map((asset) => (
-              <button key={asset.id} className={asset.id === selected.id ? "selected" : ""} type="button" onClick={() => setSelectedId(asset.id)}>
-                <span className={`dot ${assetTone(asset.status)}`} />
-                <span>
-                  <strong>{t(asset.name)}</strong>
-                  <small>{asset.id} / {t(asset.type)} / {asset.controller}</small>
-                </span>
-                <StatusPill label={asset.status} tone={assetTone(asset.status)} />
-              </button>
-            ))}
-          </div>
-        </Panel>
-        <Panel icon={HardDrive} title={t(selected.name)} action={selected.id}>
-          <DeviceDossier asset={selected} />
-        </Panel>
+      <div className="network-tabs" role="tablist" aria-label={t("Network and Devices")}>
+        {networkTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={networkTab === tab.id}
+            className={networkTab === tab.id ? "active" : ""}
+            onClick={() => setNetworkTab(tab.id)}
+          >
+            <strong>{t(tab.label)}</strong>
+          </button>
+        ))}
       </div>
 
-      <Panel icon={Wrench} title="Maintenance workbench">
-        <KanbanBoard />
-      </Panel>
+      {networkTab === "assetOperations" ? (
+        <section className="asset-operations-group" aria-label={t("Asset operations")}>
+          <div className="asset-operations-header">
+            <strong>{t("Asset operations")}</strong>
+          </div>
+          <div className="asset-operations-workspace">
+            <section className="asset-operations-pane asset-registry-pane" aria-label={t("Asset registry")}>
+              <header className="asset-pane-header">
+                <div>
+                  <span className="panel-icon"><RadioTower size={18} /></span>
+                  <h2>{t("Asset registry")}</h2>
+                </div>
+              </header>
+              <div className="ai-search-row">
+                <input value={estateQuery} onChange={(event) => setEstateQuery(event.target.value)} placeholder={t("Ask in words, e.g. show warning highway assets")} />
+                <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || estateFiltering} onClick={askEstateFilter}>{estateFiltering ? t("Searching") : t("Ask")}</Button>
+                {estateFilter ? <button type="button" onClick={() => { setEstateFilter(null); setEstateQuery(""); }}>{t("Clear")}</button> : null}
+              </div>
+              <div className="asset-registry">
+                {visibleAssets.map((asset) => (
+                  <button key={asset.id} className={asset.id === selected.id ? "selected" : ""} type="button" onClick={() => setSelectedId(asset.id)}>
+                    <span className={`dot ${assetTone(asset.status)}`} />
+                    <span>
+                      <strong>{t(asset.name)}</strong>
+                      <small>{asset.id} / {t(asset.type)} / {asset.controller}</small>
+                    </span>
+                    <StatusPill label={asset.status} tone={assetTone(asset.status)} />
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section className="asset-operations-pane asset-twin-pane" aria-label={t("Asset digital twin (3D)")}>
+              <header className="asset-pane-header">
+                <div>
+                  <span className="panel-icon"><HardDrive size={18} /></span>
+                  <h2>{t("Asset digital twin (3D)")}</h2>
+                </div>
+                <div className="asset-pane-actions">
+                  <span>{selected.id}</span>
+                  {existingServiceOrder ? (
+                    <Button icon={Wrench} variant="secondary" onClick={() => setNetworkTab("maintenanceWorkbench")}>
+                      {t("Open work order")} {existingServiceOrder.id}
+                    </Button>
+                  ) : (
+                    <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || ticketLoading} onClick={createTicketDraft}>{ticketLoading ? t("Drafting") : t("Draft ticket")}</Button>
+                  )}
+                  <Button icon={Maximize2} variant="secondary" onClick={() => setTwinFullscreen(true)}>{t("Full screen")}</Button>
+                </div>
+              </header>
+              <div className="asset-twin-stack">
+                <ClientOnlyBillboardTwin />
+                {existingServiceOrder ? (
+                  <section className="ai-mini-panel existing-work-order-panel">
+                    <div>
+                      <span>{t("Existing work order")}</span>
+                      <strong>{existingServiceOrder.id} | {t(existingServiceOrder.title)}</strong>
+                      <small>{t(existingServiceOrder.status)} / {t(existingServiceOrder.owner)} / {t(existingServiceOrder.due)}</small>
+                    </div>
+                    <div className="chip-row">
+                      {existingServiceOrder.partsNeeded.slice(0, 3).map((part) => <span key={part}>{t(part)}</span>)}
+                      {linkedPurchaseOrders.slice(0, 2).map((order) => <span key={order.id}>{order.id} / {t(order.status)}</span>)}
+                    </div>
+                    <div className="mini-panel-actions">
+                      <Button icon={Wrench} variant="secondary" onClick={() => setNetworkTab("maintenanceWorkbench")}>{t("View workbench")}</Button>
+                      {hasOpenPoForItem ? (
+                        <Button icon={ShoppingBag} variant="secondary" onClick={() => setNetworkTab("supplyChain")}>{t("View purchase order")}</Button>
+                      ) : (
+                        <Button icon={ShoppingBag} onClick={() => createPurchaseOrderFromIssue(existingServiceOrder)}>{t("Create purchase order")}</Button>
+                      )}
+                    </div>
+                  </section>
+                ) : ticketDraft ? (
+                  <section className="ai-mini-panel">
+                    <div>
+                      <span>{t("MediaGPT ticket draft")}</span>
+                      <strong>{ticketDraft.title}</strong>
+                      <small>{ticketDraft.summary}</small>
+                    </div>
+                    <div className="chip-row">
+                      <span>{ticketDraft.slaSuggestion}</span>
+                      {ticketDraft.partsNeeded.slice(0, 3).map((part) => <span key={part}>{part}</span>)}
+                    </div>
+                    <div className="mini-panel-actions">
+                      <Button icon={Wrench} onClick={createOrderFromDraft}>{t("Create service order")}</Button>
+                      {hasOpenPoForItem ? (
+                        <Button icon={ShoppingBag} variant="secondary" onClick={() => setNetworkTab("supplyChain")}>{t("View purchase order")}</Button>
+                      ) : (
+                        <Button icon={ShoppingBag} variant="secondary" onClick={() => createPurchaseOrderFromIssue()}>{t("Create purchase order")}</Button>
+                      )}
+                    </div>
+                  </section>
+                ) : null}
+                <div className="detail-cards compact">
+                  <Detail label="Selected asset" value={selected.name} />
+                  <Detail label="Network" value={selected.network} />
+                  <Detail label="Controller" value={selected.controller} />
+                  <Detail label="Temperature" value={selected.tempC} />
+                </div>
+              </div>
+            </section>
+          </div>
+          {twinFullscreen ? (
+            <div
+              className="twin-fullscreen"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("Asset digital twin (3D)")}
+              onClick={(event) => {
+                if (event.currentTarget === event.target) setTwinFullscreen(false);
+              }}
+            >
+              <section className="twin-fullscreen-panel">
+                <header className="twin-fullscreen-header">
+                  <div>
+                    <span>{t("Asset digital twin (3D)")}</span>
+                    <h2>{t(selected.name)}</h2>
+                    <p>{selected.id} / {t(selected.type)} / {selected.controller}</p>
+                  </div>
+                  <button type="button" className="icon-button" onClick={() => setTwinFullscreen(false)} aria-label={t("Close full screen")}>
+                    <X size={18} />
+                  </button>
+                </header>
+                <ClientOnlyBillboardTwin variant="fullscreen" />
+              </section>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
-      <Panel icon={ClipboardCheck} title="BoM, service orders and POs" action="AI recommendations enabled">
-        <InventoryOperationsTable />
-      </Panel>
+      {networkTab === "maintenanceWorkbench" ? (
+        <Panel icon={Wrench} title="Maintenance workbench" action={`${fieldTasks.length} ${t("service tasks")}`}>
+          <KanbanBoard serviceOrders={serviceOrders} />
+        </Panel>
+      ) : null}
+
+      {networkTab === "supplyChain" ? (
+        <Panel icon={ClipboardCheck} title="Supply chain" action={`${assetSupplyRecords.filter((record) => record.tone !== "good").length} ${t("assets need action")}`}>
+          <InventoryOperationsTable serviceOrders={serviceOrders} purchaseOrders={purchaseOrders} />
+        </Panel>
+      ) : null}
     </PageBody>
   );
 }
@@ -3186,7 +4205,6 @@ function DeviceDossier({ asset }: { asset: Asset }) {
     </div>
   );
 }
-
 type SupplyComponent = {
   component: string;
   quantity: string;
@@ -3228,11 +4246,13 @@ const assetSupplyRecords: AssetSupplyRecord[] = [
       { component: "Asset unit", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8840", soStep: "Preventive maintenance scheduled", owner: "Maintenance team", recommendation: "No action: keep in standard preventive cycle." },
       { component: "LED cabinet", quantity: "2", state: "Available in depot", stateTone: "good", po: "PO-4471", poEta: "12 Jul 2026", so: "SO-8840", soStep: "Panel health inspection", owner: "Field dispatch", recommendation: "Replace during next low-traffic window." },
       { component: "Thermal sensor kit", quantity: "1", state: "Reserved for field team", stateTone: "warn", po: "PO-4452", poEta: "08 Jul 2026", so: "SO-8840", soStep: "Close-out evidence", owner: "Verification team", recommendation: "Attach thermal images before closing SO." },
+      { component: "Cooling fan kit", quantity: "2", state: "Field stock available", stateTone: "good", po: "No PO required", poEta: "Depot stock", so: "SO-8846", soStep: "Dispatch pending access permit", owner: "Field dispatch", recommendation: "Combine with cabinet closure visit to avoid a second truck roll." },
+      { component: "Rear door latch set", quantity: "4", state: "Reserved for field team", stateTone: "warn", po: "PO-4522", poEta: "05 Jul 2026", so: "SO-8847", soStep: "Unlatched cabinet closure", owner: "Maintenance planner", recommendation: "Replace all latches on the affected column, not only the failed door." },
     ],
   },
   {
     assetId: "AD-BRG-014",
-    assetName: "Airport Road Premium",
+    assetName: "Mussafah Bridge Banner",
     assetType: "Premium roadside LED",
     health: "Attention",
     tone: "warn",
@@ -3244,6 +4264,8 @@ const assetSupplyRecords: AssetSupplyRecord[] = [
       { component: "Asset unit", quantity: "1", state: "Attention", stateTone: "warn", po: "No PO required", poEta: "N/A", so: "SO-8821", soStep: "Thermal inspection in progress", owner: "NOC operator", recommendation: "Run remote diagnostics before technician dispatch." },
       { component: "Edge controller", quantity: "1", state: "Ordered from supplier", stateTone: "warn", po: "PO-4490", poEta: "06 Jul 2026", so: "SO-8821", soStep: "Controller replacement queued", owner: "Field dispatch", recommendation: "Hold publish-heavy schedule until controller replacement is complete." },
       { component: "Cooling fan kit", quantity: "2", state: "Reserved for field team", stateTone: "good", po: "PO-4484", poEta: "04 Jul 2026", so: "SO-8828", soStep: "Technician dispatch", owner: "Maintenance team", recommendation: "Use reserved stock; avoid opening a new PO." },
+      { component: "Ambient light sensor", quantity: "1", state: "Available in depot", stateTone: "good", po: "No PO required", poEta: "Depot stock", so: "SO-8821", soStep: "Brightness validation", owner: "Verification team", recommendation: "Swap sensor during controller visit if calibration drift remains above 8%." },
+      { component: "Cabinet ventilation filter", quantity: "6", state: "Below reorder point", stateTone: "warn", po: "PO-4520", poEta: "09 Jul 2026", so: "SO-8828", soStep: "Thermal remediation", owner: "O&M admin", recommendation: "Approve replenishment because two bridge assets share the same filter batch." },
     ],
   },
   {
@@ -3260,6 +4282,8 @@ const assetSupplyRecords: AssetSupplyRecord[] = [
       { component: "5G router", quantity: "1", state: "Warranty exchange", stateTone: "warn", po: "No PO required", poEta: "N/A", so: "SO-8816", soStep: "Awaiting vendor confirmation", owner: "O&M admin", recommendation: "Keep vendor replacement under warranty claim." },
       { component: "Router antenna", quantity: "2", state: "Available in depot", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8816", soStep: "Part received", owner: "Field dispatch", recommendation: "Dispatch technician after router arrives." },
       { component: "Media player", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8794", soStep: "Completed", owner: "Verification team", recommendation: "No action: keep in standard preventive cycle." },
+      { component: "PoP camera", quantity: "1", state: "Calibration required", stateTone: "warn", po: "No PO required", poEta: "N/A", so: "SO-8851", soStep: "Camera calibration", owner: "Verification team", recommendation: "Do not close the monthly proof audit until camera alignment is confirmed." },
+      { component: "Indoor humidity sensor", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8794", soStep: "Completed", owner: "Maintenance team", recommendation: "Keep as baseline telemetry for retail-loop anomaly detection." },
     ],
   },
   {
@@ -3276,108 +4300,204 @@ const assetSupplyRecords: AssetSupplyRecord[] = [
       { component: "Power supply", quantity: "1", state: "Ordered from supplier", stateTone: "danger", po: "PO-4512", poEta: "15 Jul 2026", so: "SO-8837", soStep: "Awaiting vendor confirmation", owner: "O&M admin", recommendation: "Escalate PO confirmation if supplier does not acknowledge by 17:00." },
       { component: "Main breaker", quantity: "1", state: "Reserved for field team", stateTone: "warn", po: "PO-4509", poEta: "09 Jul 2026", so: "SO-8837", soStep: "Technician dispatch", owner: "Field dispatch", recommendation: "Group power supply replacement with adjacent Al Ain asset to reduce truck roll." },
       { component: "LED module batch", quantity: "4", state: "Available in depot", stateTone: "good", po: "PO-4471", poEta: "12 Jul 2026", so: "SO-8837", soStep: "Panel health inspection", owner: "Maintenance team", recommendation: "Use reserved stock; avoid opening a new PO." },
+      { component: "Surge protector", quantity: "1", state: "Supplier delay", stateTone: "danger", po: "PO-4518", poEta: "18 Jul 2026", so: "SO-8837", soStep: "Procurement escalation", owner: "O&M admin", recommendation: "Escalate to alternate supplier because gateway assets share lightning-risk exposure." },
+      { component: "Fiber media converter", quantity: "1", state: "Reserved for field team", stateTone: "good", po: "PO-4499", poEta: "Depot stock", so: "SO-8849", soStep: "Connectivity restoration", owner: "Network operations", recommendation: "Install only if packet loss remains after breaker replacement." },
+    ],
+  },
+  {
+    assetId: "AD-BUS-022",
+    assetName: "Yas Island Bus Stop Pair",
+    assetType: "Dual-sided bus stop",
+    health: "Operational",
+    tone: "good",
+    openSos: 2,
+    openPos: 1,
+    nextPoEta: "08 Jul 2026",
+    recommendation: "Run UPS test before the next tourism takeover; no publishing freeze required.",
+    components: [
+      { component: "Asset unit", quantity: "2", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8834", soStep: "Routine paired-stop audit", owner: "Maintenance team", recommendation: "Keep both sides in the same service order for proof consistency." },
+      { component: "UPS battery pack", quantity: "2", state: "Ordered from supplier", stateTone: "warn", po: "PO-4519", poEta: "08 Jul 2026", so: "SO-8834", soStep: "Backup power test", owner: "O&M admin", recommendation: "Replace both battery packs together to avoid asymmetric runtime." },
+      { component: "Passenger-facing glass", quantity: "1", state: "Available in depot", stateTone: "good", po: "No PO required", poEta: "Depot stock", so: "SO-8843", soStep: "Cosmetic inspection", owner: "Field dispatch", recommendation: "Defer until night service window; no ad playback impact." },
+      { component: "Edge nano controller", quantity: "1", state: "Operational", stateTone: "good", po: "No PO required", poEta: "N/A", so: "SO-8834", soStep: "Runtime test", owner: "NOC operator", recommendation: "Keep controller firmware pinned until paired stop test completes." },
+    ],
+  },
+  {
+    assetId: "AD-HWY-009",
+    assetName: "Al Ain Gateway",
+    assetType: "Highway billboard",
+    health: "Offline",
+    tone: "danger",
+    openSos: 3,
+    openPos: 2,
+    nextPoEta: "07 Jul 2026",
+    recommendation: "Treat as a service restoration chain: controller restart, moisture check, then replacement if telemetry remains stale.",
+    components: [
+      { component: "Edge controller", quantity: "1", state: "Restart failed", stateTone: "danger", po: "PO-4524", poEta: "07 Jul 2026", so: "SO-8854", soStep: "Signal loss root-cause review", owner: "Network operations", recommendation: "Keep offline until controller heartbeat returns for 30 consecutive minutes." },
+      { component: "Rear door gasket", quantity: "4", state: "Water ingress risk", stateTone: "danger", po: "PO-4526", poEta: "10 Jul 2026", so: "SO-8855", soStep: "Moisture sensor verification", owner: "Field dispatch", recommendation: "Replace gasket before powering the receiving-card bay." },
+      { component: "Receiving card", quantity: "2", state: "Reserved for field team", stateTone: "warn", po: "PO-4496", poEta: "Depot stock", so: "SO-8854", soStep: "Fallback replacement ready", owner: "Maintenance planner", recommendation: "Hold receiving cards in reserve; do not consume unless diagnostics confirm damage." },
+      { component: "Fiber patch lead", quantity: "2", state: "Available in depot", stateTone: "good", po: "No PO required", poEta: "Depot stock", so: "SO-8854", soStep: "Connectivity restoration", owner: "Network operations", recommendation: "Replace patch lead during site visit to eliminate a low-cost failure point." },
     ],
   },
 ];
 
-function InventoryOperationsTable() {
+function InventoryOperationsTable({ serviceOrders, purchaseOrders }: { serviceOrders: ServiceOrder[]; purchaseOrders: PurchaseOrder[] }) {
   const t = useT();
   const [expandedIds, setExpandedIds] = useState<string[]>([assetSupplyRecords[0].assetId]);
+  const [supplyNotice, setSupplyNotice] = useState("");
 
   function toggle(assetId: string) {
     setExpandedIds((items) => (items.includes(assetId) ? items.filter((id) => id !== assetId) : [...items, assetId]));
   }
 
+  function hasActionableRecommendation(text: string) {
+    const normalized = text.toLowerCase();
+    return Boolean(text.trim()) && !normalized.startsWith("no action:");
+  }
+
   return (
-    <div className="table-card asset-supply-table">
-      <table>
-        <thead>
-          <tr>
-            <th>{t("Asset")}</th>
-            <th>{t("Status")}</th>
-            <th>{t("BOM items")}</th>
-            <th>{t("Open SOs")}</th>
-            <th>{t("Open POs")}</th>
-            <th>{t("Next PO ETA")}</th>
-            <th>{t("AI recommendation")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assetSupplyRecords.map((record) => {
-            const expanded = expandedIds.includes(record.assetId);
-            return (
-              <Fragment key={record.assetId}>
-                <tr className={`supply-asset-row ${expanded ? "expanded" : ""}`}>
-                  <td data-label={t("Asset")}>
-                    <button type="button" className="supply-toggle" aria-expanded={expanded} onClick={() => toggle(record.assetId)}>
-                      <ChevronRight size={16} />
-                      <span>
-                        <strong>{t(record.assetName)}</strong>
-                        <small>{record.assetId} / {t(record.assetType)}</small>
-                      </span>
-                    </button>
-                  </td>
-                  <td data-label={t("Status")}><StatusPill label={record.health} tone={record.tone} /></td>
-                  <td data-label={t("BOM items")}>{record.components.length}</td>
-                  <td data-label={t("Open SOs")}>{record.openSos}</td>
-                  <td data-label={t("Open POs")}>{record.openPos}</td>
-                  <td data-label={t("Next PO ETA")}>{record.nextPoEta}</td>
-                  <td data-label={t("AI recommendation")}><span className="ai-recommendation">{t(record.recommendation)}</span></td>
-                </tr>
-                {expanded ? (
-                  <tr className="supply-detail-row">
-                    <td colSpan={7}>
-                      <div className="supply-detail">
-                        <div className="supply-detail-heading">
-                          <strong>{t("Expanded BoM and work orders")}</strong>
-                          <span>{record.assetId}</span>
-                        </div>
-                        <table className="bom-detail-table">
-                          <thead>
-                            <tr>
-                              <th>{t("Component")}</th>
-                              <th>{t("Qty")}</th>
-                              <th>{t("State")}</th>
-                              <th>{t("PO / ETA")}</th>
-                              <th>{t("SO / step")}</th>
-                              <th>{t("Owner")}</th>
-                              <th>{t("AI recommendation")}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {record.components.map((component) => (
-                              <tr key={`${record.assetId}-${component.component}`}>
-                                <td data-label={t("Component")}><strong>{t(component.component)}</strong></td>
-                                <td data-label={t("Qty")}>{component.quantity}</td>
-                                <td data-label={t("State")}><StatusPill label={component.state} tone={component.stateTone} /></td>
-                                <td data-label={t("PO / ETA")}>
-                                  <strong>{t(component.po)}</strong>
-                                  <span>{t(component.poEta)}</span>
-                                </td>
-                                <td data-label={t("SO / step")}>
-                                  <strong>{component.so}</strong>
-                                  <span>{t(component.soStep)}</span>
-                                </td>
-                                <td data-label={t("Owner")}>{t(component.owner)}</td>
-                                <td data-label={t("AI recommendation")}><span className="ai-recommendation">{t(component.recommendation)}</span></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+    <div className="inventory-operations">
+      <div className="table-card asset-supply-table">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("Asset")}</th>
+              <th>{t("Status")}</th>
+              <th>{t("BOM items")}</th>
+              <th>{t("Open SOs")}</th>
+              <th>{t("Open POs")}</th>
+              <th>{t("Next PO ETA")}</th>
+              <th>{t("AI recommendation")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assetSupplyRecords.map((record) => {
+              const expanded = expandedIds.includes(record.assetId);
+              const actionableComponents = record.components.filter((component) => hasActionableRecommendation(component.recommendation));
+              const linkedOrders = serviceOrders.filter((order) => order.assetId === record.assetId);
+              const linkedPurchaseOrders = purchaseOrders.filter((order) => order.assetId === record.assetId);
+              return (
+                <Fragment key={record.assetId}>
+                  <tr className={`supply-asset-row ${expanded ? "expanded" : ""}`}>
+                    <td data-label={t("Asset")}>
+                      <button type="button" className="supply-toggle" aria-expanded={expanded} onClick={() => toggle(record.assetId)}>
+                        <ChevronRight size={16} />
+                        <span>
+                          <strong>{t(record.assetName)}</strong>
+                          <small>{record.assetId} / {t(record.assetType)}</small>
+                        </span>
+                      </button>
                     </td>
+                    <td data-label={t("Status")}><StatusPill label={record.health} tone={record.tone} /></td>
+                    <td data-label={t("BOM items")}>{record.components.length}</td>
+                    <td data-label={t("Open SOs")}>{record.openSos + linkedOrders.filter((order) => order.status !== "Completed").length}</td>
+                    <td data-label={t("Open POs")}>{record.openPos + linkedPurchaseOrders.filter((order) => order.status !== "Received").length}</td>
+                    <td data-label={t("Next PO ETA")}>{record.nextPoEta}</td>
+                    <td data-label={t("AI recommendation")}><span className="ai-recommendation supply-ai-recommendation">{t(record.recommendation)}</span></td>
                   </tr>
-                ) : null}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {expanded ? (
+                    <tr className="supply-detail-row">
+                      <td colSpan={7}>
+                        <div className="supply-detail">
+                          <table className="bom-detail-table">
+                            <thead>
+                              <tr>
+                                <th>{t("Component")}</th>
+                                <th>{t("Qty")}</th>
+                                <th>{t("State")}</th>
+                                <th>{t("PO / ETA")}</th>
+                                <th>{t("SO / step")}</th>
+                                <th>{t("Owner")}</th>
+                                <th>{t("AI recommendation")}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {record.components.map((component) => (
+                                <tr key={`${record.assetId}-${component.component}`}>
+                                  <td data-label={t("Component")}><strong>{t(component.component)}</strong></td>
+                                  <td data-label={t("Qty")}>{component.quantity}</td>
+                                  <td data-label={t("State")}><StatusPill label={component.state} tone={component.stateTone} /></td>
+                                  <td data-label={t("PO / ETA")}>
+                                    <strong>{t(component.po)}</strong>
+                                    <span>{t(component.poEta)}</span>
+                                  </td>
+                                  <td data-label={t("SO / step")}>
+                                    <strong>{component.so}</strong>
+                                    <span>{t(component.soStep)}</span>
+                                  </td>
+                                  <td data-label={t("Owner")}>{t(component.owner)}</td>
+                                  <td data-label={t("AI recommendation")}>
+                                    {hasActionableRecommendation(component.recommendation) ? (
+                                      <span className="ai-recommendation supply-ai-recommendation">{t(component.recommendation)}</span>
+                                    ) : (
+                                      <span className="muted">{t("Standard cycle")}</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                              {linkedOrders.map((order) => (
+                                <tr key={`${record.assetId}-${order.id}`} className="service-order-linked-row">
+                                  <td data-label={t("Component")}><strong>{order.componentId}</strong></td>
+                                  <td data-label={t("Qty")}>1</td>
+                                  <td data-label={t("State")}><StatusPill label={order.status} tone={order.severity === "Critical" ? "danger" : order.severity === "High" ? "warn" : "info"} /></td>
+                                  <td data-label={t("PO / ETA")}>
+                                    <strong>{t(order.linkedPo)}</strong>
+                                    <span>{t(order.due)}</span>
+                                  </td>
+                                  <td data-label={t("SO / step")}>
+                                    <strong>{order.id}</strong>
+                                    <span>{t(order.title)}</span>
+                                  </td>
+                                  <td data-label={t("Owner")}>{t(order.owner)}</td>
+                                  <td data-label={t("AI recommendation")}><span className="ai-recommendation supply-ai-recommendation">{t(order.summary)}</span></td>
+                                </tr>
+                              ))}
+                              {linkedPurchaseOrders.map((order) => (
+                                <tr key={`${record.assetId}-${order.id}`} className="purchase-order-linked-row">
+                                  <td data-label={t("Component")}><strong>{t(order.item)}</strong></td>
+                                  <td data-label={t("Qty")}>{order.quantity}</td>
+                                  <td data-label={t("State")}><StatusPill label={order.status} tone={order.status === "Confirmed" || order.status === "Received" ? "good" : "warn"} /></td>
+                                  <td data-label={t("PO / ETA")}>
+                                    <strong>{order.id}</strong>
+                                    <span>{t(order.eta)}</span>
+                                  </td>
+                                  <td data-label={t("SO / step")}>
+                                    <strong>{order.linkedServiceOrder || t("Direct procurement")}</strong>
+                                    <span>{t("Supplier follow-up")}</span>
+                                  </td>
+                                  <td data-label={t("Owner")}>{t(order.vendor)}</td>
+                                  <td data-label={t("AI recommendation")}><span className="ai-recommendation supply-ai-recommendation">{t("Track supplier ETA and update maintenance plan if delivery moves.")}</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <div className="supply-actions-strip">
+                            <span>{actionableComponents.length} {t("AI actions")}</span>
+                            <div>
+                              <Button variant="secondary" icon={Wrench} onClick={() => setSupplyNotice(`${record.assetId}: ${t("service order drafted")}`)}>{t("Create SO")}</Button>
+                              <Button variant="secondary" icon={Send} onClick={() => setSupplyNotice(`${record.assetId}: ${t("supplier notification queued")}`)}>{t("Notify supplier")}</Button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {supplyNotice ? <p className="media-notice">{supplyNotice}</p> : null}
+      <CollapsibleIntelligenceCitations
+        ruleIds={["RULE-NET-001", "RULE-NET-002", "RULE-NET-003", "RULE-NET-004"]}
+        sourceIds={["KB-NET-001", "KB-NET-002", "KB-NET-003", "KB-NET-004"]}
+        action="Create service order"
+      />
     </div>
   );
 }
 
-function KanbanBoard() {
+function KanbanBoard({ serviceOrders }: { serviceOrders: ServiceOrder[] }) {
   const t = useT();
   const columns: Array<{ label: string; states: Array<(typeof fieldTasks)[number]["column"]> }> = [
     { label: "Pending Assignment", states: ["Pending Assignment"] },
@@ -3390,11 +4510,18 @@ function KanbanBoard() {
       {columns.map((column) => (
         <section key={column.label}>
           <strong>{t(column.label)}</strong>
-          {fieldTasks.filter((task) => column.states.includes(task.column)).slice(0, 3).map((task) => (
+          {serviceOrders.filter((order) => column.states.includes(order.status)).map((order) => (
+            <article key={order.id} className="service-order-card">
+              <span className={order.severity === "Critical" ? "danger" : ""}>{t(order.severity)}</span>
+              <p>{order.id} | {t(order.title)}</p>
+              <small>{order.assetId} / {t(order.owner)} / {t(order.due)}</small>
+            </article>
+          ))}
+          {fieldTasks.filter((task) => column.states.includes(task.column)).map((task) => (
             <article key={task.id}>
               <span className={task.column === "Overdue" ? "danger" : ""}>{t(task.column === "Overdue" ? "Overdue" : task.priority)}</span>
               <p>{t(task.title)}</p>
-              <small>{task.asset} / {t(task.owner)}</small>
+              <small>{task.asset} / {t(task.owner)} / {t(task.due)}</small>
             </article>
           ))}
         </section>
@@ -3783,6 +4910,20 @@ function boundaryTone(boundary: Boundary): Tone {
   return "danger";
 }
 
+function creativeCopyToAgentResult(copy: CreativeCopy & { source?: string }): AgentResult {
+  const concepts = copy.concepts?.length ? copy.concepts : [];
+  return {
+    summary: concepts.length
+      ? `${concepts.length} bilingual concepts generated ${copy.source === "openai" ? "with OpenAI" : "from offline fallback"}.`
+      : "No concepts generated.",
+    columns: ["Ratio", "Headline EN", "Headline AR", "Body EN", "Body AR"],
+    rows: concepts.map((concept) => [concept.ratio, concept.headline_en, concept.headline_ar, concept.body_en, concept.body_ar]),
+    notes: ["All concepts must re-enter CMS moderation before publishing", "Arabic and English copy remain reviewer-approved, not automatically published"],
+    primaryAction: "Send to CMS Library",
+    primaryTone: copy.source === "openai" ? "good" : "warn",
+  };
+}
+
 type RunLogEntry = {
   id: string;
   agent: string;
@@ -3791,7 +4932,7 @@ type RunLogEntry = {
   at: string;
 };
 
-function MediaGptSuite({ t }: { t: (value: string) => string }) {
+function MediaGptSuite({ aiAvailable, t }: { aiAvailable: boolean; t: (value: string) => string }) {
   const [activeId, setActiveId] = useState<AgentId>("insights");
   const active = mediaGptAgents.find((a) => a.id === activeId)!;
   const [inputs, setInputs] = useState<AgentInputs>(() => {
@@ -3800,8 +4941,13 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
     return seed;
   });
   const [result, setResult] = useState<AgentResult | null>(null);
-  const [log, setLog] = useState<RunLogEntry[]>([]);
+  const [log, setLog] = useState<RunLogEntry[]>([
+    { id: "run-seed-1", agent: "MediaGPT Moderator", boundary: "Never modify", summary: "Rights evidence requested for Airport retail launch.", at: "10:42" },
+    { id: "run-seed-2", agent: "MediaGPT Sentinel", boundary: "Read-only", summary: "AD-BRG-014 controller risk linked to open PO.", at: "10:18" },
+    { id: "run-seed-3", agent: "MediaGPT Optimizer", boundary: "Recommend", summary: "Yas evening slots recommended for leisure campaign.", at: "09:57" },
+  ]);
   const [toast, setToast] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   function selectAgent(id: AgentId) {
     const spec = mediaGptAgents.find((a) => a.id === id)!;
@@ -3816,8 +4962,15 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
     setInputs((prev) => ({ ...prev, [key]: value }));
   }
 
-  function runAgent() {
-    const out = active.run(inputs);
+  async function runAgent() {
+    setRunning(true);
+    const out = active.id === "studio" || active.id === "dco-adapter"
+      ? creativeCopyToAgentResult(await aiGenerateCreativeCopy({
+          brief: inputs.brief || "Civic DOOH campaign",
+          tone: inputs.tone || "Civic",
+          ratios: ["6:1", "9:16", "1:1", "3:4"],
+        }))
+      : active.run(inputs);
     setResult(out);
     const now = new Date();
     const at = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -3825,12 +4978,22 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
       { id: `${active.id}-${Date.now()}`, agent: active.name, boundary: active.boundary, summary: out.summary, at },
       ...prev,
     ].slice(0, 6));
+    setRunning(false);
   }
 
   function performPrimary() {
     if (!result?.primaryAction) return;
     setToast(`${t(result.primaryAction)} - ${t("submitted for governance")}`);
     setTimeout(() => setToast(null), 2400);
+  }
+
+  function applyStarter(agentId: AgentId, patch: AgentInputs) {
+    const spec = mediaGptAgents.find((a) => a.id === agentId)!;
+    const seed: AgentInputs = {};
+    spec.fields.forEach((f) => (seed[f.key] = patch[f.key] ?? f.defaultValue));
+    setActiveId(agentId);
+    setInputs(seed);
+    setResult(null);
   }
 
   const ActiveIcon = active.icon;
@@ -3910,7 +5073,9 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
           </div>
 
           <ActionRow>
-            <Button icon={Zap} onClick={runAgent}>Run agent</Button>
+            <Button icon={Zap} disabled={running || (!aiAvailable && (active.id === "studio" || active.id === "dco-adapter"))} onClick={runAgent}>
+              {running ? t("Running") : t("Run agent")}
+            </Button>
             {result?.primaryAction ? (
               <Button icon={Send} variant="secondary" onClick={performPrimary}>{result.primaryAction}</Button>
             ) : null}
@@ -3929,20 +5094,27 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
               ) : null}
             </div>
           ) : (
-            <div className="workbench-empty">{t("Set the inputs above and run the agent to see governed output.")}</div>
+            <div className="workbench-empty workbench-starters">
+              <strong>{t("Common asks")}</strong>
+              <button type="button" onClick={() => applyStarter("insights", { q: "Coca-Cola placements on Yas Island last year", scope: "Campaigns" })}>
+                {t("Find campaign history")}
+              </button>
+              <button type="button" onClick={() => applyStarter("workflow-composer", { zone: "Airport route", daypart: "Morning peak", creative: "CR-90421" })}>
+                {t("Prepare a governed schedule")}
+              </button>
+              <button type="button" onClick={() => applyStarter("moderator", { check: "Deep" })}>
+                {t("Review a submitted creative")}
+              </button>
+            </div>
           )}
         </section>
       </div>
 
       <Panel icon={Activity} title="Recent runs">
-        {log.length === 0 ? (
-          <div className="workbench-empty">{t("No runs in this session yet.")}</div>
-        ) : (
-          <CompactTable
-            columns={["Time", "Agent", "Boundary", "Result"]}
-            rows={log.map((entry) => [entry.at, entry.agent, entry.boundary, entry.summary])}
-          />
-        )}
+        <CompactTable
+          columns={["Time", "Agent", "Boundary", "Result"]}
+          rows={log.map((entry) => [entry.at, entry.agent, entry.boundary, entry.summary])}
+        />
       </Panel>
 
       {toast ? <Toast>{toast}</Toast> : null}
@@ -3950,147 +5122,259 @@ function MediaGptSuite({ t }: { t: (value: string) => string }) {
   );
 }
 
-const knowledgeBases = [
-  { id: "policy", name: "Policy and compliance", description: "UAE media policy, ADMO content standards, brand safety and Arabic copy rules.", documents: 42, chunks: "8,420", usedBy: "MediaGPT Moderator, MediaGPT Compliance Agent" },
-  { id: "commercial", name: "Commercial and rate cards", description: "Packages, pricing rules, financial guardrails, proof-of-play settlement and bidder terms.", documents: 28, chunks: "4,960", usedBy: "MediaGPT Optimizer, MediaGPT Insights" },
-  { id: "operations", name: "Operations and emergency", description: "Emergency SOPs, CAP-UAE templates, distribution rules, edge cache procedures and operator playbooks.", documents: 34, chunks: "6,870", usedBy: "MediaGPT Orchestrator, MediaGPT Sentinel" },
-  { id: "technical", name: "Network and maintenance", description: "BoM catalogues, service manuals, edge-device runbooks, telemetry dictionaries and spare-part workflows.", documents: 51, chunks: "11,240", usedBy: "MediaGPT Sentinel, MediaGPT Maintenance" },
-];
-
-const seedKnowledgeSources = [
-  { id: "KB-001", base: "policy", name: "ADMO creative review policy.pdf", type: "PDF", status: "Indexed", chunks: "1,284", owner: "Content governance", lastIndexed: "Today 09:22", usedBy: "MediaGPT Moderator" },
-  { id: "KB-002", base: "policy", name: "Arabic terminology and tone guide.docx", type: "DOCX", status: "Indexed", chunks: "842", owner: "Arabic QA", lastIndexed: "Today 08:40", usedBy: "MediaGPT Compliance Agent" },
-  { id: "KB-003", base: "commercial", name: "2026 DOOH rate-card rules.xlsx", type: "XLSX", status: "Indexed", chunks: "618", owner: "Finance", lastIndexed: "Yesterday", usedBy: "MediaGPT Optimizer" },
-  { id: "KB-004", base: "operations", name: "Emergency broadcast SOP.pdf", type: "PDF", status: "Indexing", chunks: "390", owner: "Control room", lastIndexed: "In progress", usedBy: "MediaGPT Orchestrator" },
-  { id: "KB-005", base: "technical", name: "Edge controller maintenance runbook.pdf", type: "PDF", status: "Indexed", chunks: "1,942", owner: "Network operations", lastIndexed: "Jun 30, 2026", usedBy: "MediaGPT Sentinel" },
-];
-
 function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
-  const [active, setActive] = useState(knowledgeBases[0].id);
-  const [sources, setSources] = useState(seedKnowledgeSources);
-  const selected = knowledgeBases.find((item) => item.id === active) ?? knowledgeBases[0];
-  const visibleSources = sources.filter((source) => source.base === active);
+  const [active, setActive] = useState<KnowledgeCollectionId>(knowledgeCollections[0].id);
+  const [sources, setSources] = useState<KnowledgeSource[]>(knowledgeSourceCatalogue);
+  const [selectedSourceId, setSelectedSourceId] = useState(knowledgeSourceCatalogue[0].id);
+  const [query, setQuery] = useState("");
+  const [opsOpen, setOpsOpen] = useState(false);
+  const [ontologyOpen, setOntologyOpen] = useState(false);
+  const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false);
+  const selected = knowledgeCollections.find((item) => item.id === active) || knowledgeCollections[0];
+  const visibleSources = sources
+    .filter((source) => source.collectionId === active)
+    .filter((source) => {
+      const haystack = [
+        localized(source.title, t),
+        localized(source.summary, t),
+        source.owner,
+        source.tags.join(" "),
+        source.usedBy.join(" "),
+      ].join(" ").toLowerCase();
+      return haystack.includes(query.toLowerCase());
+    });
+  const selectedSource = sources.find((source) => source.id === selectedSourceId) || visibleSources[0] || sources[0];
   const pending = sources.filter((source) => source.status !== "Indexed").length;
+  const indexedChunks = sources.reduce((sum, source) => sum + source.chunks, 0);
+  const coverageRows = knowledgeCollections.map((collection) => {
+    const collectionSources = sources.filter((source) => source.collectionId === collection.id);
+    const indexedCount = collectionSources.filter((source) => source.status === "Indexed").length;
+    const rulesUsingCollection = ruleCatalogue.filter((rule) => collectionSources.some((source) => source.id === rule.sourceId)).length;
+    const agents = Array.from(new Set(collectionSources.flatMap((source) => source.usedBy))).slice(0, 3).join(", ");
+    return [
+      localized(collection.name, t),
+      `${indexedCount}/${collectionSources.length}`,
+      String(rulesUsingCollection),
+      agents || t("Not mapped yet"),
+    ];
+  });
+  const ingestionRows = sources
+    .filter((source) => source.status !== "Indexed")
+    .map((source) => [
+      source.id,
+      localized(source.title, t),
+      t(source.status),
+      source.lastIndexed,
+      t(source.owner),
+    ]);
+
+  useEffect(() => {
+    if (visibleSources.length && !visibleSources.some((source) => source.id === selectedSourceId)) {
+      setSelectedSourceId(visibleSources[0].id);
+    }
+  }, [visibleSources, selectedSourceId]);
 
   function queueSource() {
+    const id = `KB-UP-${String(sources.length + 1).padStart(3, "0")}`;
     setSources((items) => [
       {
-        id: `KB-${String(items.length + 1).padStart(3, "0")}`,
-        base: active,
-        name: "Uploaded bidder evidence pack.pdf",
-        type: "PDF",
+        id,
+        collectionId: active,
+        title: { en: "Uploaded bidder evidence pack", ar: "حزمة أدلة معلن مرفوعة" },
+        type: "Dataset",
         status: "Queued",
-        chunks: "0",
         owner: "Technical Platform Owner",
+        version: "v0.1",
+        effectiveDate: "Draft",
+        sensitivity: "Internal",
+        chunks: 0,
         lastIndexed: "Queued now",
-        usedBy: "MediaGPT Moderator",
+        summary: { en: "New mock source waiting for indexing and governance review.", ar: "مصدر تجريبي جديد بانتظار الفهرسة ومراجعة الحوكمة." },
+        body: { en: "This placeholder represents a future upload flow for local files, bid packets, contracts and operating notes.", ar: "يمثل هذا العنصر مسار رفع لاحق للملفات المحلية وحزم العروض والعقود والملاحظات التشغيلية." },
+        linkedEntities: ["ONT-KNOWLEDGE", "ONT-SUBMISSION"],
+        tags: ["uploaded", "mock"],
+        citations: ["Draft upload"],
+        usedBy: ["MediaGPT Moderator"],
       },
       ...items,
     ]);
+    setSelectedSourceId(id);
   }
 
   function reindex() {
-    setSources((items) => items.map((item) => item.base === active ? { ...item, status: "Indexed", lastIndexed: "Just now", chunks: item.chunks === "0" ? "312" : item.chunks } : item));
+    setSources((items) =>
+      items.map((item) =>
+        item.collectionId === active
+          ? { ...item, status: "Indexed", lastIndexed: "Just now", chunks: item.chunks === 0 ? 312 : item.chunks }
+          : item,
+      ),
+    );
+  }
+
+  function updateSource(id: string, patch: Partial<KnowledgeSource>) {
+    setSources((items) => items.map((source) => (source.id === id ? { ...source, ...patch } : source)));
+  }
+
+  function updateSourceText(id: string, field: "title" | "summary" | "body", lang: keyof LocalizedText, value: string) {
+    setSources((items) =>
+      items.map((source) =>
+        source.id === id ? { ...source, [field]: { ...source[field], [lang]: value } } : source,
+      ),
+    );
   }
 
   return (
     <PageBody>
       <MetricGrid>
-        <Metric label="Knowledge bases" value={String(knowledgeBases.length)} helper="MediaGPT source corpora" tone="info" />
+        <Metric label="Ontology entities" value={String(ontologyCatalogue.length)} helper="Shared DOOH vocabulary" tone="info" />
+        <Metric label="Knowledge bases" value={String(knowledgeCollections.length)} helper="MediaGPT source corpora" tone="info" />
         <Metric label="Documents" value={String(sources.length)} helper="Uploaded or connected" tone="good" />
-        <Metric label="Indexed chunks" value="33,802" helper="Retrieval-ready passages" tone="good" />
+        <Metric label="Indexed chunks" value={indexedChunks.toLocaleString("en-US")} helper="Retrieval-ready passages" tone="good" />
         <Metric label="Pending indexing" value={String(pending)} helper="Queued or processing" tone={pending ? "warn" : "good"} />
       </MetricGrid>
-      <div className="split-grid cms-grid">
-        <Panel icon={Database} title="Knowledge bases" action={<Button icon={Upload} variant="secondary" onClick={queueSource}>Add source</Button>}>
+
+      <div className="utility-action-strip">
+        <Button icon={Upload} variant="secondary" onClick={queueSource}>Add source</Button>
+        <Button icon={RefreshCcw} variant="secondary" onClick={reindex}>Re-index selected</Button>
+        <Button icon={Layers3} variant="secondary" onClick={() => setOpsOpen((value) => !value)}>{opsOpen ? "Hide coverage" : "Show coverage"}</Button>
+        <Button icon={Database} variant="secondary" onClick={() => setOntologyOpen((value) => !value)}>{ontologyOpen ? "Hide ontology" : "Show ontology"}</Button>
+      </div>
+
+      {opsOpen ? (
+        <div className="split-grid">
+          <Panel icon={Layers3} title="Knowledge coverage">
+            <CompactTable
+              columns={["Knowledge base", "Indexed sources", "Rules linked", "MediaGPT consumers"]}
+              rows={coverageRows}
+            />
+          </Panel>
+          <Panel icon={RefreshCcw} title="Indexing queue">
+            <CompactTable
+              columns={["Source", "Title", "Status", "Last indexed", "Owner"]}
+              rows={ingestionRows.length ? ingestionRows : [["-", t("No pending sources"), t("Indexed"), "-", "-"]]}
+            />
+          </Panel>
+        </div>
+      ) : null}
+
+      {ontologyOpen ? (
+        <Panel icon={Database} title="DOOH ontology">
+          <div className="ontology-grid">
+            {ontologyCatalogue.map((entity) => (
+              <article key={entity.id} className="ontology-card">
+                <span>{entity.id}</span>
+                <strong>{localized(entity.name, t)}</strong>
+                <p>{localized(entity.definition, t)}</p>
+                <div className="chip-row">
+                  <span>{localized(entity.layer, t)}</span>
+                  {entity.relationships.slice(0, 2).map((relationship) => <span key={relationship}>{t(relationship)}</span>)}
+                </div>
+              </article>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+
+      <div className="split-grid cms-grid knowledge-workspace">
+        <Panel icon={Database} title="Knowledge bases">
+          <div className="knowledge-search">
+            <Search size={15} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search sources, tags, owners")} />
+          </div>
           <div className="knowledge-list">
-            {knowledgeBases.map((base) => (
+            {knowledgeCollections.map((base) => (
               <button key={base.id} type="button" className={base.id === active ? "selected" : ""} onClick={() => setActive(base.id)}>
-                <strong>{t(base.name)}</strong>
-                <span>{t(base.description)}</span>
-                <small>{base.documents} {t("documents")} / {base.chunks} {t("chunks")}</small>
+                <strong>{localized(base.name, t)}</strong>
+                <span>{localized(base.description, t)}</span>
+                <small>{base.documents} {t("documents")} / {base.chunks.toLocaleString("en-US")} {t("chunks")} / {t(base.sensitivity)}</small>
               </button>
             ))}
           </div>
         </Panel>
-        <Panel icon={FileText} title={t(selected.name)} action={<Button icon={RefreshCcw} variant="secondary" onClick={reindex}>Re-index selected</Button>}>
-          <p className="notes">{t(selected.description)}</p>
-          <CompactTable
-            columns={["Source", "Type", "Status", "Chunks", "Owner", "Used by", "Last indexed"]}
-            rows={visibleSources.map((source) => [source.name, source.type, source.status, source.chunks, source.owner, source.usedBy, source.lastIndexed])}
-          />
+        <Panel icon={FileText} title={localized(selected.name, t)}>
+          <div className="source-summary-card">
+            <p>{localized(selected.description, t)}</p>
+            <div className="chip-row">
+              <span>{t("Owner")}: {t(selected.owner)}</span>
+              <span>{t("Sensitivity")}: {t(selected.sensitivity)}</span>
+              {selected.domains.map((domain) => <span key={domain}>{t(domain)}</span>)}
+            </div>
+          </div>
+          <div className="knowledge-list source-list">
+            {visibleSources.map((source) => (
+              <button key={source.id} type="button" className={source.id === selectedSource.id ? "selected" : ""} onClick={() => setSelectedSourceId(source.id)}>
+                <strong>{localized(source.title, t)}</strong>
+                <span>{localized(source.summary, t)}</span>
+                <small>{source.id} / {t(source.type)} / {t(source.status)} / {source.chunks.toLocaleString("en-US")} {t("chunks")}</small>
+              </button>
+            ))}
+          </div>
         </Panel>
       </div>
+
+      {selectedSource ? (
+        <Panel
+          icon={FileCheck2}
+          title={localized(selectedSource.title, t)}
+          action={
+            <div className="panel-action-row">
+              <StatusPill label={selectedSource.status} tone={selectedSource.status === "Indexed" ? "good" : "warn"} />
+              <Button icon={sourceDetailsOpen ? X : Eye} variant="secondary" onClick={() => setSourceDetailsOpen((value) => !value)}>
+                {sourceDetailsOpen ? "Hide details" : "Show details"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="knowledge-detail-grid">
+            <section className="source-detail">
+              <div className="rule-detail">
+                <Detail label="Owner" value={selectedSource.owner} />
+                <Detail label="Version" value={selectedSource.version} />
+                <Detail label="Effective date" value={selectedSource.effectiveDate} />
+                <Detail label="Sensitivity" value={selectedSource.sensitivity} />
+                <Detail label="Last indexed" value={selectedSource.lastIndexed} />
+                <Detail label="Used by" value={selectedSource.usedBy.join(", ")} />
+              </div>
+              {sourceDetailsOpen ? (
+                <>
+                  <p className="notes">{localized(selectedSource.body, t)}</p>
+                  <div className="citation-grid">
+                    <div>
+                      <span>{t("Linked entities")}</span>
+                      <div className="chip-row">{selectedSource.linkedEntities.map((entity) => <span key={entity}>{entity}</span>)}</div>
+                    </div>
+                    <div>
+                      <span>{t("Citations")}</span>
+                      <div className="chip-row">{selectedSource.citations.map((citation) => <span key={citation}>{t(citation)}</span>)}</div>
+                    </div>
+                    <div>
+                      <span>{t("Tags")}</span>
+                      <div className="chip-row">{selectedSource.tags.map((tag) => <span key={tag}>{t(tag)}</span>)}</div>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </section>
+            <section className="rule-editor source-editor">
+              <label><span>{t("Title EN")}</span><input value={selectedSource.title.en} onChange={(event) => updateSourceText(selectedSource.id, "title", "en", event.target.value)} /></label>
+              <label><span>{t("Title AR")}</span><input value={selectedSource.title.ar} onChange={(event) => updateSourceText(selectedSource.id, "title", "ar", event.target.value)} /></label>
+              <label><span>{t("Type")}</span><input value={selectedSource.type} onChange={(event) => updateSource(selectedSource.id, { type: event.target.value as KnowledgeSource["type"] })} /></label>
+              <label><span>{t("Status")}</span><select value={selectedSource.status} onChange={(event) => updateSource(selectedSource.id, { status: event.target.value as KnowledgeSource["status"] })}><option>Indexed</option><option>Indexing</option><option>Queued</option><option>Needs review</option></select></label>
+              <label><span>{t("Owner")}</span><input value={selectedSource.owner} onChange={(event) => updateSource(selectedSource.id, { owner: event.target.value })} /></label>
+              <label><span>{t("Version")}</span><input value={selectedSource.version} onChange={(event) => updateSource(selectedSource.id, { version: event.target.value })} /></label>
+              <label className="rule-form-wide"><span>{t("Summary EN")}</span><textarea value={selectedSource.summary.en} onChange={(event) => updateSourceText(selectedSource.id, "summary", "en", event.target.value)} /></label>
+              <label className="rule-form-wide"><span>{t("Summary AR")}</span><textarea value={selectedSource.summary.ar} onChange={(event) => updateSourceText(selectedSource.id, "summary", "ar", event.target.value)} /></label>
+              <ActionRow>
+                <Button icon={Save} onClick={() => updateSource(selectedSource.id, { lastIndexed: "Saved just now" })}>Save source</Button>
+                <Button icon={RefreshCcw} variant="secondary" onClick={() => updateSource(selectedSource.id, { status: "Indexed", lastIndexed: "Just now", chunks: selectedSource.chunks || 312 })}>Index source</Button>
+              </ActionRow>
+            </section>
+          </div>
+        </Panel>
+      ) : null}
     </PageBody>
   );
 }
-
-type DoohRuleStatus = "Active" | "Strict" | "Draft";
-type DoohRuleMode = "Enforce" | "Recommend" | "Monitor";
-
-interface DoohRule {
-  id: string;
-  title: string;
-  scope: string;
-  mode: DoohRuleMode;
-  status: DoohRuleStatus;
-  condition: string;
-  action: string;
-  owner: string;
-  aiEffect: string;
-  version: string;
-}
-
-const seedDoohRules: DoohRule[] = [
-  {
-    id: "RULE-01",
-    title: "Arabic parity",
-    scope: "CMS submissions",
-    mode: "Enforce",
-    status: "Active",
-    condition: "Arabic copy missing or materially different",
-    action: "Block submission and request bilingual revision",
-    owner: "Content governance",
-    aiEffect: "Hard block before MediaGPT recommendation",
-    version: "v1.8",
-  },
-  {
-    id: "RULE-02",
-    title: "Restricted sector separation",
-    scope: "Commercial scheduling",
-    mode: "Recommend",
-    status: "Active",
-    condition: "Competing brands within the same takeover window",
-    action: "Recommend alternate slot and protect exclusivity",
-    owner: "Commercial finance",
-    aiEffect: "Guides bid optimizer and scheduling assistant",
-    version: "v1.4",
-  },
-  {
-    id: "RULE-03",
-    title: "Emergency authority",
-    scope: "Alerts and emergencies",
-    mode: "Enforce",
-    status: "Strict",
-    condition: "No named authority, SLA, CAP-UAE payload, or bilingual text",
-    action: "Require dual approval before broadcast queue",
-    owner: "Control room",
-    aiEffect: "Blocks emergency orchestration until verification passes",
-    version: "v2.1",
-  },
-  {
-    id: "RULE-04",
-    title: "BoM spare-part escalation",
-    scope: "Network maintenance",
-    mode: "Monitor",
-    status: "Draft",
-    condition: "Critical component below reorder point or PO ETA exceeds SLA",
-    action: "Recommend substitute part, SO escalation, or technician dispatch",
-    owner: "Network operations",
-    aiEffect: "Feeds maintenance recommender and service-order queue",
-    version: "v0.9",
-  },
-];
 
 function ruleTone(status: DoohRuleStatus): Tone {
   if (status === "Strict") return "danger";
@@ -4098,48 +5382,83 @@ function ruleTone(status: DoohRuleStatus): Tone {
   return "good";
 }
 
-function RulesPage({ t }: { t: (value: string) => string }) {
-  const [rules, setRules] = useState(seedDoohRules);
-  const [selectedId, setSelectedId] = useState(seedDoohRules[0].id);
-  const [creating, setCreating] = useState(false);
-  const [savedNotice, setSavedNotice] = useState("");
-  const [draft, setDraft] = useState<Omit<DoohRule, "id" | "version">>({
-    title: "",
+function emptyRuleDraft(): DoohRule {
+  return {
+    id: "",
+    title: { en: "", ar: "" },
+    family: "Creative policy",
     scope: "CMS submissions",
+    workflowStage: "AI Screening",
     mode: "Recommend",
     status: "Draft",
-    condition: "",
-    action: "",
+    severity: "Medium",
+    enabled: true,
+    condition: { en: "", ar: "" },
+    action: { en: "", ar: "" },
+    recommendedAction: "Prepare governed action",
     owner: "Platform Admin",
-    aiEffect: "Available to MediaGPT after save",
+    sourceId: knowledgeSourceCatalogue[0].id,
+    overridePolicy: { en: "Requires named owner approval.", ar: "يتطلب اعتماد المالك المسمى." },
+    effectiveDate: "Draft",
+    version: "v0.1",
+    aiEffect: { en: "Available to MediaGPT after save.", ar: "يتاح لـ MediaGPT بعد الحفظ." },
+    linkedEntities: ["ONT-RULE", "ONT-ACTION"],
+    testCases: [{ input: "Sample input", expected: "Expected result" }],
+  };
+}
+
+function RulesPage({ t }: { t: (value: string) => string }) {
+  const [rules, setRules] = useState<DoohRule[]>(ruleCatalogue);
+  const [selectedId, setSelectedId] = useState(ruleCatalogue[0].id);
+  const [creating, setCreating] = useState(false);
+  const [savedNotice, setSavedNotice] = useState("");
+  const [draft, setDraft] = useState<DoohRule>(emptyRuleDraft);
+  const [simulationId, setSimulationId] = useState(simulationCatalogue[0].id);
+  const [familyFilter, setFamilyFilter] = useState("All");
+  const [coverageOpen, setCoverageOpen] = useState(false);
+  const [ruleDetailsOpen, setRuleDetailsOpen] = useState(false);
+  const [ruleTestsOpen, setRuleTestsOpen] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const families = ["All", ...Array.from(new Set(rules.map((rule) => rule.family)))];
+  const selected = rules.find((rule) => rule.id === selectedId) || rules[0];
+  const filteredRules = rules.filter((rule) => familyFilter === "All" || rule.family === familyFilter);
+  const simulation = simulationCatalogue.find((item) => item.id === simulationId) || simulationCatalogue[0];
+  const simulationRules = simulation.matchingRuleIds.map(ruleById).filter(Boolean) as DoohRule[];
+  const simulationSources = simulation.citedSourceIds.map(sourceById).filter(Boolean) as KnowledgeSource[];
+  const workflowCoverageRows = Array.from(new Set(rules.map((rule) => rule.workflowStage))).map((stage) => {
+    const stageRules = rules.filter((rule) => rule.workflowStage === stage);
+    const enforced = stageRules.filter((rule) => rule.mode === "Enforce").length;
+    const recommended = stageRules.filter((rule) => rule.mode === "Recommend").length;
+    const monitored = stageRules.filter((rule) => rule.mode === "Monitor").length;
+    const sourcesLinked = new Set(stageRules.map((rule) => rule.sourceId)).size;
+    return [t(stage), String(stageRules.length), String(enforced), String(recommended), String(monitored), String(sourcesLinked)];
   });
-  const selected = rules.find((rule) => rule.id === selectedId) ?? rules[0];
+
   function updateSelected(patch: Partial<DoohRule>) {
     setRules((items) => items.map((rule) => rule.id === selected.id ? { ...rule, ...patch } : rule));
     setSavedNotice("");
   }
+
+  function updateSelectedText(field: "title" | "condition" | "action" | "overridePolicy" | "aiEffect", lang: keyof LocalizedText, value: string) {
+    updateSelected({ [field]: { ...selected[field], [lang]: value } } as Partial<DoohRule>);
+  }
+
+  function updateDraftText(field: "title" | "condition" | "action" | "overridePolicy" | "aiEffect", lang: keyof LocalizedText, value: string) {
+    setDraft((item) => ({ ...item, [field]: { ...item[field], [lang]: value } }));
+  }
+
   function createRule() {
-    if (!draft.title.trim() || !draft.condition.trim() || !draft.action.trim()) return;
+    if (!draft.title.en.trim() || !draft.condition.en.trim() || !draft.action.en.trim()) return;
     const next: DoohRule = {
       ...draft,
-      id: `RULE-${String(rules.length + 1).padStart(2, "0")}`,
-      title: draft.title.trim(),
-      condition: draft.condition.trim(),
-      action: draft.action.trim(),
-      version: "v0.1",
+      id: `RULE-CUSTOM-${String(rules.length + 1).padStart(3, "0")}`,
+      title: { en: draft.title.en.trim(), ar: draft.title.ar.trim() || draft.title.en.trim() },
+      condition: { en: draft.condition.en.trim(), ar: draft.condition.ar.trim() || draft.condition.en.trim() },
+      action: { en: draft.action.en.trim(), ar: draft.action.ar.trim() || draft.action.en.trim() },
     };
     setRules((items) => [next, ...items]);
     setSelectedId(next.id);
-    setDraft({
-      title: "",
-      scope: "CMS submissions",
-      mode: "Recommend",
-      status: "Draft",
-      condition: "",
-      action: "",
-      owner: "Platform Admin",
-      aiEffect: "Available to MediaGPT after save",
-    });
+    setDraft(emptyRuleDraft());
     setCreating(false);
     setSavedNotice("Rule created and added to MediaGPT governance.");
   }
@@ -4157,70 +5476,221 @@ function RulesPage({ t }: { t: (value: string) => string }) {
     <PageBody>
       <MetricGrid>
         <Metric label="Rule packs" value={String(rules.length)} helper="Condition AI reasoning" tone="good" />
-        <Metric label="Enforced rules" value={String(rules.filter((rule) => rule.mode === "Enforce").length)} helper="Cannot be bypassed by AI" tone="danger" />
-        <Metric label="Recommendation rules" value={String(rules.filter((rule) => rule.mode === "Recommend").length)} helper="Guide AI outputs" tone="warn" />
-        <Metric label="Draft rules" value={String(rules.filter((rule) => rule.status === "Draft").length)} helper="Ready for governance review" tone="info" />
+        <Metric label="Enforced rules" value={String(rules.filter((rule) => rule.mode === "Enforce" && rule.enabled).length)} helper="Cannot be bypassed by AI" tone="danger" />
+        <Metric label="Recommendation rules" value={String(rules.filter((rule) => rule.mode === "Recommend" && rule.enabled).length)} helper="Guide AI outputs" tone="warn" />
+        <Metric label="Simulation scenarios" value={String(simulationCatalogue.length)} helper="Ready to test rule firing" tone="info" />
       </MetricGrid>
+      <div className="utility-action-strip">
+        <Button icon={Layers3} variant="secondary" onClick={() => setCoverageOpen((value) => !value)}>{coverageOpen ? "Hide coverage" : "Show coverage"}</Button>
+        <Button icon={Zap} variant="secondary" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "Hide simulator" : "Show simulator"}</Button>
+      </div>
+      {coverageOpen ? (
+        <Panel icon={Layers3} title="Rule coverage by workflow">
+          <CompactTable
+            columns={["Workflow stage", "Rules", "Enforced", "Recommended", "Monitored", "Sources linked"]}
+            rows={workflowCoverageRows}
+          />
+        </Panel>
+      ) : null}
       <div className="split-grid cms-grid">
         <Panel icon={ShieldCheck} title="Rules" action={<Button icon={Plus} variant="secondary" onClick={() => setCreating((value) => !value)}>Create rule</Button>}>
           {creating ? (
             <div className="rule-form">
-              <label><span>{t("Rule name")}</span><input value={draft.title} onChange={(event) => setDraft((item) => ({ ...item, title: event.target.value }))} placeholder={t("New governance rule")} /></label>
+              <label><span>{t("Rule name EN")}</span><input value={draft.title.en} onChange={(event) => updateDraftText("title", "en", event.target.value)} placeholder={t("New governance rule")} /></label>
+              <label><span>{t("Rule name AR")}</span><input value={draft.title.ar} onChange={(event) => updateDraftText("title", "ar", event.target.value)} /></label>
               <label><span>{t("Scope")}</span><input value={draft.scope} onChange={(event) => setDraft((item) => ({ ...item, scope: event.target.value }))} /></label>
+              <label><span>{t("Family")}</span><input value={draft.family} onChange={(event) => setDraft((item) => ({ ...item, family: event.target.value }))} /></label>
               <label><span>{t("Mode")}</span><select value={draft.mode} onChange={(event) => setDraft((item) => ({ ...item, mode: event.target.value as DoohRuleMode }))}><option>Enforce</option><option>Recommend</option><option>Monitor</option></select></label>
               <label><span>{t("Status")}</span><select value={draft.status} onChange={(event) => setDraft((item) => ({ ...item, status: event.target.value as DoohRuleStatus }))}><option>Draft</option><option>Active</option><option>Strict</option></select></label>
-              <label className="rule-form-wide"><span>{t("Condition")}</span><textarea value={draft.condition} onChange={(event) => setDraft((item) => ({ ...item, condition: event.target.value }))} placeholder={t("When this rule should fire")} /></label>
-              <label className="rule-form-wide"><span>{t("Action")}</span><textarea value={draft.action} onChange={(event) => setDraft((item) => ({ ...item, action: event.target.value }))} placeholder={t("What MediaGPT or the workflow must do")} /></label>
+              <label className="rule-form-wide"><span>{t("Condition EN")}</span><textarea value={draft.condition.en} onChange={(event) => updateDraftText("condition", "en", event.target.value)} placeholder={t("When this rule should fire")} /></label>
+              <label className="rule-form-wide"><span>{t("Action EN")}</span><textarea value={draft.action.en} onChange={(event) => updateDraftText("action", "en", event.target.value)} placeholder={t("What MediaGPT or the workflow must do")} /></label>
               <label><span>{t("Owner")}</span><input value={draft.owner} onChange={(event) => setDraft((item) => ({ ...item, owner: event.target.value }))} /></label>
-              <label><span>{t("AI effect")}</span><input value={draft.aiEffect} onChange={(event) => setDraft((item) => ({ ...item, aiEffect: event.target.value }))} /></label>
+              <label><span>{t("Source")}</span><select value={draft.sourceId} onChange={(event) => setDraft((item) => ({ ...item, sourceId: event.target.value }))}>{knowledgeSourceCatalogue.map((source) => <option key={source.id} value={source.id}>{localized(source.title, t)}</option>)}</select></label>
               <ActionRow>
                 <Button variant="secondary" onClick={() => setCreating(false)}>Cancel</Button>
-                <Button icon={Plus} onClick={createRule} disabled={!draft.title.trim() || !draft.condition.trim() || !draft.action.trim()}>Add rule</Button>
+                <Button icon={Plus} onClick={createRule} disabled={!draft.title.en.trim() || !draft.condition.en.trim() || !draft.action.en.trim()}>Add rule</Button>
               </ActionRow>
             </div>
           ) : null}
+          <div className="filter-row">
+            {families.map((family) => (
+              <button key={family} type="button" className={familyFilter === family ? "active" : ""} onClick={() => setFamilyFilter(family)}>
+                {t(family)}
+              </button>
+            ))}
+          </div>
           <div className="knowledge-list">
-            {rules.map((rule) => (
+            {filteredRules.map((rule) => (
               <button key={rule.id} type="button" className={selected.id === rule.id ? "selected" : ""} onClick={() => setSelectedId(rule.id)}>
-                <strong>{t(rule.title)}</strong>
-                <span>{t(rule.scope)} / {t(rule.mode)} / {t(rule.owner)}</span>
-                <small>{rule.id} / {t(rule.status)} / {rule.version}</small>
+                <strong>{localized(rule.title, t)}</strong>
+                <span>{t(rule.family)} / {t(rule.scope)} / {t(rule.mode)} / {t(rule.owner)}</span>
+                <small>{rule.id} / {t(rule.status)} / {rule.version} / {rule.enabled ? t("Enabled") : t("Disabled")}</small>
               </button>
             ))}
           </div>
         </Panel>
-        <Panel icon={ClipboardCheck} title={selected.title} action={<StatusPill label={selected.status} tone={ruleTone(selected.status)} />}>
-          <div className="rule-detail">
-            <Detail label="Mode" value={selected.mode} />
-            <Detail label="Applies to" value={selected.scope} />
-            <Detail label="Owner" value={selected.owner} />
-          </div>
+        <Panel
+          icon={ClipboardCheck}
+          title={localized(selected.title, t)}
+          action={
+            <div className="panel-action-row">
+              <StatusPill label={selected.status} tone={ruleTone(selected.status)} />
+              <Button icon={ruleDetailsOpen ? X : Eye} variant="secondary" onClick={() => setRuleDetailsOpen((value) => !value)}>
+                {ruleDetailsOpen ? "Hide details" : "Show details"}
+              </Button>
+            </div>
+          }
+        >
+          {ruleDetailsOpen ? (
+            <div className="rule-detail">
+              <Detail label="Mode" value={selected.mode} />
+              <Detail label="Applies to" value={selected.scope} />
+              <Detail label="Owner" value={selected.owner} />
+              <Detail label="Severity" value={selected.severity} />
+              <Detail label="Workflow stage" value={selected.workflowStage} />
+              <Detail label="Source" value={sourceById(selected.sourceId)?.id || selected.sourceId} />
+            </div>
+          ) : null}
           <Segmented value={selected.mode} onChange={(mode) => updateSelected({ mode })} items={[
             { id: "Enforce", label: t("Enforce") },
             { id: "Recommend", label: t("Recommend") },
             { id: "Monitor", label: t("Monitor") },
           ]} />
           <div className="rule-editor">
-            <label><span>{t("Rule name")}</span><input value={selected.title} onChange={(event) => updateSelected({ title: event.target.value })} /></label>
+            <label><span>{t("Rule name EN")}</span><input value={selected.title.en} onChange={(event) => updateSelectedText("title", "en", event.target.value)} /></label>
+            <label><span>{t("Rule name AR")}</span><input value={selected.title.ar} onChange={(event) => updateSelectedText("title", "ar", event.target.value)} /></label>
+            <label><span>{t("Family")}</span><input value={selected.family} onChange={(event) => updateSelected({ family: event.target.value })} /></label>
             <label><span>{t("Scope")}</span><input value={selected.scope} onChange={(event) => updateSelected({ scope: event.target.value })} /></label>
             <label><span>{t("Status")}</span><select value={selected.status} onChange={(event) => updateSelected({ status: event.target.value as DoohRuleStatus })}><option>Active</option><option>Strict</option><option>Draft</option></select></label>
+            <label><span>{t("Severity")}</span><select value={selected.severity} onChange={(event) => updateSelected({ severity: event.target.value as DoohRule["severity"] })}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label>
             <label><span>{t("Owner")}</span><input value={selected.owner} onChange={(event) => updateSelected({ owner: event.target.value })} /></label>
-            <label className="rule-form-wide"><span>{t("Condition")}</span><textarea value={selected.condition} onChange={(event) => updateSelected({ condition: event.target.value })} /></label>
-            <label className="rule-form-wide"><span>{t("Action")}</span><textarea value={selected.action} onChange={(event) => updateSelected({ action: event.target.value })} /></label>
-            <label className="rule-form-wide"><span>{t("AI effect")}</span><input value={selected.aiEffect} onChange={(event) => updateSelected({ aiEffect: event.target.value })} /></label>
+            <label><span>{t("Enabled")}</span><select value={selected.enabled ? "Enabled" : "Disabled"} onChange={(event) => updateSelected({ enabled: event.target.value === "Enabled" })}><option>Enabled</option><option>Disabled</option></select></label>
+            <label><span>{t("Source")}</span><select value={selected.sourceId} onChange={(event) => updateSelected({ sourceId: event.target.value })}>{knowledgeSourceCatalogue.map((source) => <option key={source.id} value={source.id}>{source.id} - {localized(source.title, t)}</option>)}</select></label>
+            <label className="rule-form-wide"><span>{t("Condition EN")}</span><textarea value={selected.condition.en} onChange={(event) => updateSelectedText("condition", "en", event.target.value)} /></label>
+            <label className="rule-form-wide"><span>{t("Condition AR")}</span><textarea value={selected.condition.ar} onChange={(event) => updateSelectedText("condition", "ar", event.target.value)} /></label>
+            <label className="rule-form-wide"><span>{t("Action EN")}</span><textarea value={selected.action.en} onChange={(event) => updateSelectedText("action", "en", event.target.value)} /></label>
+            <label className="rule-form-wide"><span>{t("Override policy")}</span><textarea value={localized(selected.overridePolicy, t)} readOnly /></label>
+            <label className="rule-form-wide"><span>{t("AI effect")}</span><input value={localized(selected.aiEffect, t)} readOnly /></label>
           </div>
+          {ruleDetailsOpen ? (
+            <CollapsibleIntelligenceCitations ruleIds={[selected.id]} sourceIds={[selected.sourceId]} action={selected.recommendedAction} />
+          ) : null}
           {savedNotice ? <p className="media-notice">{t(savedNotice)}</p> : null}
-          <CompactTable
-            columns={["Rule", "Condition", "Action", "AI effect"]}
-            rows={rules.map((rule) => [rule.title, rule.condition, rule.action, rule.aiEffect])}
-          />
+          <div className="inline-toggle-row">
+            <Button icon={ruleTestsOpen ? X : FileCheck2} variant="secondary" onClick={() => setRuleTestsOpen((value) => !value)}>
+              {ruleTestsOpen ? "Hide tests" : "Show tests"}
+            </Button>
+          </div>
+          {ruleTestsOpen ? (
+            <CompactTable
+              columns={["Test input", "Expected result"]}
+              rows={selected.testCases.map((test) => [test.input, test.expected])}
+            />
+          ) : null}
           <ActionRow>
             <Button icon={Save} onClick={saveRule}>Save changes</Button>
             <Button icon={Trash2} variant="secondary" onClick={() => deleteRule(selected.id)} disabled={rules.length < 2}>Delete rule</Button>
           </ActionRow>
         </Panel>
       </div>
+
+      {simulationOpen ? (
+        <div className="split-grid cms-grid">
+        <Panel icon={Zap} title="Rule simulator">
+          <label className="rule-simulator-select">
+            <span>{t("Scenario")}</span>
+            <select value={simulationId} onChange={(event) => setSimulationId(event.target.value)}>
+              {simulationCatalogue.map((context) => (
+                <option key={context.id} value={context.id}>{localized(context.label, t)}</option>
+              ))}
+            </select>
+          </label>
+          <div className="simulator-output">
+            <p>{localized(simulation.input, t)}</p>
+            <StatusPill label={simulation.tone === "danger" ? "Issue detected" : "AI-assisted"} tone={simulation.tone} />
+            <strong>{localized(simulation.recommendation, t)}</strong>
+            <span>{t("Next action")}: {localized(simulation.action, t)}</span>
+          </div>
+          <CollapsibleIntelligenceCitations
+            ruleIds={simulationRules.map((rule) => rule.id)}
+            sourceIds={simulationSources.map((source) => source.id)}
+            action={localized(simulation.action, t)}
+          />
+        </Panel>
+        <Panel icon={Workflow} title="Scenario library">
+          <CompactTable
+            columns={["Scenario", "Workflow", "Rules", "Outcome", "Next action"]}
+            rows={scenarioCatalogue.map((scenario) => [
+              localized(scenario.title, t),
+              scenario.workflow,
+              scenario.rules.join(", "),
+              localized(scenario.outcome, t),
+              localized(scenario.nextAction, t),
+            ])}
+          />
+        </Panel>
+      </div>
+      ) : null}
     </PageBody>
+  );
+}
+
+function CollapsibleIntelligenceCitations({
+  ruleIds,
+  sourceIds,
+  action,
+}: {
+  ruleIds: string[];
+  sourceIds: string[];
+  action: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className={`intelligence-citations-toggle ${open ? "open" : ""}`}>
+      <Button variant="secondary" icon={open ? X : Sparkles} onClick={() => setOpen((value) => !value)}>
+        {open ? t("Hide AI details") : t("Show AI details")}
+      </Button>
+      {open ? <IntelligenceCitations ruleIds={ruleIds} sourceIds={sourceIds} action={action} /> : null}
+    </div>
+  );
+}
+
+function IntelligenceCitations({
+  ruleIds,
+  sourceIds,
+  action,
+}: {
+  ruleIds: string[];
+  sourceIds: string[];
+  action: string;
+}) {
+  const t = useT();
+  const rules = ruleIds.map(ruleById).filter(Boolean) as DoohRule[];
+  const sources = sourceIds.map(sourceById).filter(Boolean) as KnowledgeSource[];
+  return (
+    <div className="intelligence-citations">
+      <span className="citations-kicker">{t("MediaGPT governance")}</span>
+      <div className="citation-columns">
+        <div>
+          <strong>{t("Rules fired")}</strong>
+          {rules.map((rule) => (
+            <small key={rule.id}>{rule.id} / {localized(rule.title, t)} / {t(rule.mode)}</small>
+          ))}
+        </div>
+        <div>
+          <strong>{t("Knowledge cited")}</strong>
+          {sources.map((source) => (
+            <small key={source.id}>{source.id} / {localized(source.title, t)}</small>
+          ))}
+        </div>
+        <div>
+          <strong>{t("Allowed action")}</strong>
+          <small>{t(action)}</small>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -4781,17 +6251,37 @@ function EdgeGauge({ label, value }: { label: string; value: number }) {
 
 function FinancialsPage({
   approvals,
+  aiAvailable,
   onDecision,
   t,
 }: {
   approvals: FinanceApproval[];
+  aiAvailable: boolean;
   onDecision: (id: string, state: FinanceApproval["state"]) => void;
   t: (value: string) => string;
 }) {
   const [budget, setBudget] = useState(420);
   const [demand, setDemand] = useState(68);
   const [discount, setDiscount] = useState(8);
+  const [yieldNote, setYieldNote] = useState<{ explanation: string; adjustment: string; source?: string } | null>(null);
+  const [yieldLoading, setYieldLoading] = useState(false);
+  const [reportSummary, setReportSummary] = useState<{ summary: string; source?: string } | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
+
+  async function explainScenario() {
+    setYieldLoading(true);
+    const result = await aiExplainYield({ budget, demand, discount, computedTarget: projectedRevenue });
+    setYieldNote({ explanation: result.explanation, adjustment: result.adjustment, source: result.source });
+    setYieldLoading(false);
+  }
+
+  async function summarizeProofAndFinance() {
+    setReportLoading(true);
+    const result = await aiSummarizeReport({ scope: "proof-of-play settlement controls and financial approvals" });
+    setReportSummary({ summary: result.summary, source: result.source });
+    setReportLoading(false);
+  }
 
   return (
     <PageBody>
@@ -4841,6 +6331,11 @@ function FinancialsPage({
             </tbody>
           </table>
         </div>
+        <CollapsibleIntelligenceCitations
+          ruleIds={["RULE-COM-001", "RULE-COM-002", "RULE-COM-003", "RULE-AI-001"]}
+          sourceIds={["KB-COM-001", "KB-COM-002", "KB-COM-003", "KB-AI-001"]}
+          action="Send finance review"
+        />
       </Panel>
 
       <div className="split-grid wide-left">
@@ -4865,6 +6360,24 @@ function FinancialsPage({
               <strong>{langMoney(projectedRevenue, t)}</strong>
             </div>
           </div>
+          <ActionRow>
+            <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || yieldLoading} onClick={explainScenario}>{yieldLoading ? t("Explaining") : t("Explain yield")}</Button>
+          </ActionRow>
+          {yieldNote ? (
+            <section className="ai-mini-panel">
+              <div>
+                <span>{t("MediaGPT yield explanation")}</span>
+                <strong>{yieldNote.explanation}</strong>
+                <small>{yieldNote.adjustment}</small>
+              </div>
+              <StatusPill label={yieldNote.source === "openai" ? "OpenAI" : "Offline"} tone={yieldNote.source === "openai" ? "good" : "warn"} />
+            </section>
+          ) : null}
+          <CollapsibleIntelligenceCitations
+            ruleIds={["RULE-COM-001", "RULE-COM-004", "RULE-AI-001"]}
+            sourceIds={["KB-COM-001", "KB-COM-004", "KB-AI-001"]}
+            action="Regenerate scenario"
+          />
         </Panel>
       </div>
 
@@ -4877,6 +6390,39 @@ function FinancialsPage({
             ["Civic emergency lane", "Non-billed", "Non-billed", "Policy", "Standing"],
             ["Yas leisure loop", "AED 26 CPM", "AED 24 CPM", "Finance director", "Aug 15, 2026"],
           ]}
+        />
+        <CollapsibleIntelligenceCitations
+          ruleIds={["RULE-COM-001", "RULE-COM-002"]}
+          sourceIds={["KB-COM-001", "KB-COM-002"]}
+          action="Adjust schedule"
+        />
+      </Panel>
+
+      <Panel icon={FileCheck2} title="Proof-of-play settlement controls">
+        <ActionRow>
+          <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || reportLoading} onClick={summarizeProofAndFinance}>{reportLoading ? t("Summarizing") : t("Summarize report")}</Button>
+        </ActionRow>
+        {reportSummary ? (
+          <section className="ai-mini-panel">
+            <div>
+              <span>{t("MediaGPT report summary")}</span>
+              <strong>{reportSummary.summary}</strong>
+            </div>
+            <StatusPill label={reportSummary.source === "openai" ? "OpenAI" : "Offline"} tone={reportSummary.source === "openai" ? "good" : "warn"} />
+          </section>
+        ) : null}
+        <CompactTable
+          columns={["Campaign", "Proof coverage", "Exception", "Settlement state"]}
+          rows={[
+            ["Weekend mall offer", "99.7%", "None", "Ready to settle"],
+            ["Yas summer promotion", "97.0%", "AD-BUS-022 missing signed event", "Make-good recommended"],
+            ["Airport retail launch", "Pending", "Not yet published", "Not started"],
+          ]}
+        />
+        <CollapsibleIntelligenceCitations
+          ruleIds={["RULE-POP-001", "RULE-POP-002", "RULE-AI-001"]}
+          sourceIds={["KB-POP-001", "KB-POP-002", "KB-AI-001"]}
+          action="Offer make-good"
         />
       </Panel>
     </PageBody>
@@ -4896,6 +6442,14 @@ function CampaignsPage({
 }) {
   const messagesByCampaign = new Map(bidderMessages.map((message) => [message.campaign, message]));
   const revisionCount = campaigns.filter((item) => item.status === "Changes requested").length;
+  const [messageNotice, setMessageNotice] = useState("");
+  const actionMessages = campaigns
+    .map((campaign) => {
+      const communication = messagesByCampaign.get(campaign.campaign);
+      const message = campaign.revisionMessage ?? communication?.message;
+      return message ? { campaign, message } : null;
+    })
+    .filter(Boolean) as Array<{ campaign: BidderCampaign; message: string }>;
 
   return (
     <PageBody>
@@ -4905,6 +6459,26 @@ function CampaignsPage({
         <Metric label="Live or published" value={String(campaigns.filter((item) => item.status === "Published").length)} helper="On network" tone="good" />
         <Metric label="In review" value={String(campaigns.filter((item) => item.status === "Submitted" || item.status === "In review").length)} helper="ADMO action" tone="warn" />
       </MetricGrid>
+      {actionMessages.length ? (
+        <Panel icon={Bell} title="ADMO messages" action={`${actionMessages.length} ${t("action required")}`}>
+          <div className="bidder-message-queue">
+            {actionMessages.map(({ campaign, message }) => (
+              <article key={campaign.id}>
+                <div>
+                  <strong>{t(campaign.campaign)}</strong>
+                  <p>{message}</p>
+                  <small>{campaign.revisionFrom ? `${t("From")}: ${t(campaign.revisionFrom)}` : t("From ADMO CMS")}</small>
+                </div>
+                <div className="row-actions">
+                  <Button variant="secondary" icon={Eye} onClick={() => setMessageNotice(`${t("Opened request")}: ${t(campaign.campaign)}`)}>{t("Review request")}</Button>
+                  <Button icon={Upload} onClick={() => setMessageNotice(`${t("Revision staged")}: ${t(campaign.campaign)}`)}>{t("Upload revision")}</Button>
+                </div>
+              </article>
+            ))}
+          </div>
+          {messageNotice ? <p className="media-notice">{messageNotice}</p> : null}
+        </Panel>
+      ) : null}
       <Panel
         icon={Megaphone}
         title={t("Campaigns")}
@@ -4940,7 +6514,7 @@ function CampaignsPage({
                           <p>{message}</p>
                           <small>
                             {campaign.revisionFrom ? `${t("From")}: ${t(campaign.revisionFrom)}` : t("From ADMO CMS")}
-                            {campaign.revisionRequestedAt ? ` · ${campaign.revisionRequestedAt}` : ""}
+                            {campaign.revisionRequestedAt ? ` | ${campaign.revisionRequestedAt}` : ""}
                           </small>
                         </div>
                       ) : (
@@ -5095,7 +6669,7 @@ function AuctionCard({
         <div>
           <strong>{t(lot.lotName)}</strong>
           <span>{t(lot.network)}</span>
-          <small>{t(lot.flightWindow)} · {t(lot.impressions)}</small>
+          <small>{t(lot.flightWindow)} | {t(lot.impressions)}</small>
         </div>
       </div>
       <div className="auction-stats">
@@ -5137,20 +6711,86 @@ function AuctionCard({
   );
 }
 
-function MediaGptChatbot({ t }: { t: (value: string) => string }) {
+type ChatMessage = {
+  role: "user" | "assistant";
+  body: string;
+  table?: string[][];
+  chart?: ChatAnswer["chart"];
+  actions?: string[];
+  source?: string;
+  toolTrace?: AgentToolTrace[];
+  proposedActions?: PendingAgentAction[];
+};
+
+function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) => string }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; body: string; table?: string[][] }>>([
+  const [loading, setLoading] = useState(false);
+  const [pendingActions, setPendingActions] = useState<PendingAgentAction[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", body: "Ask about assets, schedules, submissions, financials or emergencies. Large outputs expand here." },
   ]);
 
-  function ask() {
+  useEffect(() => {
+    if (!open) return;
+    void refreshPendingActions();
+  }, [open]);
+
+  async function refreshPendingActions() {
+    const result = await aiListAgentActions("pending");
+    if ("actions" in result && Array.isArray(result.actions)) setPendingActions(result.actions);
+  }
+
+  async function ask() {
     if (!query.trim()) return;
-    const response = buildMediaGptResponse(query);
-    setMessages((items) => [...items, { role: "user", body: query }, response]);
-    setExpanded(Boolean(response.table));
+    const nextQuery = query;
     setQuery("");
+    setLoading(true);
+    setMessages((items) => [...items, { role: "user", body: nextQuery }]);
+    const result = await aiRunMediaGPTAgent({
+      message: nextQuery,
+      role: profile.id,
+      actor: profile.name,
+    });
+    const fallback = buildMediaGptResponse(nextQuery);
+    const richAnswer = shouldRequestRichAnswer(nextQuery)
+      ? await aiAskMediaGPT({
+          query: nextQuery,
+          locale: isArabicInterface(t) ? "ar" : "en",
+          history: messages.slice(-6).map((message) => ({ role: message.role, body: message.body })),
+        })
+      : null;
+    const response: ChatMessage = result.source === "offline"
+      ? { ...fallback, source: "offline" }
+      : {
+          role: "assistant" as const,
+          body: result.reply,
+          table: richAnswer?.table,
+          chart: richAnswer?.chart,
+          actions: richAnswer?.suggestedActions,
+          toolTrace: result.toolTrace,
+          proposedActions: result.proposedActions,
+          source: result.source,
+        };
+    setMessages((items) => [...items, response]);
+    if (response.proposedActions?.length) setPendingActions((items) => mergeActions(response.proposedActions || [], items));
+    setExpanded(Boolean(response.table || response.chart || response.proposedActions?.length));
+    setLoading(false);
+  }
+
+  async function decideAction(action: PendingAgentAction, decision: "approve" | "reject") {
+    const result = decision === "approve"
+      ? await aiApproveAgentAction({ id: action.id, actor: profile.name, role: profile.id })
+      : await aiRejectAgentAction({ id: action.id, actor: profile.name, role: profile.id, reason: "Rejected from MediaGPT chat" });
+    if ("action" in result) {
+      const next = result.action;
+      setPendingActions((items) => items.map((item) => item.id === next.id ? next : item).filter((item) => item.status === "pending"));
+      setMessages((items) => items.map((message) => ({
+        ...message,
+        proposedActions: message.proposedActions?.map((item) => item.id === next.id ? next : item),
+      })));
+    }
   }
 
   if (!open) {
@@ -5181,19 +6821,101 @@ function MediaGptChatbot({ t }: { t: (value: string) => string }) {
                 </tbody>
               </table>
             ) : null}
+            {message.chart ? <ChatChart chart={message.chart} /> : null}
+            {message.actions?.length ? (
+              <div className="chat-suggestions">
+                {message.actions.map((action) => <span key={action}>{t(action)}</span>)}
+              </div>
+            ) : null}
+            {message.toolTrace?.length ? <ToolTrace trace={message.toolTrace} t={t} /> : null}
+            {message.proposedActions?.length ? (
+              <div className="agent-action-list">
+                {message.proposedActions.map((action) => (
+                  <AgentActionCard key={action.id} action={action} onApprove={() => decideAction(action, "approve")} onReject={() => decideAction(action, "reject")} t={t} />
+                ))}
+              </div>
+            ) : null}
+            {message.source === "offline" ? <small className="chat-source">{t("Offline fallback")}</small> : null}
           </article>
         ))}
+        {loading ? (
+          <article className="assistant">
+            <p>{t("MediaGPT is thinking")}</p>
+          </article>
+        ) : null}
       </div>
       <footer>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Ask MediaGPT")} onKeyDown={(event) => event.key === "Enter" && ask()} />
-        <button type="button" onClick={ask} aria-label={t("Send")} title={t("Send")}><Send size={17} /></button>
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Ask MediaGPT")} onKeyDown={(event) => event.key === "Enter" && !loading && ask()} />
+        <button type="button" onClick={ask} disabled={loading} aria-label={t("Send")} title={t("Send")}><Send size={17} /></button>
       </footer>
+      {pendingActions.length ? (
+        <details className="approval-inbox" open={expanded}>
+          <summary>{t("Pending MediaGPT approvals")} <span>{pendingActions.length}</span></summary>
+          <div className="agent-action-list">
+            {pendingActions.map((action) => (
+              <AgentActionCard key={action.id} action={action} onApprove={() => decideAction(action, "approve")} onReject={() => decideAction(action, "reject")} t={t} />
+            ))}
+          </div>
+        </details>
+      ) : null}
       <div className="chat-actions">
         <button type="button">{t("Save output")}</button>
         <button type="button">{t("Export")}</button>
       </div>
     </section>
   );
+}
+
+function ToolTrace({ trace, t }: { trace: AgentToolTrace[]; t: (value: string) => string }) {
+  return (
+    <div className="tool-trace">
+      {trace.map((item, index) => (
+        <span key={`${item.tool}-${index}`} className={`tool-trace-item ${item.kind}`}>
+          {t(item.tool)} | {t(item.status)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function AgentActionCard({
+  action,
+  onApprove,
+  onReject,
+  t,
+}: {
+  action: PendingAgentAction;
+  onApprove: () => void;
+  onReject: () => void;
+  t: (value: string) => string;
+}) {
+  return (
+    <article className={`agent-action-card status-${action.status}`}>
+      <div>
+        <span>{t("Approval required")}</span>
+        <strong>{t(action.preview)}</strong>
+        <small>{action.tool} | {action.id}</small>
+      </div>
+      {action.status === "pending" ? (
+        <div className="agent-action-buttons">
+          <button type="button" onClick={onReject}>{t("Reject")}</button>
+          <button type="button" onClick={onApprove}>{t("Approve")}</button>
+        </div>
+      ) : (
+        <StatusPill label={action.status} tone={action.status === "executed" ? "good" : "warn"} />
+      )}
+    </article>
+  );
+}
+
+function shouldRequestRichAnswer(query: string) {
+  return /chart|graph|barplot|plot|trend|month|monthly|table|dashboard|revenue|financial|compare|breakdown/i.test(query);
+}
+
+function mergeActions(next: PendingAgentAction[], existing: PendingAgentAction[]) {
+  const byId = new Map(existing.map((action) => [action.id, action]));
+  next.forEach((action) => byId.set(action.id, action));
+  return Array.from(byId.values()).filter((action) => action.status === "pending");
 }
 
 function buildMediaGptResponse(query: string): { role: "assistant"; body: string; table?: string[][] } {
@@ -5236,6 +6958,43 @@ function buildMediaGptResponse(query: string): { role: "assistant"; body: string
     };
   }
   return { role: "assistant", body: "The estate is mostly healthy: 3 of 5 assets are live, one is under maintenance, and one is offline." };
+}
+
+function ChatChart({ chart }: { chart: ChatAnswer["chart"] }) {
+  if (!chart?.data?.length || !chart.xKey || !chart.yKey) return null;
+  const data = chart.data.map((item) => ({
+    ...item,
+    [chart.yKey]: typeof item[chart.yKey] === "number" ? item[chart.yKey] : Number(String(item[chart.yKey]).replace(/[^0-9.-]/g, "")) || 0,
+  }));
+  const formatter = (value: unknown) => {
+    const numeric = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(numeric) ? `AED ${numeric.toLocaleString("en-US")}` : String(value);
+  };
+
+  return (
+    <div className="chat-chart" aria-label={chart.title}>
+      <strong>{chart.title}</strong>
+      <ResponsiveContainer width="100%" height={210}>
+        {chart.type === "line" ? (
+          <LineChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 2 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey={chart.xKey} tickLine={false} axisLine={false} />
+            <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} tickLine={false} axisLine={false} width={42} />
+            <Tooltip formatter={formatter} />
+            <Line type="monotone" dataKey={chart.yKey} stroke="#214f3f" strokeWidth={3} dot={{ r: 3 }} />
+          </LineChart>
+        ) : (
+          <BarChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 2 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey={chart.xKey} tickLine={false} axisLine={false} />
+            <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} tickLine={false} axisLine={false} width={42} />
+            <Tooltip formatter={formatter} />
+            <Bar dataKey={chart.yKey} fill="#214f3f" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 function PageBody({ children }: { children: ReactNode }) {
@@ -5512,6 +7271,24 @@ function summarizeZones(items: Asset[]) {
   return Array.from(grouped.values());
 }
 
+function applyEstateFilter(items: Asset[], filter: EstateFilter | null) {
+  if (!filter) return items;
+  const freeText = filter.freeText?.toLowerCase().trim();
+  const hasStructuredFilter = Boolean(filter.status || filter.zone || filter.type || filter.controller);
+  return items.filter((asset) => {
+    if (filter.status && asset.status.toLowerCase() !== filter.status.toLowerCase()) return false;
+    if (filter.zone && !asset.zone.toLowerCase().includes(filter.zone.toLowerCase())) return false;
+    if (filter.type && !asset.type.toLowerCase().includes(filter.type.toLowerCase())) return false;
+    if (filter.controller && !asset.controller.toLowerCase().includes(filter.controller.toLowerCase())) return false;
+    if (freeText && !hasStructuredFilter) {
+      const haystack = `${asset.id} ${asset.name} ${asset.type} ${asset.zone} ${asset.status} ${asset.controller}`.toLowerCase();
+      const usefulWords = freeText.split(/\s+/).filter((word) => word.length > 2 && !["show", "find", "with", "assets", "asset"].includes(word));
+      if (usefulWords.length && !usefulWords.some((word) => haystack.includes(word))) return false;
+    }
+    return true;
+  });
+}
+
 function priorityTone(priority: Submission["priority"]): Tone {
   if (priority === "High") return "danger";
   if (priority === "Medium") return "warn";
@@ -5529,6 +7306,13 @@ function assetTone(status: Asset["status"]): Tone {
   if (status === "Offline") return "danger";
   if (status === "Warning" || status === "Maintenance") return "warn";
   return "neutral";
+}
+
+function defaultProcurementItem(asset: Asset) {
+  if (asset.status === "Offline") return "Edge controller";
+  if (asset.status === "Warning") return asset.tempC.includes("57") ? "Cooling fan kit" : "Thermal sensor kit";
+  if (asset.status === "Maintenance") return "Rear door gasket";
+  return "LED module batch";
 }
 
 function alertTone(state: AlertState): Tone {
@@ -5582,7 +7366,20 @@ function notificationBody(notification: PlatformNotification, t: Translator) {
 }
 
 function mediaCreative(index: number) {
-  const ids = ["etihad-retail", "yas-tourism", "mall-footfall", "brand-guidelines", "compliance-pack", "live-slate"];
+  const ids = [
+    "holiday-notice",
+    "weather-alert",
+    "etihad-retail",
+    "yas-tourism",
+    "mall-footfall",
+    "live-slate",
+    "eid-family-retail",
+    "coca-cola-national-day",
+    "experience-abu-dhabi",
+    "ramadan-kareem",
+    "royal-safari",
+    "compliance-pack",
+  ];
   return ids[index % ids.length];
 }
 
@@ -5608,7 +7405,7 @@ interface BriefPayload {
   daypart: string;
   reach: string;
   compliance: { uaeMedia: boolean; arabicProof: boolean; rightsCleared: boolean; noPolitical: boolean };
-  assets: Array<{ name: string; type: string; size: string; illustration: string }>;
+  assets: Array<{ name: string; type: string; size: string; illustration: string; previewUrl?: string }>;
 }
 
 interface FinanceApproval {
@@ -5622,8 +7419,20 @@ interface FinanceApproval {
   state: "Pending" | "Approved" | "On hold" | "Rejected";
 }
 
-const wizardCreativeIds = ["etihad-retail", "yas-tourism", "mall-footfall", "brand-guidelines", "compliance-pack", "live-slate"];
+const wizardCreativeIds = [
+  "etihad-retail",
+  "yas-tourism",
+  "mall-footfall",
+  "eid-family-retail",
+  "coca-cola-national-day",
+  "experience-abu-dhabi",
+  "ramadan-kareem",
+  "royal-safari",
+  "holiday-notice",
+  "live-slate",
+];
 const wizardZones = ["Corniche", "Downtown", "Yas Island", "Al Ain gateways", "Airport road", "Reem Island"];
+const wizardObjectives = ["Awareness", "Footfall", "Sales activation", "Tourism visitation", "Public information", "Event attendance"];
 
 function NewCampaignWizard({
   defaultBidder,
@@ -5637,16 +7446,17 @@ function NewCampaignWizard({
   t: (v: string) => string;
 }) {
   const [step, setStep] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [data, setData] = useState<BriefPayload>({
     campaign: "",
     packageName: "Downtown retail loop",
-    budget: "AED 320,000",
+    budget: "320000",
     creativeId: wizardCreativeIds[0],
     languages: "Arabic + English",
     startDate: "Jul 15, 2026",
     endDate: "Aug 15, 2026",
     priority: "Standard",
-    objective: "",
+    objective: "Awareness",
     contactName: defaultBidder,
     contactEmail: "campaigns@bidder.ae",
     brand: "",
@@ -5654,12 +7464,9 @@ function NewCampaignWizard({
     audience: "Residents 25-45, premium spenders",
     targetZones: ["Corniche", "Downtown"],
     daypart: "Prime evening (17:00-22:00)",
-    reach: "Estimated 1.2M impressions / week",
+    reach: "1200000",
     compliance: { uaeMedia: false, arabicProof: false, rightsCleared: false, noPolitical: false },
-    assets: [
-      { name: "hero-landscape.mp4", type: "Video 1920x1080", size: "24 MB", illustration: wizardCreativeIds[0] },
-      { name: "hero-portrait.jpg", type: "Image 1080x1920", size: "3.1 MB", illustration: wizardCreativeIds[1] },
-    ],
+    assets: [],
   });
 
   const steps = [
@@ -5682,11 +7489,22 @@ function NewCampaignWizard({
     }));
   }
 
-  function addAsset() {
-    const nextId = wizardCreativeIds[data.assets.length % wizardCreativeIds.length];
+  function addAssetFiles(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
     setData((d) => ({
       ...d,
-      assets: [...d.assets, { name: `asset-${d.assets.length + 1}.mp4`, type: "Video 1920x1080", size: "18 MB", illustration: nextId }],
+      creativeId: d.assets[0]?.illustration ?? d.creativeId,
+      assets: [
+        ...d.assets,
+        ...selectedFiles.map((file, index) => ({
+          name: file.name,
+          type: file.type || "Creative file",
+          size: formatFileSize(file.size),
+          illustration: wizardCreativeIds[(d.assets.length + index) % wizardCreativeIds.length],
+          previewUrl: file.type.startsWith("image/") || file.type.startsWith("video/") ? URL.createObjectURL(file) : undefined,
+        })),
+      ],
     }));
   }
 
@@ -5700,7 +7518,7 @@ function NewCampaignWizard({
     (step === 0 && basicsComplete) ||
     (step === 1 && data.assets.length > 0) ||
     (step === 2 && data.targetZones.length > 0) ||
-    (step === 3 && data.budget.trim()) ||
+    (step === 3 && Number(data.budget) > 0 && Number(data.reach) > 0) ||
     (step === 4 && complianceComplete) ||
     step === 5,
   );
@@ -5735,7 +7553,11 @@ function NewCampaignWizard({
                   <option>Retail</option><option>Tourism</option><option>Government</option><option>Finance</option><option>Automotive</option><option>Real estate</option>
                 </select>
               </label>
-              <label><span>{t("Primary objective")}</span><textarea value={data.objective} onChange={(e) => update("objective", e.target.value)} placeholder={t("Describe what success looks like for this campaign.")} /></label>
+              <label><span>{t("Primary objective")}</span>
+                <select value={data.objective} onChange={(e) => update("objective", e.target.value)}>
+                  {wizardObjectives.map((objective) => <option key={objective}>{objective}</option>)}
+                </select>
+              </label>
               <label><span>{t("Contact")}</span><input value={data.contactName} onChange={(e) => update("contactName", e.target.value)} /></label>
               <label><span>{t("Email")}</span><input value={data.contactEmail} onChange={(e) => update("contactEmail", e.target.value)} /></label>
               {!basicsComplete ? <p className="wizard-hint wizard-full">{t("Campaign name and brand are required before continuing.")}</p> : null}
@@ -5749,12 +7571,27 @@ function NewCampaignWizard({
                   <strong>{t("Creative pack")}</strong>
                   <small>{t("Illustrations, motion, and static assets. Arabic + English required.")}</small>
                 </div>
-                <Button icon={Plus} variant="secondary" onClick={addAsset}>{t("Add asset")}</Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,application/pdf"
+                  hidden
+                  onChange={(event) => addAssetFiles(event.target.files)}
+                />
+                <Button icon={Upload} variant="secondary" onClick={() => fileInputRef.current?.click()}>{t("Upload files")}</Button>
               </div>
               <div className="wizard-asset-grid">
+                {!data.assets.length ? (
+                  <div className="wizard-upload-empty">
+                    <Upload size={24} />
+                    <strong>{t("No creative files uploaded")}</strong>
+                    <span>{t("Upload image, video or PDF creative files from your laptop.")}</span>
+                  </div>
+                ) : null}
                 {data.assets.map((asset, i) => (
                   <article key={i} className="wizard-asset">
-                    <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(asset.illustration)}")` }} />
+                    <div className="creative-frame" style={{ backgroundImage: `url("${asset.previewUrl || creativeBackground(asset.illustration)}")` }} />
                     <div className="wizard-asset-meta">
                       <strong>{asset.name}</strong>
                       <span>{asset.type} / {asset.size}</span>
@@ -5794,7 +7631,7 @@ function NewCampaignWizard({
                   <option>Prime evening (17:00-22:00)</option><option>Morning commute (07:00-10:00)</option><option>Full day rotation</option><option>Weekend leisure</option>
                 </select>
               </label>
-              <label><span>{t("Expected reach")}</span><input value={data.reach} onChange={(e) => update("reach", e.target.value)} /></label>
+              <label><span>{t("Expected weekly impressions")}</span><input type="number" min={1} step={1000} value={data.reach} onChange={(e) => update("reach", e.target.value)} /></label>
             </div>
           )}
 
@@ -5805,7 +7642,7 @@ function NewCampaignWizard({
                   <option>Downtown retail loop</option><option>Airport and premium roadside</option><option>Yas leisure loop</option><option>Civic bilingual pack</option>
                 </select>
               </label>
-              <label><span>{t("Total budget")}</span><input value={data.budget} onChange={(e) => update("budget", e.target.value)} placeholder="AED 320,000" /></label>
+              <label><span>{t("Total budget (AED)")}</span><input type="number" min={1} step={1000} value={data.budget} onChange={(e) => update("budget", e.target.value)} placeholder="320000" /></label>
               <label><span>{t("Start")}</span><input value={data.startDate} onChange={(e) => update("startDate", e.target.value)} /></label>
               <label><span>{t("End")}</span><input value={data.endDate} onChange={(e) => update("endDate", e.target.value)} /></label>
               <label><span>{t("Priority")}</span>
@@ -5840,13 +7677,14 @@ function NewCampaignWizard({
                 <Detail label="Campaign" value={data.campaign || "-"} />
                 <Detail label="Brand" value={data.brand || "-"} />
                 <Detail label="Package" value={data.packageName} />
-                <Detail label="Budget" value={data.budget} />
+                <Detail label="Budget" value={`AED ${Number(data.budget || 0).toLocaleString("en-US")}`} />
                 <Detail label="Start" value={data.startDate} />
                 <Detail label="End" value={data.endDate} />
                 <Detail label="Languages" value={data.languages} />
                 <Detail label="Priority" value={data.priority} />
                 <Detail label="Zones" value={data.targetZones.join(", ") || "-"} />
                 <Detail label="Daypart" value={data.daypart} />
+                <Detail label="Reach" value={`${Number(data.reach || 0).toLocaleString("en-US")} weekly impressions`} />
                 <Detail label="Assets" value={`${data.assets.length} files`} />
                 <Detail label="Compliance" value={Object.values(data.compliance).every(Boolean) ? "All confirmed" : "Incomplete"} />
               </div>
@@ -5863,7 +7701,12 @@ function NewCampaignWizard({
           {step < steps.length - 1 ? (
             <Button disabled={!canNext} onClick={() => setStep(step + 1)}>{t("Continue")}</Button>
           ) : (
-            <Button icon={Send} onClick={() => onSubmit(data)}>{t("Submit to ADMO")}</Button>
+            <Button icon={Send} onClick={() => onSubmit({
+              ...data,
+              budget: `AED ${Number(data.budget || 0).toLocaleString("en-US")}`,
+              reach: `${Number(data.reach || 0).toLocaleString("en-US")} weekly impressions`,
+              assets: data.assets.map(({ previewUrl, ...asset }) => asset),
+            })}>{t("Submit to ADMO")}</Button>
           )}
         </footer>
       </div>
@@ -5871,5 +7714,9 @@ function NewCampaignWizard({
   );
 }
 
-export default App;
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
 
+export default App;

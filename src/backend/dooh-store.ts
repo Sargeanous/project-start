@@ -142,6 +142,36 @@ export interface PlatformNotification {
   readBy: NotificationRecipient[];
 }
 
+export interface ServiceOrder {
+  id: string;
+  assetId: string;
+  assetName: string;
+  componentId: string;
+  title: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  status: "Pending Assignment" | "Pending Execution" | "In Progress" | "Completed" | "Overdue";
+  owner: string;
+  due: string;
+  summary: string;
+  partsNeeded: string[];
+  linkedPo: string;
+  createdAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  assetId: string;
+  assetName: string;
+  componentId: string;
+  item: string;
+  quantity: number;
+  vendor: string;
+  status: "Draft" | "Submitted" | "Confirmed" | "Received";
+  eta: string;
+  linkedServiceOrder?: string;
+  createdAt: string;
+}
+
 export interface DoohState {
   submissions: Submission[];
   campaigns: BidderCampaign[];
@@ -153,6 +183,8 @@ export interface DoohState {
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
+  serviceOrders: ServiceOrder[];
+  purchaseOrders: PurchaseOrder[];
   activity: ActivityItem[];
   notifications: PlatformNotification[];
 }
@@ -373,6 +405,79 @@ const initialState: DoohState = {
       state: "Pending",
     },
   ],
+  serviceOrders: [
+    {
+      id: "SO-8828",
+      assetId: "AD-BRG-014",
+      assetName: "Mussafah Bridge Banner",
+      componentId: "C05R01",
+      title: "Cooling fan stalled",
+      severity: "High",
+      status: "In Progress",
+      owner: "Maintenance team",
+      due: "Today 16:00",
+      summary: "Thermal remediation visit active. Fan kit reserved from depot stock.",
+      partsNeeded: ["Cooling fan kit", "Cabinet ventilation filter"],
+      linkedPo: "PO-4484",
+      createdAt: "2026-07-02T14:12:00.000Z",
+    },
+    {
+      id: "SO-8837",
+      assetId: "AD-AIN-052",
+      assetName: "Al Ain Civic",
+      componentId: "PSU-01",
+      title: "Power supply replacement",
+      severity: "Critical",
+      status: "Pending Execution",
+      owner: "Field dispatch",
+      due: "Jul 05, 2026",
+      summary: "Power supply and breaker replacement waiting for PO confirmation.",
+      partsNeeded: ["Power supply", "Main breaker", "Surge protector"],
+      linkedPo: "PO-4512",
+      createdAt: "2026-07-01T09:20:00.000Z",
+    },
+  ],
+  purchaseOrders: [
+    {
+      id: "PO-4484",
+      assetId: "AD-BRG-014",
+      assetName: "Mussafah Bridge Banner",
+      componentId: "C05R01",
+      item: "Cooling fan kit",
+      quantity: 2,
+      vendor: "NovaStar UAE distributor",
+      status: "Confirmed",
+      eta: "Jul 04, 2026",
+      linkedServiceOrder: "SO-8828",
+      createdAt: "2026-07-02T14:20:00.000Z",
+    },
+    {
+      id: "PO-4520",
+      assetId: "AD-BRG-014",
+      assetName: "Mussafah Bridge Banner",
+      componentId: "C05R01",
+      item: "Cabinet ventilation filter",
+      quantity: 6,
+      vendor: "Abu Dhabi LED Parts",
+      status: "Submitted",
+      eta: "Jul 09, 2026",
+      linkedServiceOrder: "SO-8828",
+      createdAt: "2026-07-02T15:10:00.000Z",
+    },
+    {
+      id: "PO-4512",
+      assetId: "AD-AIN-052",
+      assetName: "Al Ain Civic",
+      componentId: "PSU-01",
+      item: "Power supply",
+      quantity: 1,
+      vendor: "Delta power systems",
+      status: "Submitted",
+      eta: "Jul 15, 2026",
+      linkedServiceOrder: "SO-8837",
+      createdAt: "2026-07-01T09:35:00.000Z",
+    },
+  ],
   activity: [
     { id: "ACT-001", actor: "System", action: "Seeded demo state", subject: "DOOH platform", at: new Date().toISOString() },
   ],
@@ -430,6 +535,8 @@ function normalizeState(state: DoohState): DoohState {
   return {
     ...state,
     bidderMessages: state.bidderMessages ?? [],
+    serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
+    purchaseOrders: state.purchaseOrders ?? cloneState(initialState).purchaseOrders,
     notifications: (state.notifications?.length ? state.notifications : cloneState(initialState).notifications).map((notification) => ({
       ...notification,
       readBy: notification.readBy ?? [],
@@ -868,6 +975,97 @@ export async function requestSubmissionChanges(
     addActivity(draft, actor, "Sent bidder revision request", item.campaign);
   });
   return { state, submission, communication };
+}
+
+export async function createServiceOrder(
+  payload: {
+    assetId: string;
+    assetName?: string;
+    componentId?: string;
+    title: string;
+    severity: ServiceOrder["severity"];
+    summary?: string;
+    partsNeeded?: string[];
+  },
+  actor: string,
+): Promise<{ state: DoohState; serviceOrder: ServiceOrder }> {
+  let serviceOrder!: ServiceOrder;
+  const state = await commit((draft) => {
+    serviceOrder = {
+      id: nextId("SO", draft.serviceOrders ?? []),
+      assetId: payload.assetId,
+      assetName: payload.assetName || payload.assetId,
+      componentId: payload.componentId || "Asset unit",
+      title: payload.title.trim(),
+      severity: payload.severity,
+      status: "Pending Assignment",
+      owner: "Maintenance dispatch",
+      due: payload.severity === "Critical" ? "Today" : "Next service window",
+      summary: payload.summary || "Created from the Network and Devices digital twin.",
+      partsNeeded: (payload.partsNeeded ?? []).filter(Boolean).slice(0, 6),
+      linkedPo: payload.partsNeeded?.length ? "PO pending" : "No PO required",
+      createdAt: formatNow(),
+    };
+    draft.serviceOrders = [serviceOrder, ...(draft.serviceOrders ?? [])].slice(0, 120);
+    addNotification(draft, {
+      title: "Service order created",
+      body: `${serviceOrder.id} created for ${serviceOrder.assetName}.`,
+      subject: serviceOrder.assetName,
+      recipients: ["technical", "admin", "control-room"],
+      page: "network",
+      tone: payload.severity === "Critical" ? "critical" : "action",
+    });
+    addActivity(draft, actor, "Created service order", `${serviceOrder.id} | ${serviceOrder.assetName}`);
+  });
+  return { state, serviceOrder };
+}
+
+export async function createPurchaseOrder(
+  payload: {
+    assetId: string;
+    assetName?: string;
+    componentId?: string;
+    item: string;
+    quantity?: number;
+    vendor?: string;
+    eta?: string;
+    linkedServiceOrder?: string;
+  },
+  actor: string,
+): Promise<{ state: DoohState; purchaseOrder: PurchaseOrder }> {
+  let purchaseOrder!: PurchaseOrder;
+  const state = await commit((draft) => {
+    purchaseOrder = {
+      id: nextId("PO", draft.purchaseOrders ?? []),
+      assetId: payload.assetId,
+      assetName: payload.assetName || payload.assetId,
+      componentId: payload.componentId || "Asset unit",
+      item: payload.item.trim(),
+      quantity: Math.max(1, Math.min(Number(payload.quantity) || 1, 50)),
+      vendor: payload.vendor?.trim() || "Preferred DOOH spares supplier",
+      status: "Submitted",
+      eta: payload.eta?.trim() || "Next supplier window",
+      linkedServiceOrder: payload.linkedServiceOrder,
+      createdAt: formatNow(),
+    };
+    draft.purchaseOrders = [purchaseOrder, ...(draft.purchaseOrders ?? [])].slice(0, 160);
+    if (payload.linkedServiceOrder) {
+      const order = draft.serviceOrders.find((item) => item.id === payload.linkedServiceOrder);
+      if (order && (!order.linkedPo || order.linkedPo === "PO pending" || order.linkedPo === "No PO required")) {
+        order.linkedPo = purchaseOrder.id;
+      }
+    }
+    addNotification(draft, {
+      title: "Purchase order submitted",
+      body: `${purchaseOrder.id} submitted for ${purchaseOrder.item} on ${purchaseOrder.assetName}.`,
+      subject: purchaseOrder.assetName,
+      recipients: ["technical", "admin", "control-room"],
+      page: "network",
+      tone: "action",
+    });
+    addActivity(draft, actor, "Created purchase order", `${purchaseOrder.id} | ${purchaseOrder.assetName}`);
+  });
+  return { state, purchaseOrder };
 }
 
 export async function playScheduleItem(id: string, actor: string): Promise<DoohState> {

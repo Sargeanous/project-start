@@ -158,6 +158,45 @@ export interface FieldTask {
   due: string;
 }
 
+export interface HistoricalCampaign {
+  id: string;
+  campaign: string;
+  advertiser: string;
+  packageName: string;
+  zone: string;
+  assetIds: string[];
+  startDate: string;
+  endDate: string;
+  budgetAed: number;
+  impressions: number;
+  plays: number;
+  pop: string;
+  outcome: string;
+}
+
+export interface HistoricalBid {
+  id: string;
+  lotId: string;
+  lotName: string;
+  bidder: string;
+  campaign: string;
+  zone: string;
+  amountAed: number;
+  submittedAt: string;
+  result: "Won" | "Outbid" | "Withdrawn";
+}
+
+export interface HistoricalRun {
+  id: string;
+  type: "Playback" | "Proof-of-play" | "Maintenance" | "AI review" | "Emergency";
+  subject: string;
+  assetId: string;
+  startedAt: string;
+  endedAt: string;
+  status: "Completed" | "Issue found" | "Resolved" | "Escalated";
+  summary: string;
+}
+
 export interface MediaAsset {
   id: string;
   title: string;
@@ -340,6 +379,35 @@ export const assets: Asset[] = [
     tempC: "35°C",
     otaRing: "Ring 2",
   },
+];
+
+export const historicalCampaigns: HistoricalCampaign[] = [
+  { id: "HC-2025-001", campaign: "Coca-Cola Taste the Feeling", advertiser: "Coca-Cola", packageName: "Yas leisure loop", zone: "Yas Island", assetIds: ["AD-BUS-022"], startDate: "2025-03-01", endDate: "2025-03-21", budgetAed: 312000, impressions: 1280000, plays: 18520, pop: "99.2%", outcome: "Strong evening recall, renewed for summer route" },
+  { id: "HC-2024-044", campaign: "Yas Bay activation", advertiser: "Coca-Cola", packageName: "Yas leisure loop", zone: "Yas Island", assetIds: ["AD-BUS-022"], startDate: "2024-08-04", endDate: "2024-08-24", budgetAed: 268500, impressions: 1040000, plays: 16440, pop: "98.8%", outcome: "High footfall lift near hotel corridor" },
+  { id: "HC-2024-088", campaign: "Airport Duty Free summer", advertiser: "Abu Dhabi Duty Free", packageName: "Airport and premium roadside", zone: "Airport route", assetIds: ["AD-HWY-001"], startDate: "2024-06-10", endDate: "2024-07-07", budgetAed: 425000, impressions: 1710000, plays: 22180, pop: "99.5%", outcome: "Converted to annual route buy" },
+  { id: "HC-2025-012", campaign: "Experience Abu Dhabi desert", advertiser: "DCT Abu Dhabi", packageName: "Full estate civic takeover", zone: "Abu Dhabi City", assetIds: ["AD-HWY-001", "AD-DWT-011"], startDate: "2025-01-15", endDate: "2025-02-15", budgetAed: 780000, impressions: 3100000, plays: 42600, pop: "99.7%", outcome: "Best performing tourism creative in Q1" },
+  { id: "HC-2025-033", campaign: "Ramadan Kareem civic greetings", advertiser: "ADMO", packageName: "Civic bilingual pack", zone: "Abu Dhabi City", assetIds: ["AD-HWY-001", "AD-BUS-022", "AD-DWT-011"], startDate: "2025-03-10", endDate: "2025-04-10", budgetAed: 0, impressions: 3950000, plays: 58400, pop: "99.9%", outcome: "No commercial displacement incidents" },
+  { id: "HC-2025-071", campaign: "Weekend mall offer", advertiser: "Retail Majlis", packageName: "Downtown retail loop", zone: "Downtown", assetIds: ["AD-DWT-011"], startDate: "2025-11-01", endDate: "2025-11-14", budgetAed: 184000, impressions: 810000, plays: 12600, pop: "99.1%", outcome: "Make-good issued for one camera proof gap" },
+  { id: "HC-2026-002", campaign: "Road safety rotation", advertiser: "Abu Dhabi Police", packageName: "Civic emergency lane", zone: "Abu Dhabi City", assetIds: ["AD-HWY-001"], startDate: "2026-01-05", endDate: "2026-01-31", budgetAed: 0, impressions: 1620000, plays: 30400, pop: "99.96%", outcome: "Emergency priority route validated" },
+  { id: "HC-2026-019", campaign: "Royal Safari winter push", advertiser: "Royal Safari", packageName: "Airport and premium roadside", zone: "Airport route", assetIds: ["AD-HWY-001", "AD-BRG-014"], startDate: "2026-02-10", endDate: "2026-03-05", budgetAed: 365000, impressions: 1390000, plays: 19700, pop: "98.9%", outcome: "Bridge asset temperature warning reduced delivered plays by 1.8%" },
+];
+
+export const historicalBids: HistoricalBid[] = [
+  { id: "HB-9001", lotId: "LOT-4411", lotName: "Corniche prime - evening rotation", bidder: "Yas Tourism", campaign: "Yas Bay summer", zone: "Corniche", amountAed: 442000, submittedAt: "2026-06-22T15:40:00Z", result: "Won" },
+  { id: "HB-9002", lotId: "LOT-4411", lotName: "Corniche prime - evening rotation", bidder: "Coca-Cola", campaign: "Noor summer", zone: "Corniche", amountAed: 437000, submittedAt: "2026-06-22T15:18:00Z", result: "Outbid" },
+  { id: "HB-9003", lotId: "LOT-4408", lotName: "Downtown retail loop - weekend", bidder: "Retail Majlis", campaign: "Weekend mall offer", zone: "Downtown", amountAed: 168500, submittedAt: "2026-06-20T12:12:00Z", result: "Won" },
+  { id: "HB-9004", lotId: "LOT-4402", lotName: "Yas leisure loop - summer flight", bidder: "Yas Tourism", campaign: "Yas leisure flight", zone: "Yas Island", amountAed: 225000, submittedAt: "2026-05-28T10:24:00Z", result: "Won" },
+  { id: "HB-9005", lotId: "LOT-4402", lotName: "Yas leisure loop - summer flight", bidder: "Royal Safari", campaign: "Desert evening", zone: "Yas Island", amountAed: 220000, submittedAt: "2026-05-28T09:56:00Z", result: "Outbid" },
+  { id: "HB-9006", lotId: "LOT-4397", lotName: "Airport gantry arrival", bidder: "Abu Dhabi Duty Free", campaign: "Arrival retail", zone: "Airport route", amountAed: 398000, submittedAt: "2026-04-18T13:05:00Z", result: "Won" },
+];
+
+export const historicalRuns: HistoricalRun[] = [
+  { id: "HR-001", type: "Playback", subject: "Road safety rotation", assetId: "AD-HWY-001", startedAt: "2026-07-02T08:00:00Z", endedAt: "2026-07-02T20:00:00Z", status: "Completed", summary: "12,480 plays completed with signed proof packets" },
+  { id: "HR-002", type: "Proof-of-play", subject: "Weekend mall offer", assetId: "AD-DWT-011", startedAt: "2026-07-01T00:00:00Z", endedAt: "2026-07-01T23:59:00Z", status: "Issue found", summary: "Camera angle drift created one evidence gap, make-good recommended" },
+  { id: "HR-003", type: "Maintenance", subject: "Cooling fan stalled", assetId: "AD-BRG-014", startedAt: "2026-07-02T14:12:00Z", endedAt: "2026-07-02T16:45:00Z", status: "Escalated", summary: "Technician requested fan kit and controller thermal review" },
+  { id: "HR-004", type: "AI review", subject: "Airport retail launch", assetId: "CMS", startedAt: "2026-07-02T11:05:00Z", endedAt: "2026-07-02T11:07:00Z", status: "Completed", summary: "MediaGPT found bilingual copy acceptable, CTA legibility needs human check" },
+  { id: "HR-005", type: "Emergency", subject: "Weather alert broadcast", assetId: "Al Ain gateways", startedAt: "2026-07-01T17:30:00Z", endedAt: "2026-07-01T18:00:00Z", status: "Resolved", summary: "CAP payload validated and cached on highway assets" },
+  { id: "HR-006", type: "Playback", subject: "Yas summer promotion", assetId: "AD-BUS-022", startedAt: "2026-06-29T09:30:00Z", endedAt: "2026-06-29T23:00:00Z", status: "Completed", summary: "Tourism creative delivered 9,840 paired-panel plays" },
 ];
 
 export const tickets: Ticket[] = [
@@ -545,6 +613,16 @@ export const fieldTasks: FieldTask[] = [
   { id: "TSK-4403", title: "Edge controller restart", column: "In Progress", priority: "High", owner: "NOC operator", asset: "AD-HWY-009", due: "00:55" },
   { id: "TSK-4404", title: "Monthly brightness audit", column: "Completed", priority: "Low", owner: "Maintenance team", asset: "AD-HWY-001", due: "Yesterday" },
   { id: "TSK-4405", title: "Backup power test", column: "Overdue", priority: "High", owner: "O&M admin", asset: "AD-BUS-022", due: "Yesterday" },
+  { id: "TSK-4406", title: "Fan kit replacement", column: "Pending Assignment", priority: "High", owner: "Maintenance planner", asset: "AD-HWY-001", due: "02:10" },
+  { id: "TSK-4407", title: "Moisture sensor verification", column: "Pending Assignment", priority: "Medium", owner: "NOC operator", asset: "AD-HWY-009", due: "04:30" },
+  { id: "TSK-4408", title: "Door gasket replacement", column: "Pending Execution", priority: "Medium", owner: "Field technician", asset: "AD-BRG-014", due: "Today 18:00" },
+  { id: "TSK-4409", title: "PSU ripple measurement", column: "Pending Execution", priority: "Critical", owner: "Electrical team", asset: "AD-HWY-001", due: "Today 20:00" },
+  { id: "TSK-4410", title: "Router warranty swap", column: "In Progress", priority: "Medium", owner: "Vendor manager", asset: "AD-DWT-011", due: "Tomorrow" },
+  { id: "TSK-4411", title: "Panel pixel batch test", column: "In Progress", priority: "Low", owner: "Depot QA", asset: "AD-AIN-052", due: "Tomorrow" },
+  { id: "TSK-4412", title: "Night luminance validation", column: "Completed", priority: "Low", owner: "Verification team", asset: "AD-HWY-001", due: "Yesterday" },
+  { id: "TSK-4413", title: "Emergency UPS runtime test", column: "Completed", priority: "Medium", owner: "O&M admin", asset: "AD-BRG-014", due: "Jun 30" },
+  { id: "TSK-4414", title: "Unlatched cabinet closure", column: "Overdue", priority: "Critical", owner: "Field dispatch", asset: "AD-HWY-001", due: "2h overdue" },
+  { id: "TSK-4415", title: "Signal loss root-cause review", column: "Overdue", priority: "High", owner: "Network operations", asset: "AD-HWY-009", due: "Yesterday" },
 ];
 
 export const mediaAssets: MediaAsset[] = [
@@ -553,6 +631,13 @@ export const mediaAssets: MediaAsset[] = [
   { id: "MED-003", title: "Retail launch hero", type: "Image", tags: ["commercial", "airport"], status: "Rejected", owner: "Retail advertiser", updated: "22:30" },
   { id: "MED-004", title: "Yas live stream slate", type: "Live Stream", tags: ["tourism", "hls"], status: "Approved", owner: "Yas Tourism", updated: "21:14" },
   { id: "MED-005", title: "CSC evidence pack", type: "Document", tags: ["governance", "security"], status: "Approved", owner: "Security PMO", updated: "20:04" },
+  { id: "MED-006", title: "Eid family retail banner", type: "Image", tags: ["retail", "holiday", "family"], status: "Approved", owner: "Retail Majlis", updated: "19:42" },
+  { id: "MED-007", title: "Abu Dhabi duty free logo pack", type: "Image", tags: ["airport", "brand", "bilingual"], status: "Approved", owner: "Airport Retail", updated: "18:36" },
+  { id: "MED-008", title: "Yas Island coaster creative", type: "Image", tags: ["tourism", "yas", "leisure"], status: "Approved", owner: "Yas Tourism", updated: "18:05" },
+  { id: "MED-009", title: "Coca-Cola national day creative", type: "Image", tags: ["commercial", "national-day", "beverage"], status: "Pending Review", owner: "Beverage advertiser", updated: "17:44" },
+  { id: "MED-010", title: "Experience Abu Dhabi desert visual", type: "Image", tags: ["tourism", "destination", "desert"], status: "Approved", owner: "Tourism partner", updated: "16:10" },
+  { id: "MED-011", title: "Ramadan Kareem campaign board", type: "Image", tags: ["ramadan", "cultural", "bilingual"], status: "Pending Review", owner: "Civic studio", updated: "15:52" },
+  { id: "MED-012", title: "Royal safari destination banner", type: "Image", tags: ["tourism", "desert", "premium"], status: "Approved", owner: "Destination partner", updated: "14:20" },
 ];
 
 export const aiAudits: AiAudit[] = [
@@ -1127,11 +1212,11 @@ export interface AgentDecision {
 }
 
 export const agentDecisions: AgentDecision[] = [
-  { id: "DEC-9001", agentId: "AG-TRIAGE", trigger: "New submission · Holiday public notice", status: "Completed", confidence: "98%", steps: [{ tool: "Brand-safety scan", state: "ok" }, { tool: "Sensitive-content detector", state: "ok" }, { tool: "Stage router", state: "ok" }], tokens: "2,450", latency: "120 ms", time: "Just now" },
-  { id: "DEC-9002", agentId: "AG-TRIAGE", trigger: "New submission · Retail launch hero", status: "Awaiting approval", confidence: "72%", steps: [{ tool: "Brand-safety scan", state: "ok" }, { tool: "Sensitive-content detector", state: "error" }, { tool: "Stage router", state: "pending" }], tokens: "2,980", latency: "180 ms", time: "2 min ago" },
-  { id: "DEC-9003", agentId: "AG-PROOF", trigger: "Pre dual-control · New product launch", status: "Awaiting approval", confidence: "88%", steps: [{ tool: "RTL layout check", state: "ok" }, { tool: "Copy compliance", state: "error" }], tokens: "1,910", latency: "210 ms", time: "8 min ago" },
-  { id: "DEC-9004", agentId: "AG-EMERGENCY", trigger: "CAP-UAE alert · Weather warning", status: "Awaiting approval", confidence: "100%", steps: [{ tool: "CAP-UAE parser", state: "ok" }, { tool: "AR/EN generator", state: "ok" }, { tool: "Authority validator", state: "pending" }], tokens: "3,120", latency: "1.2 s", time: "6 min ago" },
-  { id: "DEC-9005", agentId: "AG-ALARM", trigger: "Sensor spike · Mussafah AD-BRG-014", status: "Completed", confidence: "96%", steps: [{ tool: "Anomaly model", state: "ok" }, { tool: "Dedup engine", state: "ok" }, { tool: "Dispatch recommender", state: "ok" }], tokens: "1,240", latency: "95 ms", time: "24 min ago" },
-  { id: "DEC-9006", agentId: "AG-EDGE", trigger: "Peak forecast · Yas Island", status: "Completed", confidence: "99%", steps: [{ tool: "Demand forecast", state: "ok" }, { tool: "Edge pre-cache", state: "ok" }], tokens: "880", latency: "60 ms", time: "11 min ago" },
-  { id: "DEC-9007", agentId: "AG-AUDIENCE", trigger: "Hourly estimate · Downtown Mall", status: "Completed", confidence: "93%", steps: [{ tool: "Anonymised vision", state: "ok" }, { tool: "Privacy filter", state: "ok" }, { tool: "Reach aggregator", state: "ok" }], tokens: "1,020", latency: "70 ms", time: "31 min ago" },
+  { id: "DEC-9001", agentId: "AG-TRIAGE", trigger: "New submission | Holiday public notice", status: "Completed", confidence: "98%", steps: [{ tool: "Brand-safety scan", state: "ok" }, { tool: "Sensitive-content detector", state: "ok" }, { tool: "Stage router", state: "ok" }], tokens: "2,450", latency: "120 ms", time: "Just now" },
+  { id: "DEC-9002", agentId: "AG-TRIAGE", trigger: "New submission | Retail launch hero", status: "Awaiting approval", confidence: "72%", steps: [{ tool: "Brand-safety scan", state: "ok" }, { tool: "Sensitive-content detector", state: "error" }, { tool: "Stage router", state: "pending" }], tokens: "2,980", latency: "180 ms", time: "2 min ago" },
+  { id: "DEC-9003", agentId: "AG-PROOF", trigger: "Pre dual-control | New product launch", status: "Awaiting approval", confidence: "88%", steps: [{ tool: "RTL layout check", state: "ok" }, { tool: "Copy compliance", state: "error" }], tokens: "1,910", latency: "210 ms", time: "8 min ago" },
+  { id: "DEC-9004", agentId: "AG-EMERGENCY", trigger: "CAP-UAE alert | Weather warning", status: "Awaiting approval", confidence: "100%", steps: [{ tool: "CAP-UAE parser", state: "ok" }, { tool: "AR/EN generator", state: "ok" }, { tool: "Authority validator", state: "pending" }], tokens: "3,120", latency: "1.2 s", time: "6 min ago" },
+  { id: "DEC-9005", agentId: "AG-ALARM", trigger: "Sensor spike | Mussafah AD-BRG-014", status: "Completed", confidence: "96%", steps: [{ tool: "Anomaly model", state: "ok" }, { tool: "Dedup engine", state: "ok" }, { tool: "Dispatch recommender", state: "ok" }], tokens: "1,240", latency: "95 ms", time: "24 min ago" },
+  { id: "DEC-9006", agentId: "AG-EDGE", trigger: "Peak forecast | Yas Island", status: "Completed", confidence: "99%", steps: [{ tool: "Demand forecast", state: "ok" }, { tool: "Edge pre-cache", state: "ok" }], tokens: "880", latency: "60 ms", time: "11 min ago" },
+  { id: "DEC-9007", agentId: "AG-AUDIENCE", trigger: "Hourly estimate | Downtown Mall", status: "Completed", confidence: "93%", steps: [{ tool: "Anonymised vision", state: "ok" }, { tool: "Privacy filter", state: "ok" }, { tool: "Reach aggregator", state: "ok" }], tokens: "1,020", latency: "70 ms", time: "31 min ago" },
 ];

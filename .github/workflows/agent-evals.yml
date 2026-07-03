@@ -1,0 +1,41 @@
+name: Agent hardening checks
+
+on:
+  pull_request:
+    paths:
+      - "src/backend/openai.ts"
+      - "src/backend/agent-*.ts"
+      - "src/routes/api/dooh/$.ts"
+      - "promptfoo.config.yaml"
+      - "evals/**"
+      - "package.json"
+  push:
+    branches: ["main"]
+    paths:
+      - "src/backend/openai.ts"
+      - "src/backend/agent-*.ts"
+      - "src/routes/api/dooh/$.ts"
+      - "promptfoo.config.yaml"
+      - "evals/**"
+      - "package.json"
+
+jobs:
+  build-and-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run MediaGPT agent evals
+        if: ${{ secrets.OPENAI_API_KEY != '' }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          EVAL_BASE_URL: http://127.0.0.1:5191
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5191 &
+          npx wait-on http://127.0.0.1:5191
+          npm run eval:agent
