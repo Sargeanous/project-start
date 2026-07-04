@@ -7192,3 +7192,14 @@ html[dir="rtl"] .network-tabs button.active {
 .kill-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .kill-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #b3261e; background: #fdecea; border-radius: 999px; padding: 3px 6px 3px 10px; }
 .kill-chip button { border: none; background: rgba(179,38,30,0.15); color: #b3261e; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; line-height: 1; }
+
+
+/* Queue filters + pager */
+.queue-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.queue-filters label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+.queue-filters select, .queue-filters input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; background: #fff; }
+.queue-search { flex: 1; min-width: 180px; }
+.queue-search input { width: 100%; }
+.queue-count { align-self: center; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; }
+.pager span { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }

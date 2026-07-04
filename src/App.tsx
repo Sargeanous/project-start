@@ -1023,6 +1023,14 @@ const translations: Record<string, string> = {
   "Field team dispatched to open alarms": "تم إرسال الفريق الميداني للتنبيهات المفتوحة",
   "Schedule frozen. New publishes are blocked.": "تم تجميد الجدول. النشر الجديد محظور.",
   "Bid approvals queue": "قائمة اعتماد العروض",
+  "Search": "بحث",
+  "Campaign or bidder": "الحملة أو المزايد",
+  "of": "من",
+  "No approvals match the current filters.": "لا توجد اعتمادات مطابقة للمرشحات الحالية.",
+  "Previous": "السابق",
+  "Next": "التالي",
+  "Page": "صفحة",
+  "Elevated": "مرتفع",
   "Amount": "المبلغ",
   "Margin": "الهامش",
   "Risk": "المخاطرة",
@@ -1037,7 +1045,6 @@ const translations: Record<string, string> = {
   "Rejected": "مرفوض",
   "Low": "منخفض",
   "Medium": "متوسط",
-  "Elevated": "مرتفع",
   "Rate card overrides": "استثناءات بطاقة الأسعار",
   "MediaGPT deep-scan": "الفحص العميق من ميديا جي بي تي",
   "Re-run scan": "إعادة تشغيل الفحص",
@@ -1797,7 +1804,6 @@ const translations: Record<string, string> = {
   "first approval recorded, second approver required": "تم تسجيل الاعتماد الأول، يلزم معتمد ثانٍ",
   "Revision resubmitted": "أُعيد تقديم التعديل",
   "MFA": "تحقق ثنائي",
-  "Next": "التالي",
   "SLA due": "استحقاق مستوى الخدمة",
   "v": "إصدار ",
   "hash": "بصمة",
@@ -7578,6 +7584,116 @@ function AuctionDesk({
   );
 }
 
+const APPROVALS_PER_PAGE = 10;
+const RISK_TONE_MAP: Record<string, Tone> = { Low: "good", Medium: "warn", Elevated: "danger" };
+const APPROVAL_STATE_TONE: Record<string, Tone> = { Approved: "good", Rejected: "danger", "On hold": "warn", Pending: "info" };
+
+function BidApprovalsQueue({
+  approvals,
+  onDecision,
+  t,
+}: {
+  approvals: FinanceApproval[];
+  onDecision: (id: string, state: FinanceApproval["state"]) => void;
+  t: (value: string) => string;
+}) {
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [riskFilter, setRiskFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filtered = approvals.filter((row) => {
+    if (statusFilter !== "All" && row.state !== statusFilter) return false;
+    if (riskFilter !== "All" && row.risk !== riskFilter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      if (!`${row.campaign} ${row.bidder} ${row.packageName}`.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+  const pageCount = Math.max(1, Math.ceil(filtered.length / APPROVALS_PER_PAGE));
+  const current = Math.min(page, pageCount);
+  const pageRows = filtered.slice((current - 1) * APPROVALS_PER_PAGE, current * APPROVALS_PER_PAGE);
+  const pendingCount = approvals.filter((r) => r.state === "Pending").length;
+
+  // Reset to page 1 whenever a filter changes.
+  useEffect(() => { setPage(1); }, [statusFilter, riskFilter, search]);
+
+  return (
+    <Panel icon={ShieldCheck} title={t("Bid approvals queue")} action={<StatusPill label={`${pendingCount} ${t("pending")}`} tone={pendingCount ? "warn" : "good"} />}>
+      <div className="queue-filters">
+        <label>{t("Status")}
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            {["All", "Pending", "Approved", "On hold", "Rejected"].map((o) => <option key={o} value={o}>{t(o)}</option>)}
+          </select>
+        </label>
+        <label>{t("Risk")}
+          <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)}>
+            {["All", "Low", "Medium", "Elevated"].map((o) => <option key={o} value={o}>{t(o)}</option>)}
+          </select>
+        </label>
+        <label className="queue-search">{t("Search")}
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Campaign or bidder")} />
+        </label>
+        <span className="queue-count">{filtered.length} {t("of")} {approvals.length}</span>
+      </div>
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("Campaign")}</th>
+              <th>{t("Bidder")}</th>
+              <th>{t("Amount")}</th>
+              <th>{t("Margin")}</th>
+              <th>{t("Risk")}</th>
+              <th>{t("Decision")}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.id}>
+                <td data-label={t("Campaign")}><strong>{t(row.campaign)}</strong><span>{t(row.packageName)}</span></td>
+                <td data-label={t("Bidder")}>{t(row.bidder)}</td>
+                <td data-label={t("Amount")}>{t(row.amount)}</td>
+                <td data-label={t("Margin")}>{row.margin}</td>
+                <td data-label={t("Risk")}><StatusPill label={row.risk} tone={RISK_TONE_MAP[row.risk] ?? "warn"} /></td>
+                <td data-label={t("Decision")}><StatusPill label={row.state} tone={APPROVAL_STATE_TONE[row.state] ?? "info"} /></td>
+                <td>
+                  {row.state === "Pending" ? (
+                    <div className="row-actions">
+                      <Button onClick={() => onDecision(row.id, "Approved")}>{t("Approve")}</Button>
+                      <Button variant="secondary" onClick={() => onDecision(row.id, "On hold")}>{t("Hold")}</Button>
+                      <Button variant="secondary" onClick={() => onDecision(row.id, "Rejected")}>{t("Reject")}</Button>
+                    </div>
+                  ) : (
+                    <Button variant="secondary" onClick={() => onDecision(row.id, "Pending")}>{t("Re-open")}</Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!pageRows.length ? (
+              <tr><td colSpan={7}><p className="cell-note">{t("No approvals match the current filters.")}</p></td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      {pageCount > 1 ? (
+        <div className="pager">
+          <Button variant="secondary" disabled={current <= 1} onClick={() => setPage(current - 1)}>{t("Previous")}</Button>
+          <span>{t("Page")} {current} {t("of")} {pageCount}</span>
+          <Button variant="secondary" disabled={current >= pageCount} onClick={() => setPage(current + 1)}>{t("Next")}</Button>
+        </div>
+      ) : null}
+      <CollapsibleIntelligenceCitations
+        ruleIds={["RULE-COM-001", "RULE-COM-002", "RULE-COM-003", "RULE-AI-001"]}
+        sourceIds={["KB-COM-001", "KB-COM-002", "KB-COM-003", "KB-AI-001"]}
+        action="Send finance review"
+      />
+    </Panel>
+  );
+}
+
 function FinancialsPage({
   approvals,
   auctions,
@@ -7648,51 +7764,7 @@ function FinancialsPage({
         <Metric label="Pending approvals" value={String(approvals.filter((a) => a.state === "Pending").length)} helper="Finance sign-off" tone={approvals.filter((a) => a.state === "Pending").length ? "warn" : "good"} />
       </MetricGrid>
 
-      <Panel icon={ShieldCheck} title={t("Bid approvals queue")}>
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>{t("Campaign")}</th>
-                <th>{t("Bidder")}</th>
-                <th>{t("Amount")}</th>
-                <th>{t("Margin")}</th>
-                <th>{t("Risk")}</th>
-                <th>{t("Decision")}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvals.map((row) => (
-                <tr key={row.id}>
-                  <td data-label={t("Campaign")}><strong>{t(row.campaign)}</strong><span>{t(row.packageName)}</span></td>
-                  <td data-label={t("Bidder")}>{t(row.bidder)}</td>
-                  <td data-label={t("Amount")}>{t(row.amount)}</td>
-                  <td data-label={t("Margin")}>{row.margin}</td>
-                  <td data-label={t("Risk")}><StatusPill label={row.risk} tone={row.risk === "Low" ? "good" : row.risk === "Medium" ? "warn" : "danger"} /></td>
-                  <td data-label={t("Decision")}><StatusPill label={row.state} tone={row.state === "Approved" ? "good" : row.state === "Rejected" ? "danger" : row.state === "On hold" ? "warn" : "info"} /></td>
-                  <td>
-                    {row.state === "Pending" ? (
-                      <div className="row-actions">
-                        <Button onClick={() => onDecision(row.id, "Approved")}>{t("Approve")}</Button>
-                        <Button variant="secondary" onClick={() => onDecision(row.id, "On hold")}>{t("Hold")}</Button>
-                        <Button variant="secondary" onClick={() => onDecision(row.id, "Rejected")}>{t("Reject")}</Button>
-                      </div>
-                    ) : (
-                      <Button variant="secondary" onClick={() => onDecision(row.id, "Pending")}>{t("Re-open")}</Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <CollapsibleIntelligenceCitations
-          ruleIds={["RULE-COM-001", "RULE-COM-002", "RULE-COM-003", "RULE-AI-001"]}
-          sourceIds={["KB-COM-001", "KB-COM-002", "KB-COM-003", "KB-AI-001"]}
-          action="Send finance review"
-        />
-      </Panel>
+      <BidApprovalsQueue approvals={approvals} onDecision={onDecision} t={t} />
 
       <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} onReconcile={onReconcile} t={t} />
 
