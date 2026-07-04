@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
+import { assets as dataAssets } from "../data";
 import { evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
 
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
-type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
+type AlertState = "Check required" | "Checked" | "Approval required" | "Approved" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
 type Priority = "Low" | "Medium" | "High";
 type CampaignStatus = "Draft" | "Bidding" | "Submitted" | "In review" | "Changes requested" | "Approved" | "Scheduled" | "Published";
@@ -201,6 +202,8 @@ export interface PublishedItem {
   started: string;
 }
 
+export type AlertScopeMode = "zone" | "citywide";
+
 export interface EmergencyAlert {
   id: string;
   title: string;
@@ -211,6 +214,22 @@ export interface EmergencyAlert {
   endTime: string;
   state: AlertState;
   criticality: "Critical" | "Major" | "Minor";
+  // CAP-UAE fields (Tech Spec 10.7 / RFP NCM)
+  identifier?: string;
+  sender?: string;
+  area?: string;
+  severity?: "Extreme" | "Severe" | "Moderate" | "Minor";
+  urgency?: "Immediate" | "Expected" | "Future";
+  certainty?: "Observed" | "Likely" | "Possible";
+  headline?: string;
+  bodyEn?: string;
+  bodyAr?: string;
+  scopeMode?: AlertScopeMode;
+  targetAssets?: string[];
+  approvals?: ApprovalSignature[];
+  ackBy?: string[];
+  deadlineAt?: string; // preemption countdown target
+  capIdentifier?: string;
 }
 
 export interface VerificationStep {
@@ -340,6 +359,17 @@ export interface AlertDraft {
   scope: string;
   content: string;
   criticality: "Critical" | "Major" | "Minor";
+  identifier?: string;
+  sender?: string;
+  area?: string;
+  severity?: EmergencyAlert["severity"];
+  urgency?: EmergencyAlert["urgency"];
+  certainty?: EmergencyAlert["certainty"];
+  headline?: string;
+  bodyEn?: string;
+  bodyAr?: string;
+  scopeMode?: AlertScopeMode;
+  targetAssets?: string[];
 }
 
 const initialVerificationSteps: VerificationStep[] = [
@@ -1903,19 +1933,47 @@ export async function playScheduleItem(id: string, actor: string): Promise<DoohS
   });
 }
 
+// Map a CAP area / scope text to concrete asset IDs (routing input for the
+// operator to accept or adjust; AI only explains, never auto-applies).
+export function zonesToAssetIds(areaOrZone: string): string[] {
+  const needle = (areaOrZone || "").toLowerCase();
+  if (!needle || needle.includes("estate") || needle.includes("citywide") || needle.includes("all")) {
+    return dataAssets.map((asset) => asset.id);
+  }
+  return dataAssets
+    .filter((asset) => needle.includes(asset.zone.toLowerCase()) || asset.zone.toLowerCase().includes(needle) || needle.includes(asset.id.toLowerCase()))
+    .map((asset) => asset.id);
+}
+
 export async function createAlert(payload: AlertDraft, actor: string): Promise<{ state: DoohState; alert: EmergencyAlert }> {
   let alert!: EmergencyAlert;
   const state = await commit((draft) => {
+    const scopeMode: AlertScopeMode = payload.scopeMode ?? (/(citywide|estate|all)/i.test(payload.area || payload.scope || "") ? "citywide" : "zone");
+    const targets = payload.targetAssets?.length ? payload.targetAssets : zonesToAssetIds(payload.area || payload.scope || "");
     alert = {
       id: nextId("ALT", draft.alerts),
-      title: payload.title.trim(),
-      scope: payload.scope || "Estate-wide",
-      authority: actor || "Duty officer",
-      sla: payload.criticality === "Critical" ? "Display within 60s" : "Display within 5m",
+      title: (payload.headline || payload.title).trim(),
+      scope: payload.scope || payload.area || "Estate-wide",
+      authority: payload.sender || actor || "NCEMA",
+      sla: scopeMode === "citywide" ? "Citywide display within 5m" : "Zone display within 2m",
       audience: "Public",
       endTime: "Default 2 hours",
       state: "Check required",
       criticality: payload.criticality,
+      identifier: payload.identifier,
+      capIdentifier: payload.identifier,
+      sender: payload.sender || "NCEMA",
+      area: payload.area || payload.scope,
+      severity: payload.severity,
+      urgency: payload.urgency,
+      certainty: payload.certainty,
+      headline: payload.headline || payload.title,
+      bodyEn: payload.bodyEn || payload.content,
+      bodyAr: payload.bodyAr,
+      scopeMode,
+      targetAssets: targets,
+      approvals: [],
+      ackBy: [],
     };
     draft.alerts = [alert, ...draft.alerts];
     draft.verificationSteps = cloneState({ ...initialState, verificationSteps: initialVerificationSteps }).verificationSteps;
@@ -1950,12 +2008,64 @@ export async function runEmergencyChecks(id: string, actor: string): Promise<Doo
   });
 }
 
+// Human-gated approval of an emergency alert (RFP NCM + APP-009). NCEMA content
+// is never modified; a NAMED approver signs off, and citywide scope requires
+// DUAL CONTROL (two distinct MFA-verified approvers) before go-live.
+export async function approveEmergencyAlert(
+  payload: { id: string; approverName: string; role: string; mfaVerified?: boolean },
+  actor: string,
+): Promise<{ state: DoohState; alert: EmergencyAlert; pendingSecondApproval: boolean }> {
+  let alert!: EmergencyAlert;
+  let pendingSecondApproval = false;
+  const state = await commit((draft) => {
+    const item = draft.alerts.find((entry) => entry.id === payload.id);
+    if (!item) throw new Error("Alert not found");
+    if (item.state !== "Approval required" && item.state !== "Checked") {
+      throw new Error(`Alert ${item.id} is ${item.state}; approval requires completed checks`);
+    }
+    const approver = namedApprovers.find((entry) => entry.name === payload.approverName);
+    if (!approver) throw new Error(`${payload.approverName} is not a named approver`);
+    if (!payload.mfaVerified) throw new Error("MFA step-up required to approve an emergency broadcast");
+    item.approvals = item.approvals ?? [];
+    if (item.approvals.some((signature) => signature.name === payload.approverName)) {
+      throw new Error(`${payload.approverName} has already signed; dual control requires a different approver`);
+    }
+    item.approvals = [...item.approvals, { name: payload.approverName, role: approver.role, at: formatNow(), mfa: true }];
+    const needed = item.scopeMode === "citywide" ? 2 : 1;
+    if (item.approvals.length < needed) {
+      pendingSecondApproval = true;
+      addNotification(draft, {
+        title: "Second emergency approval required",
+        body: `${item.title} (citywide) has 1 of 2 required approvals.`,
+        subject: item.title,
+        recipients: ["control-room", "admin"],
+        page: "alerts",
+        tone: "action",
+      });
+      addActivity(draft, actor, "Recorded first emergency approval", item.title);
+      alert = { ...item };
+      return;
+    }
+    item.state = "Approved";
+    addNotification(draft, {
+      title: "Emergency alert approved",
+      body: `${item.title} approved by ${item.approvals.map((s) => s.name).join(" + ")}. Ready to broadcast.`,
+      subject: item.title,
+      recipients: ["control-room", "admin"],
+      page: "alerts",
+      tone: "warning",
+    });
+    addActivity(draft, actor, "Approved emergency alert", item.title);
+    alert = { ...item };
+  });
+  return { state, alert, pendingSecondApproval };
+}
+
 export async function queueEmergencyBroadcast(id: string, actor: string): Promise<DoohState> {
   return commit((draft) => {
     const alert = draft.alerts.find((item) => item.id === id);
     if (!alert) throw new Error("Alert not found");
-    const checked = draft.verificationSteps.every((step) => step.state === "Checked");
-    if (!checked) throw new Error("Checks must be completed before broadcast queue");
+    if (alert.state !== "Approved") throw new Error("Alert must be approved by a named approver before queueing");
     alert.state = "Broadcast queued";
     addNotification(draft, {
       title: "Emergency broadcast queued",
@@ -1973,35 +2083,52 @@ export async function broadcastEmergencyNow(id: string, actor: string): Promise<
   return commit((draft) => {
     const alert = draft.alerts.find((item) => item.id === id);
     if (!alert) throw new Error("Alert not found");
-    const checked = draft.verificationSteps.every((step) => step.state === "Checked");
-    if (!checked) throw new Error("Checks must be completed before broadcast");
-    alert.state = "Live on network";
-    draft.published = [
-      {
-        id: nextId("PUB", draft.published),
-        campaign: alert.title,
-        asset: alert.scope,
+    if (alert.state !== "Approved" && alert.state !== "Broadcast queued") {
+      throw new Error("Emergency broadcast requires named-approver sign-off first");
+    }
+    const targets = alert.targetAssets?.length ? alert.targetAssets : zonesToAssetIds(alert.area || alert.scope);
+    // Rules engine at emergency targeting: Emergency tier outranks commercial
+    // proximity/zoning blocks (Tech Spec 10.5) - recorded as an override event.
+    const verdict = evaluateRules({ kind: "emergency", assetIds: targets, requesterTier: "Emergency" });
+    recordEnforcement(draft, { kind: "emergency", subject: alert.title, verdict, actor });
+
+    alert.state = "Broadcasting";
+    const deadlineMs = (alert.scopeMode === "citywide" ? 5 : 2) * 60_000;
+    alert.deadlineAt = new Date(Date.now() + deadlineMs).toISOString();
+
+    for (const assetId of targets) {
+      draft.published = [
+        { id: nextId("PUB", draft.published), campaign: alert.title, asset: assetId, creativeId: "weather-alert", started: "Now" },
+        ...draft.published,
+      ];
+      appendPopRecord(draft, {
+        assetId,
+        campaign: `${alert.title} [${alert.capIdentifier ?? alert.id}]`,
         creativeId: "weather-alert",
-        started: "Now",
-      },
-      ...draft.published,
-    ];
-    appendPopRecord(draft, {
-      assetId: alert.scope,
-      campaign: alert.title,
-      creativeId: "weather-alert",
-      kind: "emergency",
-      scheduledAt: "Immediate override",
-    });
+        kind: "emergency",
+        scheduledAt: "Immediate override",
+      });
+    }
     addNotification(draft, {
-      title: "Emergency live",
-      body: `${alert.title} is live on the DOOH network.`,
+      title: "Emergency live - preempting content",
+      body: `${alert.title} is live on ${targets.length} asset(s), approved by ${(alert.approvals ?? []).map((s) => s.name).join(" + ") || actor}. CAP ${alert.capIdentifier ?? alert.id}.`,
       subject: alert.title,
-      recipients: ["control-room", "admin"],
+      recipients: ["control-room", "admin", "reviewer"],
       page: "alerts",
       tone: "critical",
     });
     addActivity(draft, actor, "Broadcast emergency alert", alert.title);
+  });
+}
+
+export async function acknowledgeAlert(id: string, actor: string): Promise<DoohState> {
+  return commit((draft) => {
+    const alert = draft.alerts.find((item) => item.id === id);
+    if (!alert) throw new Error("Alert not found");
+    alert.ackBy = alert.ackBy ?? [];
+    if (!alert.ackBy.includes(actor)) alert.ackBy = [...alert.ackBy, actor];
+    if (alert.state === "Broadcasting") alert.state = "Live on network";
+    addActivity(draft, actor, "Acknowledged emergency alert", alert.title);
   });
 }
 

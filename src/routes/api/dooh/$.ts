@@ -41,6 +41,9 @@ import {
   approveSubmission,
   resubmitSubmission,
   evaluateRulesPreview,
+  approveEmergencyAlert,
+  acknowledgeAlert,
+  zonesToAssetIds,
   verifyPopChain,
   playScheduleItem,
   queueEmergencyBroadcast,
@@ -319,6 +322,17 @@ export const Route = createFileRoute("/api/dooh/$")({
             return Response.json({ state: await broadcastEmergencyNow(segments[1], actor) });
           }
 
+          if (segments[0] === "alerts" && segments[2] === "approve") {
+            const approverName = stringValue(body.approverName, "");
+            if (!approverName) return jsonError("Approver name is required", 422);
+            const mfaVerified = /^[0-9]{6}$/.test(stringValue(body.mfaCode, ""));
+            return Response.json(await approveEmergencyAlert({ id: segments[1], approverName, role, mfaVerified }, actor));
+          }
+
+          if (segments[0] === "alerts" && segments[2] === "ack") {
+            return Response.json({ state: await acknowledgeAlert(segments[1], actor) });
+          }
+
           if (segments[0] === "alerts" && segments[2] === "reset") {
             return Response.json({ state: await resetEmergencyAlert(segments[1], actor) });
           }
@@ -590,6 +604,41 @@ async function handleAiEndpoint(endpoint: string | undefined, request: Request) 
 
   if (endpoint === "moderateText") return moderateText(stringValue(body.text, ""));
   if (endpoint === "ttsBroadcast") return ttsBroadcast(stringValue(body.text, ""));
+
+  if (endpoint === "emergencyAssist") {
+    // Read-only assist for the NCEMA lane (RFP NCM): route + translation-parity
+    // + layout. AI NEVER modifies the alert content; it only proposes targets,
+    // flags parity gaps, and suggests layout.
+    const area = stringValue(body.area, "");
+    const bodyEn = stringValue(body.bodyEn, "");
+    const bodyAr = stringValue(body.bodyAr, "");
+    const proposedAssetIds = zonesToAssetIds(area);
+    const proposedAssets = proposedAssetIds.map((id) => {
+      const asset = assets.find((a) => a.id === id);
+      return asset ? { id, name: asset.name, zone: asset.zone } : { id, name: id, zone: "" };
+    });
+    const result = await callOpenAI({
+      system: aiSystem("You are a read-only emergency-alert reviewer. NEVER rewrite or translate the alert content; only report. Return strict JSON only: {\"parity\":boolean,\"parityIssues\":[\"...\"],\"layoutNote\":\"...\",\"routeRationale\":\"...\"}."),
+      user: [
+        "Review this CAP emergency alert for dissemination. Do not modify the content.",
+        `Area: ${area}`,
+        `English body: ${bodyEn}`,
+        `Arabic body: ${bodyAr || "(none provided)"}`,
+        `Proposed target assets: ${proposedAssets.map((a) => `${a.id} (${a.zone})`).join(", ")}`,
+        "Check: (1) EN/AR translation parity - same numbers, places, meaning; list discrepancies, do not fix them. (2) A layout note for roadside legibility at viewing distance. (3) A one-line rationale for the proposed routing.",
+      ].join("\n"),
+      json: true,
+      maxTokens: 400,
+    });
+    const fallback = {
+      parity: Boolean(bodyEn && bodyAr),
+      parityIssues: bodyAr ? [] : ["No Arabic body provided; Arabic-first parity cannot be confirmed."],
+      layoutNote: "Use a single high-contrast headline, max two lines, sans-serif, for legibility at highway distance.",
+      routeRationale: `Routed to ${proposedAssets.length} asset(s) matching the alert area.`,
+    };
+    const data = result.ok && "data" in result ? { ...(result.data as Record<string, unknown>) } : fallback;
+    return Response.json({ ...data, proposedAssets, source: result.ok ? result.source : "offline" });
+  }
 
   return jsonError("Unknown AI endpoint", 404);
 }

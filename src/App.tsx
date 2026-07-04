@@ -153,7 +153,7 @@ type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 type CmsTab = "submissions" | "library" | "scheduling";
 type NetworkTab = "assetOperations" | "maintenanceWorkbench" | "supplyChain";
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
-type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
+type AlertState = "Check required" | "Checked" | "Approval required" | "Approved" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
 interface Profile {
   id: ProfileId;
@@ -378,6 +378,8 @@ interface BidRecord {
   status: "Leading" | "Outbid";
 }
 
+type AlertScopeMode = "zone" | "citywide";
+
 interface EmergencyAlert {
   id: string;
   title: string;
@@ -388,6 +390,21 @@ interface EmergencyAlert {
   endTime: string;
   state: AlertState;
   criticality: "Critical" | "Major" | "Minor";
+  identifier?: string;
+  sender?: string;
+  area?: string;
+  severity?: "Extreme" | "Severe" | "Moderate" | "Minor";
+  urgency?: "Immediate" | "Expected" | "Future";
+  certainty?: "Observed" | "Likely" | "Possible";
+  headline?: string;
+  bodyEn?: string;
+  bodyAr?: string;
+  scopeMode?: AlertScopeMode;
+  targetAssets?: string[];
+  approvals?: ApprovalSignature[];
+  ackBy?: string[];
+  deadlineAt?: string;
+  capIdentifier?: string;
 }
 
 interface VerificationStep {
@@ -1688,6 +1705,49 @@ const translations: Record<string, string> = {
   "PROHIBITED_CATEGORY": "فئة محظورة",
   "SCHOOL_DAYPART_RESTRICTED": "قيود ساعات الدراسة",
   "SENSITIVE_ZONE_POLITICAL": "منطقة حساسة سياسياً",
+  "NCEMA CAP alerts": "تنبيهات NCEMA (CAP)",
+  "Ingest CAP alert": "استيراد تنبيه CAP",
+  "CAP identifier": "معرّف CAP",
+  "CAP ID": "معرّف CAP",
+  "CAP": "CAP",
+  "Sender": "المُرسِل",
+  "Area": "المنطقة",
+  "Zone or Citywide": "منطقة أو المدينة كاملة",
+  "Citywide": "المدينة كاملة",
+  "Severity": "الخطورة",
+  "Urgency": "الإلحاح",
+  "Certainty": "اليقين",
+  "Extreme": "أقصى",
+  "Severe": "شديد",
+  "Moderate": "متوسط",
+  "Immediate": "فوري",
+  "Expected": "متوقع",
+  "Future": "مستقبلي",
+  "Observed": "مُلاحَظ",
+  "Likely": "مرجّح",
+  "Possible": "ممكن",
+  "Headline": "العنوان الرئيسي",
+  "Severe dust storm - reduce speed": "عاصفة غبارية شديدة - خفّض السرعة",
+  "Body (English)": "النص (إنجليزي)",
+  "Body (Arabic)": "النص (عربي)",
+  "Ingest alert": "استيراد التنبيه",
+  "Targets": "الأهداف",
+  "Alert content originates from NCEMA and is never modified by AI.": "محتوى التنبيه صادر عن NCEMA ولا يُعدّله الذكاء الاصطناعي إطلاقاً.",
+  "AI dissemination assist (read-only)": "مساعدة النشر بالذكاء الاصطناعي (قراءة فقط)",
+  "Run AI assist": "تشغيل مساعدة الذكاء الاصطناعي",
+  "Translation parity OK": "تطابق الترجمة سليم",
+  "Parity issues": "مشاكل في التطابق",
+  "Routing": "التوجيه",
+  "Layout": "التنسيق",
+  "AI proposes targets, checks EN/AR parity, and suggests layout. It never edits the alert content.": "يقترح الذكاء الاصطناعي الأهداف، ويتحقق من تطابق العربية والإنجليزية، ويقترح التنسيق. لا يعدّل محتوى التنبيه أبداً.",
+  "Named-approver gate": "بوابة المعتمد المُسمّى",
+  "Citywide requires dual control (2 approvers + MFA)": "المدينة كاملة تتطلب رقابة مزدوجة (معتمدان + تحقق ثنائي)",
+  "Zone requires one named approver + MFA": "المنطقة تتطلب معتمداً واحداً + تحقق ثنائي",
+  "Broadcast now (preempt)": "بثّ الآن (تجاوز)",
+  "Display within": "العرض خلال",
+  "Preempting content on": "يتجاوز المحتوى على",
+  "Acknowledge": "إقرار",
+  "Acknowledged by": "أقرّه",
   "Stage journal": "سجل المراحل",
   "Named-approver decision": "قرار المعتمد المُسمّى",
   "Category": "الفئة",
@@ -2755,13 +2815,31 @@ function App() {
     if (result) notify("Schedule item is now playing");
   }
 
-  async function createEmergencyAlert(payload: { title: string; scope: string; content: string; criticality: EmergencyAlert["criticality"] }) {
+  async function createEmergencyAlert(payload: Record<string, unknown>) {
     const result = await syncMutation<{ state: DoohStatePayload; alert: EmergencyAlert }>("alerts", {
       actor: profile?.name ?? "Duty officer",
+      role: profile?.id ?? "control-room",
       payload,
     });
-    if (result) notify("Alert created and waiting for checks");
+    if (result) notify("CAP alert ingested and waiting for checks");
     return result?.alert ?? null;
+  }
+
+  async function approveAlert(id: string, approverName: string, mfaCode: string) {
+    const result = await syncMutation<{ state: DoohStatePayload; alert: EmergencyAlert; pendingSecondApproval: boolean }>(`alerts/${id}/approve`, {
+      actor: profile?.name ?? "Duty officer",
+      role: profile?.id ?? "control-room",
+      approverName,
+      mfaCode,
+    });
+    if (result) notify(result.pendingSecondApproval ? "First approval recorded, second approver required" : "Emergency alert approved");
+  }
+
+  async function ackAlert(id: string) {
+    const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/ack`, {
+      actor: profile?.name ?? "Duty officer",
+    });
+    if (result) notify("Emergency acknowledged");
   }
 
   async function runAlertChecks(id: string) {
@@ -2893,8 +2971,10 @@ function App() {
               steps={verificationSteps}
               onCreateAlert={createEmergencyAlert}
               onRunChecks={runAlertChecks}
+              onApproveAlert={approveAlert}
               onQueueBroadcast={queueAlertBroadcast}
               onBroadcastNow={broadcastAlertNow}
+              onAckAlert={ackAlert}
               onResetAlert={resetAlertChecks}
               aiAvailable={aiAvailable}
               t={t}
@@ -4225,30 +4305,64 @@ function SchedulingBoard({
   );
 }
 
+interface EmergencyAssist {
+  parity: boolean;
+  parityIssues: string[];
+  layoutNote: string;
+  routeRationale: string;
+  proposedAssets: Array<{ id: string; name: string; zone: string }>;
+  source?: string;
+}
+
+const emptyAlertDraft = {
+  identifier: "", sender: "NCEMA", area: "", scopeMode: "zone" as AlertScopeMode,
+  severity: "Severe", urgency: "Immediate", certainty: "Observed",
+  headline: "", bodyEn: "", bodyAr: "", criticality: "Critical",
+};
+
+function CountdownBadge({ deadlineAt, t }: { deadlineAt: string; t: (v: string) => string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const remaining = Math.max(0, Math.floor((new Date(deadlineAt).getTime() - now) / 1000));
+  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const ss = String(remaining % 60).padStart(2, "0");
+  return <span className={`emg-countdown ${remaining === 0 ? "done" : ""}`}>{remaining === 0 ? t("On network") : `${t("Display within")} ${mm}:${ss}`}</span>;
+}
+
 function AlertsPage({
   alerts,
   steps,
   onCreateAlert,
   onRunChecks,
+  onApproveAlert,
   onQueueBroadcast,
   onBroadcastNow,
+  onAckAlert,
   onResetAlert,
   aiAvailable,
   t,
 }: {
   alerts: EmergencyAlert[];
   steps: VerificationStep[];
-  onCreateAlert: (payload: { title: string; scope: string; content: string; criticality: EmergencyAlert["criticality"] }) => Promise<EmergencyAlert | null>;
+  onCreateAlert: (payload: Record<string, unknown>) => Promise<EmergencyAlert | null>;
   onRunChecks: (id: string) => void;
+  onApproveAlert: (id: string, approverName: string, mfaCode: string) => void;
   onQueueBroadcast: (id: string) => void;
   onBroadcastNow: (id: string) => void;
+  onAckAlert: (id: string) => void;
   onResetAlert: (id: string) => void;
   aiAvailable: boolean;
   t: (value: string) => string;
 }) {
   const [selectedAlertId, setSelectedAlertId] = useState(alerts[0]?.id ?? "");
-  const [draft, setDraft] = useState({ title: "", scope: "", content: "", criticality: "Major" });
-  const [drafting, setDrafting] = useState(false);
+  const [draft, setDraft] = useState({ ...emptyAlertDraft });
+  const [assist, setAssist] = useState<EmergencyAssist | null>(null);
+  const [assisting, setAssisting] = useState(false);
+  const [mfaApprover, setMfaApprover] = useState<string | null>(null);
+  const [pickApprover, setPickApprover] = useState("");
   const selected = alerts.find((alert) => alert.id === selectedAlertId) ?? alerts[0];
   const checked = steps.every((step) => step.state === "Checked");
 
@@ -4257,67 +4371,81 @@ function AlertsPage({
       setSelectedAlertId(alerts[0].id);
     }
   }, [alerts, selectedAlertId]);
+  useEffect(() => { setAssist(null); setPickApprover(""); setMfaApprover(null); }, [selectedAlertId]);
 
-  async function createAlert(event: FormEvent) {
+  async function ingestCap(event: FormEvent) {
     event.preventDefault();
-    if (!draft.title.trim()) return;
+    if (!draft.headline.trim()) return;
     const created = await onCreateAlert({
-      title: draft.title,
-      scope: draft.scope,
-      content: draft.content,
+      title: draft.headline,
+      headline: draft.headline,
+      scope: draft.area,
+      area: draft.area,
+      scopeMode: draft.scopeMode,
+      identifier: draft.identifier || `NCEMA-${Date.now().toString().slice(-6)}`,
+      sender: draft.sender,
+      severity: draft.severity,
+      urgency: draft.urgency,
+      certainty: draft.certainty,
+      bodyEn: draft.bodyEn,
+      bodyAr: draft.bodyAr,
+      content: draft.bodyEn,
       criticality: draft.criticality as EmergencyAlert["criticality"],
     });
     if (created) setSelectedAlertId(created.id);
-    setDraft({ title: "", scope: "", content: "", criticality: "Major" });
+    setDraft({ ...emptyAlertDraft });
   }
 
-  async function draftWithAi() {
-    setDrafting(true);
-    const result = await aiGenerateBroadcast({
-      brief: draft.content || draft.title || "Traffic safety notice for affected road users",
-      severity: draft.criticality,
-      zones: [draft.scope || selected?.scope || "Abu Dhabi City"],
-    });
-    setDraft((item) => ({
-      ...item,
-      title: item.title || "MediaGPT public notice",
-      content: [result.en, result.ar].filter(Boolean).join("\n\n"),
-    }));
-    setDrafting(false);
+  // Read-only AI assist: routing + translation parity + layout. Never edits content.
+  async function runAssist() {
+    if (!selected) return;
+    setAssisting(true);
+    try {
+      const response = await fetch("/api/dooh/ai/emergencyAssist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ area: selected.area || selected.scope, bodyEn: selected.bodyEn, bodyAr: selected.bodyAr }),
+      });
+      setAssist(await response.json());
+    } catch {
+      setAssist(null);
+    }
+    setAssisting(false);
   }
-
 
   if (!selected) return null;
+  const approvals = selected.approvals ?? [];
+  const neededApprovals = selected.scopeMode === "citywide" ? 2 : 1;
+  const canBroadcast = selected.state === "Approved" || selected.state === "Broadcast queued";
+  const approverOptions = namedApprovers.filter((a) => !approvals.some((s) => s.name === a.name));
 
   return (
     <PageBody>
       <MetricGrid>
         <Metric label="Ongoing alerts" value={String(alerts.length)} helper="Active or queued" tone="danger" />
-        <Metric label="SLA health" value="96%" helper="Emergency response" tone="good" />
-        <Metric label="Time to display" value="00:42" helper="Average last 24h" tone="info" />
-        <Metric label="Awaiting checks" value={String(alerts.filter((alert) => alert.state === "Check required").length)} helper="Needs action" tone="warn" />
+        <Metric label="Live broadcasts" value={String(alerts.filter((a) => a.state === "Broadcasting" || a.state === "Live on network").length)} helper="Preempting content" tone="info" />
+        <Metric label="Awaiting approval" value={String(alerts.filter((a) => a.state === "Approval required").length)} helper="Named approver gate" tone="warn" />
+        <Metric label="Awaiting checks" value={String(alerts.filter((a) => a.state === "Check required").length)} helper="Needs action" tone="warn" />
       </MetricGrid>
 
       <div className="split-grid wide-left">
-        <Panel icon={Bell} title="Active alerts">
+        <Panel icon={Bell} title={t("NCEMA CAP alerts")}>
           <div className="table-card">
             <table>
               <thead>
                 <tr>
                   <th>{t("Alert")}</th>
+                  <th>{t("CAP ID")}</th>
                   <th>{t("Scope")}</th>
-                  <th>{t("Authority")}</th>
-                  <th>{t("SLA")}</th>
                   <th>{t("Status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {alerts.map((alert) => (
                   <tr key={alert.id} className={alert.id === selected.id ? "selected-row" : ""} onClick={() => setSelectedAlertId(alert.id)}>
-                    <td data-label={t("Alert")}><strong>{t(alert.title)}</strong><span>{t(alert.audience)}</span></td>
-                    <td data-label={t("Scope")}>{t(alert.scope)}</td>
-                    <td data-label={t("Authority")}>{t(alert.authority)}</td>
-                    <td data-label={t("SLA")}>{t(alert.sla)}</td>
+                    <td data-label={t("Alert")}><strong>{t(alert.title)}</strong><span>{t(alert.sender ?? alert.authority)}</span></td>
+                    <td data-label={t("CAP ID")}><span className="cell-note">{alert.capIdentifier ?? alert.identifier ?? "-"}</span></td>
+                    <td data-label={t("Scope")}>{alert.scopeMode === "citywide" ? t("Citywide") : t(alert.scope)}</td>
                     <td data-label={t("Status")}><StatusPill label={alert.state} tone={alertTone(alert.state)} /></td>
                   </tr>
                 ))}
@@ -4326,80 +4454,125 @@ function AlertsPage({
           </div>
         </Panel>
 
-        <Panel icon={Megaphone} title={t("Create alert")}>
-          <form className="stack-form" onSubmit={createAlert}>
-            <label>
-              {t("Title")}
-              <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder={t("Weather alert broadcast")} />
-            </label>
-            <label>
-              {t("Scope")}
-              <input value={draft.scope} onChange={(event) => setDraft({ ...draft, scope: event.target.value })} placeholder={t("Al Ain gateways")} />
-            </label>
-            <label>
-              {t("Content")}
-              <textarea value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} placeholder={t("Arabic and English emergency message")} />
-            </label>
-            <label>
-              {t("Criticality")}
-              <select value={draft.criticality} onChange={(event) => setDraft({ ...draft, criticality: event.target.value })}>
-                <option value="Critical">{t("Critical")}</option>
-                <option value="Major">{t("Major")}</option>
-                <option value="Minor">{t("Minor")}</option>
-              </select>
-            </label>
+        <Panel icon={Megaphone} title={t("Ingest CAP alert")}>
+          <form className="stack-form" onSubmit={ingestCap}>
+            <div className="cap-grid">
+              <label>{t("CAP identifier")}<input value={draft.identifier} onChange={(e) => setDraft({ ...draft, identifier: e.target.value })} placeholder="NCEMA-2026-..." /></label>
+              <label>{t("Sender")}<input value={draft.sender} onChange={(e) => setDraft({ ...draft, sender: e.target.value })} /></label>
+              <label>{t("Area")}<input value={draft.area} onChange={(e) => setDraft({ ...draft, area: e.target.value })} placeholder={t("Zone or Citywide")} /></label>
+              <label>{t("Scope")}<select value={draft.scopeMode} onChange={(e) => setDraft({ ...draft, scopeMode: e.target.value as AlertScopeMode })}><option value="zone">{t("Zone")}</option><option value="citywide">{t("Citywide")}</option></select></label>
+              <label>{t("Severity")}<select value={draft.severity} onChange={(e) => setDraft({ ...draft, severity: e.target.value })}>{["Extreme","Severe","Moderate","Minor"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+              <label>{t("Urgency")}<select value={draft.urgency} onChange={(e) => setDraft({ ...draft, urgency: e.target.value })}>{["Immediate","Expected","Future"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+            </div>
+            <label>{t("Headline")}<input value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} placeholder={t("Severe dust storm - reduce speed")} /></label>
+            <div className="cap-bilingual">
+              <label>{t("Body (English)")}<textarea value={draft.bodyEn} onChange={(e) => setDraft({ ...draft, bodyEn: e.target.value })} /></label>
+              <label dir="rtl">{t("Body (Arabic)")}<textarea value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
+            </div>
             <ActionRow>
-              <Button type="button" icon={Sparkles} variant="secondary" disabled={!aiAvailable || drafting} onClick={draftWithAi}>{drafting ? t("Drafting") : t("Draft with AI")}</Button>
-              <Button type="submit">{t("Create alert")}</Button>
+              <Button type="submit" icon={ShieldAlert}>{t("Ingest alert")}</Button>
             </ActionRow>
           </form>
         </Panel>
       </div>
 
-      <Panel icon={ShieldAlert} title={selected.title} action={<StatusPill label={checked ? "Ready for approval" : selected.state} tone={checked ? "good" : alertTone(selected.state)} />}>
+      <Panel icon={ShieldAlert} title={selected.title} action={<StatusPill label={selected.state} tone={alertTone(selected.state)} />}>
         <div className="selected-alert-summary">
-          <div>
-            <span>{t("Scope")}</span>
-            <strong>{t(selected.scope)}</strong>
-          </div>
-          <div>
-            <span>{t("Authority")}</span>
-            <strong>{t(selected.authority)}</strong>
-          </div>
-          <div>
-            <span>{t("SLA")}</span>
-            <strong>{t(selected.sla)}</strong>
-          </div>
-          <div>
-            <span>{t("Audience")}</span>
-            <strong>{t(selected.audience)}</strong>
-          </div>
+          <div><span>{t("CAP ID")}</span><strong>{selected.capIdentifier ?? selected.identifier ?? "-"}</strong></div>
+          <div><span>{t("Sender")}</span><strong>{t(selected.sender ?? selected.authority)}</strong></div>
+          <div><span>{t("Scope")}</span><strong>{selected.scopeMode === "citywide" ? t("Citywide") : t(selected.scope)}</strong></div>
+          <div><span>{t("Severity")}</span><strong>{t(selected.severity ?? selected.criticality)}</strong></div>
+          <div><span>{t("SLA")}</span><strong>{t(selected.sla)}</strong></div>
+          <div><span>{t("Targets")}</span><strong>{selected.targetAssets?.length ?? 0} {t("assets")}</strong></div>
         </div>
+
+        {selected.bodyEn || selected.bodyAr ? (
+          <div className="cap-bodies">
+            {selected.bodyEn ? <blockquote>{selected.bodyEn}</blockquote> : null}
+            {selected.bodyAr ? <blockquote dir="rtl">{selected.bodyAr}</blockquote> : null}
+            <small>{t("Alert content originates from NCEMA and is never modified by AI.")}</small>
+          </div>
+        ) : null}
+
+        <div className="emg-assist">
+          <div className="emg-assist-head">
+            <strong>{t("AI dissemination assist (read-only)")}</strong>
+            <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || assisting} onClick={runAssist}>{assisting ? t("Analyzing") : t("Run AI assist")}</Button>
+          </div>
+          {assist ? (
+            <div className="emg-assist-body">
+              <div className="emg-assist-row">
+                <StatusPill label={assist.parity ? t("Translation parity OK") : t("Parity issues")} tone={assist.parity ? "good" : "warn"} />
+                {assist.parityIssues?.length ? <span className="cell-note">{assist.parityIssues.join("; ")}</span> : null}
+              </div>
+              <p className="cell-note"><strong>{t("Routing")}:</strong> {assist.routeRationale} ({assist.proposedAssets?.length ?? 0} {t("assets")})</p>
+              <p className="cell-note"><strong>{t("Layout")}:</strong> {assist.layoutNote}</p>
+            </div>
+          ) : <p className="cell-note">{t("AI proposes targets, checks EN/AR parity, and suggests layout. It never edits the alert content.")}</p>}
+        </div>
+
         <div className="verification-grid ai-intervention-box">
           {steps.map((step, index) => (
             <article key={step.label} className="verification-step">
               <span>{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <strong>{t(step.label)}</strong>
-                <small>{t(step.owner)}</small>
-              </div>
+              <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
               <StatusPill label={step.state} tone={step.state === "Checked" ? "good" : "warn"} />
             </article>
           ))}
         </div>
+
+        {selected.state === "Approval required" || approvals.length ? (
+          <div className="approvals-panel">
+            <div className="approvals-head">
+              <div>
+                <strong>{t("Named-approver gate")}</strong>
+                <span>{selected.scopeMode === "citywide" ? t("Citywide requires dual control (2 approvers + MFA)") : t("Zone requires one named approver + MFA")}</span>
+              </div>
+              <StatusPill label={`${approvals.length} / ${neededApprovals} ${t("approved")}`} tone={approvals.length >= neededApprovals ? "good" : "warn"} />
+            </div>
+            {approvals.length ? (
+              <div className="approvals-signatures">
+                {approvals.map((s) => <span key={s.name} className="approval-sig"><ShieldCheck size={14} /> {t(s.name)} · {t(s.role)} · {t("MFA")}</span>)}
+              </div>
+            ) : null}
+            {selected.state === "Approval required" ? (
+              <div className="approvals-action">
+                <label>{t("Approving as")}
+                  <select value={pickApprover} onChange={(e) => setPickApprover(e.target.value)}>
+                    <option value="">{t("Select a named approver")}</option>
+                    {approverOptions.map((a) => <option key={a.name} value={a.name}>{a.name} ({t(a.role)})</option>)}
+                  </select>
+                </label>
+                <Button icon={ShieldCheck} disabled={!pickApprover} onClick={() => setMfaApprover(pickApprover)}>{t("Approve with MFA")}</Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {selected.state === "Broadcasting" && selected.deadlineAt ? (
+          <div className="emg-live">
+            <CountdownBadge deadlineAt={selected.deadlineAt} t={t} />
+            <span className="cell-note">{t("Preempting content on")} {selected.targetAssets?.length ?? 0} {t("assets")} · {t("CAP")} {selected.capIdentifier}</span>
+            <Button icon={ShieldCheck} onClick={() => onAckAlert(selected.id)}>{t("Acknowledge")}</Button>
+          </div>
+        ) : null}
+        {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {selected.ackBy.map((a) => t(a)).join(", ")}</p> : null}
+
         <ActionRow>
-          <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button>
-          <Button variant="secondary" disabled={!checked} onClick={() => onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button>
-          <Button variant="secondary" disabled={!checked} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now")}</Button>
+          {selected.state === "Check required" ? <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button> : null}
+          {canBroadcast ? <Button icon={Megaphone} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now (preempt)")}</Button> : null}
           <Button variant="secondary" onClick={() => onResetAlert(selected.id)}>{t("Reset")}</Button>
         </ActionRow>
-        <CollapsibleIntelligenceCitations
-          ruleIds={["RULE-EMG-001", "RULE-EMG-002", "RULE-AI-001"]}
-          sourceIds={["KB-EMG-001", "KB-EMG-002", "KB-AI-001"]}
-          action={checked ? "Queue broadcast" : "Run MediaGPT checks"}
-        />
-
       </Panel>
+
+      {mfaApprover ? (
+        <MfaStepUpDialog
+          approverName={mfaApprover}
+          onCancel={() => setMfaApprover(null)}
+          onVerify={(code) => { onApproveAlert(selected.id, mfaApprover, code); setMfaApprover(null); setPickApprover(""); }}
+          t={t}
+        />
+      ) : null}
     </PageBody>
   );
 }
