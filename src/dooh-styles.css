@@ -5119,6 +5119,15 @@ html[dir="rtl"] .network-tabs button.active {
 .scenario-result {
   padding: 18px 16px 16px;
 }
+/* The MediaGPT card treatment gives .scenario-result a near-white indigo
+   background, so the earlier white text was invisible. Force dark text. */
+.scenario-result strong {
+  color: var(--ink, #16231f);
+}
+.scenario-result span {
+  color: var(--muted, #52514e);
+  opacity: 1;
+}
 
 .ai-recommendation {
   display: block;
