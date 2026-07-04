@@ -37,6 +37,8 @@ import {
   placeBid,
   closeAuction,
   confirmBookingPayment,
+  reconcileBooking,
+  verifyPopChain,
   playScheduleItem,
   queueEmergencyBroadcast,
   resetEmergencyAlert,
@@ -103,6 +105,9 @@ export const Route = createFileRoute("/api/dooh/$")({
         }
         if (segments[0] === "agent" && segments[1] === "policy" && segments[2] === "status") {
           return Response.json(await getPolicyVectorStatus());
+        }
+        if (segments[0] === "pop" && segments[1] === "verify") {
+          return Response.json(await verifyPopChain());
         }
         return jsonError("Unknown DOOH endpoint", 404);
       },
@@ -243,6 +248,12 @@ export const Route = createFileRoute("/api/dooh/$")({
             const payload = body.payload as { outcome?: "paid" | "failed" } | undefined;
             const outcome = payload?.outcome === "failed" ? "failed" : "paid";
             return Response.json(await confirmBookingPayment({ bookingId: segments[1], outcome }, actor));
+          }
+
+          if (segments[0] === "bookings" && segments[2] === "reconcile") {
+            const payload = body.payload as { step?: "bill" | "settle" } | undefined;
+            const step = payload?.step === "settle" ? "settle" : "bill";
+            return Response.json(await reconcileBooking({ bookingId: segments[1], step }, actor));
           }
 
           if (segments[0] === "schedule" && segments[2] === "play") {
@@ -581,6 +592,9 @@ function buildPlatformContext(state: Awaited<ReturnType<typeof getState>>) {
       fieldTasks: fieldTasks.slice(0, 6),
       financeApprovals: state.financeApprovals,
       proofRecords,
+      popLedger: state.popLedger.slice(-8),
+      bookings: state.bookings.slice(0, 6),
+      invoices: state.invoices.slice(0, 6),
       published: state.published,
     },
     estate: assets.map((asset) => ({ id: asset.id, name: asset.name, zone: asset.zone, status: asset.status, type: asset.type, controller: asset.controller, pop: asset.pop, tempC: asset.tempC })),

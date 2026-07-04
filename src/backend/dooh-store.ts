@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
 
@@ -132,6 +134,29 @@ export interface ScheduleItem {
   campaign: string;
   owner: string;
   state: ScheduleState;
+  submissionId?: string;
+}
+
+// Proof-of-play ledger (Tech Spec 10.3 / RFP POP): one record per playback
+// event, hash-chained so any tampering breaks verification.
+export type PopKind = "commercial" | "civic" | "emergency";
+
+export interface PopRecord {
+  id: string;
+  seq: number;
+  assetId: string;
+  campaign: string;
+  creativeId: string;
+  kind: PopKind;
+  scheduledAt: string;
+  playedAt: string;
+  brightness: string;
+  evidence: "TPM-signed (simulated)" | "Fallback";
+  thumbnailRef: string;
+  submissionId?: string;
+  bookingId?: string;
+  prevHash: string;
+  hash: string;
 }
 
 export interface PublishedItem {
@@ -231,6 +256,7 @@ export interface DoohState {
   bids: BidRecord[];
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
+  popLedger: PopRecord[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -424,6 +450,7 @@ const initialState: DoohState = {
   bids: [],
   bookings: [],
   invoices: [],
+  popLedger: [],
   alerts: [
     {
       id: "ALT-901",
@@ -593,6 +620,7 @@ function normalizeState(state: DoohState): DoohState {
     bidderMessages: state.bidderMessages ?? [],
     bookings: state.bookings ?? [],
     invoices: state.invoices ?? [],
+    popLedger: state.popLedger ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
     purchaseOrders: state.purchaseOrders ?? cloneState(initialState).purchaseOrders,
@@ -873,6 +901,106 @@ export async function placeBid(payload: { lotId: string; amount: number; campaig
   return { state, bid };
 }
 
+/* ---- Proof-of-play hash chain (Tech Spec 10.3) ---- */
+
+// Canonical payload: hashed fields are explicit so verification recomputes
+// exactly what was signed, independent of record key order.
+function popPayload(record: Omit<PopRecord, "hash">) {
+  return [record.prevHash, record.id, record.seq, record.assetId, record.campaign, record.creativeId, record.kind, record.scheduledAt, record.playedAt].join("|");
+}
+
+function appendPopRecord(
+  draft: DoohState,
+  entry: { assetId: string; campaign: string; creativeId: string; kind: PopKind; scheduledAt: string; submissionId?: string; bookingId?: string },
+): PopRecord {
+  const prevHash = draft.popLedger.length ? draft.popLedger[draft.popLedger.length - 1].hash : "GENESIS";
+  const base: Omit<PopRecord, "hash"> = {
+    id: nextId("POP", draft.popLedger),
+    seq: draft.popLedger.length + 1,
+    assetId: entry.assetId,
+    campaign: entry.campaign,
+    creativeId: entry.creativeId,
+    kind: entry.kind,
+    scheduledAt: entry.scheduledAt,
+    playedAt: formatNow(),
+    brightness: "Auto day profile",
+    evidence: "TPM-signed (simulated)",
+    thumbnailRef: entry.creativeId,
+    submissionId: entry.submissionId,
+    bookingId: entry.bookingId,
+    prevHash,
+  };
+  const record: PopRecord = { ...base, hash: createHash("sha256").update(popPayload(base)).digest("hex") };
+  draft.popLedger = [...draft.popLedger, record];
+  return record;
+}
+
+function verifyLedger(ledger: PopRecord[]): { valid: boolean; length: number; brokenAt: string | null } {
+  let prevHash = "GENESIS";
+  for (const record of ledger) {
+    if (record.prevHash !== prevHash) return { valid: false, length: ledger.length, brokenAt: record.id };
+    const recomputed = createHash("sha256").update(popPayload(record)).digest("hex");
+    if (recomputed !== record.hash) return { valid: false, length: ledger.length, brokenAt: record.id };
+    prevHash = record.hash;
+  }
+  return { valid: true, length: ledger.length, brokenAt: null };
+}
+
+export async function verifyPopChain(): Promise<{ valid: boolean; length: number; brokenAt: string | null; verifiedAt: string }> {
+  const state = await getState();
+  return { ...verifyLedger(state.popLedger), verifiedAt: formatNow() };
+}
+
+/**
+ * Reconciliation (RFP FIN-402/404): "bill" verifies delivery against the
+ * hash-chained PoP ledger and moves a Played booking to Billed; "settle"
+ * closes the settlement and moves it to Paid.
+ */
+export async function reconcileBooking(payload: { bookingId: string; step: "bill" | "settle" }, actor: string): Promise<{ state: DoohState; booking: BookingRecord }> {
+  let booking!: BookingRecord;
+  const state = await commit((draft) => {
+    const target = draft.bookings.find((item) => item.id === payload.bookingId);
+    if (!target) throw new Error("Booking not found");
+    const now = formatNow();
+
+    if (payload.step === "bill") {
+      if (target.status !== "Played") throw new Error(`Booking ${target.id} is ${target.status}; reconciliation requires Played`);
+      const plays = draft.popLedger.filter((record) => record.bookingId === target.id);
+      const chain = verifyLedger(draft.popLedger);
+      if (!chain.valid) throw new Error(`PoP chain verification failed at ${chain.brokenAt}; reconciliation blocked`);
+      target.status = "Billed";
+      target.updatedAt = now;
+      target.history = [...target.history, { status: "Billed", at: now, actor, note: `Delivery reconciled against ${plays.length} hash-chained PoP record(s); chain verified (${chain.length} entries).` }];
+      addNotification(draft, {
+        title: "Delivery reconciled",
+        body: `${target.campaign}: ${plays.length} signed playback record(s) verified against invoice ${target.invoiceId ?? ""}.`,
+        subject: target.campaign,
+        recipients: ["finance", "bidder", "admin"],
+        page: "financials",
+        tone: "info",
+      });
+      addActivity(draft, actor, "Reconciled booking against PoP", target.campaign);
+    } else {
+      if (target.status !== "Billed") throw new Error(`Booking ${target.id} is ${target.status}; settlement requires Billed`);
+      const invoice = draft.invoices.find((item) => item.id === target.invoiceId);
+      target.status = "Paid";
+      target.updatedAt = now;
+      target.history = [...target.history, { status: "Paid", at: now, actor, note: `Settlement closed${invoice?.receiptId ? ` against receipt ${invoice.receiptId}` : ""}; revenue recognised.` }];
+      addNotification(draft, {
+        title: "Settlement closed",
+        body: `${target.campaign}: booking ${target.id} fully settled and revenue recognised.`,
+        subject: target.campaign,
+        recipients: ["finance", "bidder", "admin"],
+        page: "financials",
+        tone: "success",
+      });
+      addActivity(draft, actor, "Closed settlement", target.campaign);
+    }
+    booking = { ...target };
+  });
+  return { state, booking };
+}
+
 /**
  * Close an auction lot (RFP FIN-202/203). Deterministic first-price award per
  * Technology Specification 10.6.2: the highest valid bid at or above the floor
@@ -1094,8 +1222,18 @@ export async function updateSubmissionStage(id: string, stage: SubmissionStage, 
           campaign: item.campaign,
           owner: item.bidder,
           state: "Queued",
+          submissionId: item.id,
         },
       ];
+    }
+    if (stage === "Scheduled") {
+      const booking = draft.bookings.find((entry) => entry.submissionId === item.id);
+      if (booking && booking.status === "Booked") {
+        const now = formatNow();
+        booking.status = "Scheduled";
+        booking.updatedAt = now;
+        booking.history = [...booking.history, { status: "Scheduled", at: now, actor, note: "Approved creative entered the playout schedule." }];
+      }
     }
     if (stage === "Published" && !draft.published.some((published) => published.campaign === item.campaign)) {
       draft.published = [
@@ -1326,8 +1464,10 @@ export async function playScheduleItem(id: string, actor: string): Promise<DoohS
     const slot = draft.schedule.find((item) => item.id === id);
     if (!slot) throw new Error("Schedule item not found");
     slot.state = "Playing";
+    const submission = slot.submissionId
+      ? draft.submissions.find((item) => item.id === slot.submissionId)
+      : draft.submissions.find((item) => item.campaign === slot.campaign);
     if (!draft.published.some((item) => item.campaign === slot.campaign && item.asset === slot.asset)) {
-      const submission = draft.submissions.find((item) => item.campaign === slot.campaign);
       draft.published = [
         {
           id: nextId("PUB", draft.published),
@@ -1338,6 +1478,24 @@ export async function playScheduleItem(id: string, actor: string): Promise<DoohS
         },
         ...draft.published,
       ];
+    }
+    // Every playback event mints a hash-chained PoP record; a commercial
+    // booking advances Scheduled -> Played exactly once (Tech Spec 10.3).
+    const booking = draft.bookings.find((entry) => entry.submissionId && entry.submissionId === (slot.submissionId ?? submission?.id));
+    const record = appendPopRecord(draft, {
+      assetId: slot.asset,
+      campaign: slot.campaign,
+      creativeId: submission?.creativeId ?? "live-slate",
+      kind: booking ? "commercial" : "civic",
+      scheduledAt: slot.time,
+      submissionId: submission?.id,
+      bookingId: booking?.id,
+    });
+    if (booking && booking.status === "Scheduled") {
+      const now = formatNow();
+      booking.status = "Played";
+      booking.updatedAt = now;
+      booking.history = [...booking.history, { status: "Played", at: now, actor, note: `Playout attested by PoP record ${record.id} (${record.hash.slice(0, 12)}...).` }];
     }
     addNotification(draft, {
       title: "Schedule item playing",
@@ -1434,6 +1592,13 @@ export async function broadcastEmergencyNow(id: string, actor: string): Promise<
       },
       ...draft.published,
     ];
+    appendPopRecord(draft, {
+      assetId: alert.scope,
+      campaign: alert.title,
+      creativeId: "weather-alert",
+      kind: "emergency",
+      scheduledAt: "Immediate override",
+    });
     addNotification(draft, {
       title: "Emergency live",
       body: `${alert.title} is live on the DOOH network.`,

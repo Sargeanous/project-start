@@ -272,6 +272,24 @@ interface InvoiceRecord {
   voidReason?: string;
 }
 
+interface PopRecord {
+  id: string;
+  seq: number;
+  assetId: string;
+  campaign: string;
+  creativeId: string;
+  kind: "commercial" | "civic" | "emergency";
+  scheduledAt: string;
+  playedAt: string;
+  brightness: string;
+  evidence: string;
+  thumbnailRef: string;
+  submissionId?: string;
+  bookingId?: string;
+  prevHash: string;
+  hash: string;
+}
+
 interface ScheduleItem {
   id: string;
   time: string;
@@ -379,6 +397,7 @@ interface DoohStatePayload {
   bids: BidRecord[];
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
+  popLedger: PopRecord[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -1531,6 +1550,26 @@ const translations: Record<string, string> = {
   "floor": "الحد الأدنى",
   "week": "أسبوع",
   "Active allocation contracts": "عقود التخصيص النشطة",
+  "Reconcile against PoP": "مطابقة مع إثبات العرض",
+  "Close settlement": "إغلاق التسوية",
+  "Verify hash chain": "التحقق من سلسلة التجزئة",
+  "Verifying chain": "جارٍ التحقق من السلسلة",
+  "Chain verified": "تم التحقق من السلسلة",
+  "Chain broken at": "السلسلة مكسورة عند",
+  "signed records": "سجلات موقعة",
+  "Seq": "التسلسل",
+  "Kind": "النوع",
+  "Played at": "وقت العرض",
+  "Evidence": "الدليل",
+  "Hash": "التجزئة",
+  "commercial": "تجاري",
+  "civic": "مدني",
+  "emergency": "طوارئ",
+  "TPM-signed (simulated)": "موقع عبر TPM (محاكاة)",
+  "Scheduled for playout": "مجدول للعرض",
+  "Played, awaiting PoP reconciliation": "تم العرض، بانتظار مطابقة الإثبات",
+  "Delivery reconciled, settlement closing": "تمت مطابقة التسليم، التسوية قيد الإغلاق",
+  "Settled and revenue recognised": "تمت التسوية والاعتراف بالإيراد",
   "Long-term operator contracts": "عقود المشغلين طويلة الأجل",
   "Live auction lots on assets": "فترات مزاد مباشرة على الأصول",
   "Send": "إرسال",
@@ -2069,7 +2108,6 @@ const translations: Record<string, string> = {
   "Export readiness": "جاهزية التصدير",
   "Signed event chain": "سلسلة أحداث موقعة",
   "Actor": "الفاعل",
-  "Evidence": "الدليل",
   "Policy citations attached": "استشهادات السياسة مرفقة",
   "Approved emergency queue": "اعتمد قائمة بث الطوارئ",
   "Dual-control hash": "بصمة التحكم المزدوج",
@@ -2321,6 +2359,7 @@ function App() {
   const [bids, setBids] = useState<BidRecord[]>([]);
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [popLedger, setPopLedger] = useState<PopRecord[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
   const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
@@ -2385,6 +2424,7 @@ function App() {
     setBids(next.bids);
     setBookings(next.bookings ?? []);
     setInvoices(next.invoices ?? []);
+    setPopLedger(next.popLedger ?? []);
     setAlerts(next.alerts);
     setVerificationSteps(next.verificationSteps);
     setFinanceApprovals(next.financeApprovals);
@@ -2515,6 +2555,14 @@ function App() {
       payload: { outcome },
     });
     if (result) notify(outcome === "paid" ? `${result.booking.campaign}: payment confirmed, creative in review` : `${result.booking.campaign}: payment failed, slot released`);
+  }
+
+  async function reconcileBookingChain(bookingId: string, step: "bill" | "settle") {
+    const result = await syncMutation<{ state: DoohStatePayload; booking: BookingRecord }>(`bookings/${bookingId}/reconcile`, {
+      actor: profile?.name ?? "ADMO Finance",
+      payload: { step },
+    });
+    if (result) notify(step === "bill" ? `${result.booking.campaign}: delivery reconciled against PoP` : `${result.booking.campaign}: settlement closed`);
   }
 
   async function updateSubmissionStage(id: string, stage: SubmissionStage) {
@@ -2704,7 +2752,7 @@ function App() {
           {page === "accessRoles" && <AccessRolesPage t={t} />}
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
-          {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} t={t} />}
+          {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
           {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
@@ -6546,6 +6594,7 @@ function AuctionDesk({
   invoices,
   onCloseAuction,
   onSettlePayment,
+  onReconcile,
   t,
 }: {
   auctions: AuctionLot[];
@@ -6553,6 +6602,7 @@ function AuctionDesk({
   invoices: InvoiceRecord[];
   onCloseAuction: (lotId: string) => void;
   onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
+  onReconcile: (bookingId: string, step: "bill" | "settle") => void;
   t: (value: string) => string;
 }) {
   const money = (value: number, currency: string) => `${currency} ${value.toLocaleString("en-US")}`;
@@ -6623,6 +6673,10 @@ function AuctionDesk({
                         <Button onClick={() => onSettlePayment(booking.id, "paid")}>{t("Confirm payment")}</Button>
                         <Button variant="secondary" onClick={() => onSettlePayment(booking.id, "failed")}>{t("Simulate failure")}</Button>
                       </div>
+                    ) : booking.status === "Played" ? (
+                      <Button onClick={() => onReconcile(booking.id, "bill")}>{t("Reconcile against PoP")}</Button>
+                    ) : booking.status === "Billed" ? (
+                      <Button onClick={() => onReconcile(booking.id, "settle")}>{t("Close settlement")}</Button>
                     ) : null}
                   </td>
                 </tr>
@@ -6667,20 +6721,24 @@ function FinancialsPage({
   auctions,
   bookings,
   invoices,
+  popLedger,
   aiAvailable,
   onDecision,
   onCloseAuction,
   onSettlePayment,
+  onReconcile,
   t,
 }: {
   approvals: FinanceApproval[];
   auctions: AuctionLot[];
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
+  popLedger: PopRecord[];
   aiAvailable: boolean;
   onDecision: (id: string, state: FinanceApproval["state"]) => void;
   onCloseAuction: (lotId: string) => void;
   onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
+  onReconcile: (bookingId: string, step: "bill" | "settle") => void;
   t: (value: string) => string;
 }) {
   const [budget, setBudget] = useState(420);
@@ -6690,6 +6748,19 @@ function FinancialsPage({
   const [yieldLoading, setYieldLoading] = useState(false);
   const [reportSummary, setReportSummary] = useState<{ summary: string; source?: string } | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [chainStatus, setChainStatus] = useState<{ valid: boolean; length: number; brokenAt: string | null; verifiedAt: string } | null>(null);
+  const [chainLoading, setChainLoading] = useState(false);
+
+  async function verifyChain() {
+    setChainLoading(true);
+    try {
+      const response = await fetch("/api/dooh/pop/verify");
+      setChainStatus(await response.json());
+    } catch {
+      setChainStatus(null);
+    }
+    setChainLoading(false);
+  }
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
 
   async function explainScenario() {
@@ -6761,7 +6832,7 @@ function FinancialsPage({
         />
       </Panel>
 
-      <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} t={t} />
+      <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} onReconcile={onReconcile} t={t} />
 
       <div className="split-grid wide-left">
         <Panel icon={CircleDollarSign} title="Budget and revenue breakdown">
@@ -6823,9 +6894,16 @@ function FinancialsPage({
         />
       </Panel>
 
-      <Panel icon={FileCheck2} title="Proof-of-play settlement controls">
+      <Panel icon={FileCheck2} title="Proof-of-play settlement controls" action={popLedger.length ? `${popLedger.length} ${t("signed records")}` : undefined}>
         <ActionRow>
           <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || reportLoading} onClick={summarizeProofAndFinance}>{reportLoading ? t("Summarizing") : t("Summarize report")}</Button>
+          <Button variant="secondary" disabled={chainLoading} onClick={verifyChain}>{chainLoading ? t("Verifying chain") : t("Verify hash chain")}</Button>
+          {chainStatus ? (
+            <StatusPill
+              label={chainStatus.valid ? `${t("Chain verified")} (${chainStatus.length})` : `${t("Chain broken at")} ${chainStatus.brokenAt}`}
+              tone={chainStatus.valid ? "good" : "danger"}
+            />
+          ) : null}
         </ActionRow>
         {reportSummary ? (
           <section className="ai-mini-panel">
@@ -6836,14 +6914,45 @@ function FinancialsPage({
             <StatusPill label={reportSummary.source === "openai" ? "OpenAI" : "Offline"} tone={reportSummary.source === "openai" ? "good" : "warn"} />
           </section>
         ) : null}
-        <CompactTable
-          columns={["Campaign", "Proof coverage", "Exception", "Settlement state"]}
-          rows={[
-            ["Weekend mall offer", "99.7%", "None", "Ready to settle"],
-            ["Yas summer promotion", "97.0%", "AD-BUS-022 missing signed event", "Make-good recommended"],
-            ["Airport retail launch", "Pending", "Not yet published", "Not started"],
-          ]}
-        />
+        {popLedger.length ? (
+          <div className="table-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("Seq")}</th>
+                  <th>{t("Asset")}</th>
+                  <th>{t("Campaign")}</th>
+                  <th>{t("Kind")}</th>
+                  <th>{t("Played at")}</th>
+                  <th>{t("Evidence")}</th>
+                  <th>{t("Hash")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...popLedger].reverse().slice(0, 8).map((record) => (
+                  <tr key={record.id}>
+                    <td data-label={t("Seq")}>#{record.seq}</td>
+                    <td data-label={t("Asset")}>{record.assetId}</td>
+                    <td data-label={t("Campaign")}><strong>{t(record.campaign)}</strong>{record.bookingId ? <span>{record.bookingId}</span> : null}</td>
+                    <td data-label={t("Kind")}><StatusPill label={record.kind} tone={record.kind === "emergency" ? "danger" : record.kind === "commercial" ? "info" : "good"} /></td>
+                    <td data-label={t("Played at")}>{record.playedAt.replace("T", " ").slice(0, 16)}</td>
+                    <td data-label={t("Evidence")}><span className="cell-note">{t(record.evidence)}</span></td>
+                    <td data-label={t("Hash")}><code className="hash-chip" title={record.hash}>{record.hash.slice(0, 10)}…</code></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <CompactTable
+            columns={["Campaign", "Proof coverage", "Exception", "Settlement state"]}
+            rows={[
+              ["Weekend mall offer", "99.7%", "None", "Ready to settle"],
+              ["Yas summer promotion", "97.0%", "AD-BUS-022 missing signed event", "Make-good recommended"],
+              ["Airport retail launch", "Pending", "Not yet published", "Not started"],
+            ]}
+          />
+        )}
         <CollapsibleIntelligenceCitations
           ruleIds={["RULE-POP-001", "RULE-POP-002", "RULE-AI-001"]}
           sourceIds={["KB-POP-001", "KB-POP-002", "KB-AI-001"]}
@@ -7050,7 +7159,14 @@ function MarketplacePage({
                         <td data-label={t("Invoice")}>{invoice ? <><strong>{invoice.id}</strong><span>{invoice.currency} {invoice.total.toLocaleString("en-US")} · {t(invoice.status)}{invoice.receiptId ? ` · ${invoice.receiptId}` : ""}</span></> : "-"}</td>
                         <td data-label={t("Next step")}>
                           <span className="cell-note">
-                            {booking.status === "Awaiting payment" ? t("Pay the invoice to unlock scheduling") : booking.submissionId ? `${t("Creative in governed review as")} ${booking.submissionId}` : booking.status === "Released" ? t("Slot returned to auction") : t("Awaiting playout")}
+                            {booking.status === "Awaiting payment" ? t("Pay the invoice to unlock scheduling")
+                              : booking.status === "Released" ? t("Slot returned to auction")
+                              : booking.status === "Scheduled" ? t("Scheduled for playout")
+                              : booking.status === "Played" ? t("Played, awaiting PoP reconciliation")
+                              : booking.status === "Billed" ? t("Delivery reconciled, settlement closing")
+                              : booking.status === "Paid" ? t("Settled and revenue recognised")
+                              : booking.submissionId ? `${t("Creative in governed review as")} ${booking.submissionId}`
+                              : t("Awaiting playout")}
                           </span>
                         </td>
                       </tr>
