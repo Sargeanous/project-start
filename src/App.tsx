@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
   Bell,
   Bot,
   Building2,
@@ -142,6 +143,7 @@ type Page =
   | "edgeCompute"
   | "financials"
   | "allocations"
+  | "reports"
   | "campaigns"
   | "marketplace";
 
@@ -504,14 +506,14 @@ const profiles: Profile[] = [
     name: "ADMO Finance",
     role: "Commercial finance",
     organization: "Abu Dhabi Media Office",
-    pages: ["financials", "allocations", "control"],
+    pages: ["financials", "allocations", "reports", "control"],
   },
   {
     id: "admin",
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
@@ -536,6 +538,7 @@ const navItems: Record<Page, NavItem> = {
   network: { id: "network", label: "Network and Devices", icon: RadioTower },
   financials: { id: "financials", label: "Financials", icon: WalletCards },
   allocations: { id: "allocations", label: "Commercial Map", icon: MapPinned },
+  reports: { id: "reports", label: "Reports & BI", icon: BarChart3 },
   mediagpt: { id: "mediagpt", label: "MediaGPT", icon: Bot },
   knowledge: { id: "knowledge", label: "Knowledge", icon: Database },
   rules: { id: "rules", label: "Rules", icon: ShieldCheck },
@@ -559,6 +562,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "network", label: "Network and Devices", helper: "Asset health, service orders, and purchase orders" },
   { key: "financials", label: "Financials", helper: "Approvals, budget risks, and commercial decisions" },
   { key: "allocations", label: "Commercial Map", helper: "Asset allocations, availability, and commercial KPIs" },
+  { key: "reports", label: "Reports & BI", helper: "Executive dashboards, exports, and regulatory reports" },
   { key: "mediagpt", label: "MediaGPT", helper: "Agent outputs and approved AI actions" },
   { key: "knowledge", label: "Knowledge", helper: "Source ingestion and knowledge-base changes" },
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
@@ -580,7 +584,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 }, {} as NotificationPreferences);
 
 const navGroups: NavGroup[] = [
-  { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations"] },
+  { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports"] },
   { label: "Intelligence / Agentic", pages: ["mediagpt", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
@@ -1120,6 +1124,13 @@ const translations: Record<string, string> = {
   "Checks bilingual payload, authority, SLA, and edge route before broadcast.": "يفحص الرسالة باللغتين، والجهة المعتمدة، ومستوى الخدمة، ومسار الحافة قبل البث.",
   "Ready for approval": "جاهز للاعتماد",
   "Run MediaGPT checks": "تشغيل فحوصات MediaGPT",
+  "Reports & BI": "التقارير وذكاء الأعمال",
+  "Regulatory and operational reports": "تقارير تنظيمية وتشغيلية",
+  "Export for CSC, ADMO, MRO, NCEMA": "تصدير لـ CSC وADMO وMRO وNCEMA",
+  "Report": "التقرير",
+  "Rows": "الصفوف",
+  "Export": "تصدير",
+  "Reports respect RBAC and tenant scoping; exports reflect the current live platform state.": "تحترم التقارير صلاحيات الوصول ونطاق المستأجر؛ وتعكس الصادرات الحالة الحية للمنصة.",
   "Emergency alert live on network": "التنبيه الطارئ مباشر على الشبكة",
   "Alert reset. Re-run checks.": "تم إعادة تعيين التنبيه. أعد تشغيل الفحوصات.",
   "Live on network": "مباشر على الشبكة",
@@ -1778,7 +1789,6 @@ const translations: Record<string, string> = {
   "hash": "بصمة",
   "Send": "إرسال",
   "Save output": "حفظ المخرج",
-  "Export": "تصدير",
   "Ask about assets, schedules, submissions, financials or emergencies. Large outputs expand here.": "اسأل عن الأصول أو الجداول أو الطلبات أو الماليات أو الطوارئ. تتوسع المخرجات الكبيرة هنا.",
   "Here is the current campaign workflow view.": "هذه هي نظرة سير عمل الحملات الحالية.",
   "Open alarm summary by zone. Industrial Zone and Al Ain need the operations team first.": "ملخص الإنذارات المفتوحة حسب المنطقة. المنطقة الصناعية والعين تحتاجان فريق العمليات أولاً.",
@@ -3003,6 +3013,7 @@ function App() {
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
           {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
+          {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
@@ -7045,6 +7056,118 @@ function EdgeGauge({ label, value }: { label: string; value: number }) {
       <strong>{value}%</strong>
       <div><i style={{ width: `${value}%` }} /></div>
     </div>
+  );
+}
+
+// Client-side export (RFP REP-004): downloads live state, no backend needed.
+function downloadFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function toCsv(rows: Array<Record<string, unknown>>): string {
+  if (!rows.length) return "";
+  const cols = Object.keys(rows[0]);
+  const escape = (v: unknown) => {
+    const s = v == null ? "" : Array.isArray(v) ? v.join("; ") : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => escape(r[c])).join(","))].join("\n");
+}
+
+// Executive reporting + BI (RFP REP-001..007): KPIs computed from live state,
+// with CSV/JSON export of the operational datasets.
+function ReportsPage({
+  submissions,
+  bookings,
+  invoices,
+  popLedger,
+  enforcementEvents,
+  alerts,
+  auctions,
+  t,
+}: {
+  submissions: Submission[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
+  popLedger: PopRecord[];
+  enforcementEvents: EnforcementEvent[];
+  alerts: EmergencyAlert[];
+  auctions: AuctionLot[];
+  t: (value: string) => string;
+}) {
+  const paidInvoices = invoices.filter((i) => i.status === "Paid");
+  const revenue = paidInvoices.reduce((sum, i) => sum + i.total, 0);
+  const awarded = auctions.filter((a) => a.status === "Awarded").length;
+  const fillRate = auctions.length ? Math.round((awarded / auctions.length) * 100) : 0;
+  const approvedSubs = submissions.filter((s) => ["Approved", "Scheduled", "Published"].includes(s.stage)).length;
+  const complianceRate = submissions.length ? Math.round((approvedSubs / submissions.length) * 100) : 0;
+  const commercialPop = popLedger.filter((p) => p.kind === "commercial").length;
+  const civicPop = popLedger.filter((p) => p.kind !== "commercial").length;
+  const publicShare = popLedger.length ? Math.round((civicPop / popLedger.length) * 100) : 0;
+  const blocked = enforcementEvents.filter((e) => e.outcome === "blocked").length;
+  const overridden = enforcementEvents.filter((e) => e.outcome === "overridden").length;
+
+  const kpis: Array<{ label: string; value: string; helper: string; tone: Tone }> = [
+    { label: "Recognised revenue", value: `AED ${revenue.toLocaleString("en-US")}`, helper: "Paid invoices", tone: "good" },
+    { label: "Auction fill rate", value: `${fillRate}%`, helper: `${awarded}/${auctions.length} lots awarded`, tone: fillRate > 50 ? "good" : "warn" },
+    { label: "Proof-of-play records", value: String(popLedger.length), helper: "Hash-chained", tone: "info" },
+    { label: "Public vs commercial", value: `${publicShare}% / ${100 - publicShare}%`, helper: "Playback split", tone: "neutral" },
+    { label: "Compliance rate", value: `${complianceRate}%`, helper: "Approved submissions", tone: complianceRate > 60 ? "good" : "warn" },
+    { label: "Rules blocked", value: String(blocked), helper: "Bookings stopped", tone: blocked ? "danger" : "good" },
+    { label: "Emergency overrides", value: String(overridden), helper: "Hierarchy applied", tone: "info" },
+    { label: "Active alerts", value: String(alerts.filter((a) => a.state !== "Live on network").length), helper: "In the NCEMA lane", tone: "warn" },
+  ];
+
+  const reports: Array<{ id: string; title: string; helper: string; rows: () => Array<Record<string, unknown>> }> = [
+    { id: "pop", title: "Proof-of-play ledger", helper: "Per-play evidence, hash-chained", rows: () => popLedger.map((p) => ({ seq: p.seq, asset: p.assetId, campaign: p.campaign, kind: p.kind, playedAt: p.playedAt, evidence: p.evidence, hash: p.hash })) },
+    { id: "financial", title: "Financial reconciliation", helper: "Bookings and invoices", rows: () => bookings.map((b) => ({ id: b.id, campaign: b.campaign, bidder: b.bidder, amount: b.amount, currency: b.currency, status: b.status, invoice: b.invoiceId ?? "" })) },
+    { id: "compliance", title: "Compliance and enforcement", helper: "Rules engine events", rows: () => enforcementEvents.map((e) => ({ id: e.id, at: e.at, stage: e.kind, subject: e.subject, outcome: e.outcome, reasonCodes: e.reasonCodes, actor: e.actor })) },
+    { id: "moderation", title: "Content moderation pipeline", helper: "Submissions and stages", rows: () => submissions.map((s) => ({ id: s.id, campaign: s.campaign, bidder: s.bidder, category: s.category, stage: s.stage, version: s.version, approvals: (s.approvals ?? []).map((a) => a.name) })) },
+  ];
+
+  return (
+    <PageBody>
+      <MetricGrid>
+        {kpis.slice(0, 4).map((k) => <Metric key={k.label} label={k.label} value={k.value} helper={k.helper} tone={k.tone} />)}
+      </MetricGrid>
+      <MetricGrid>
+        {kpis.slice(4).map((k) => <Metric key={k.label} label={k.label} value={k.value} helper={k.helper} tone={k.tone} />)}
+      </MetricGrid>
+
+      <Panel icon={BarChart3} title={t("Regulatory and operational reports")} action={t("Export for CSC, ADMO, MRO, NCEMA")}>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr><th>{t("Report")}</th><th>{t("Rows")}</th><th>{t("Export")}</th></tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => {
+                const rows = report.rows();
+                return (
+                  <tr key={report.id}>
+                    <td data-label={t("Report")}><strong>{t(report.title)}</strong><span>{t(report.helper)}</span></td>
+                    <td data-label={t("Rows")}>{rows.length}</td>
+                    <td data-label={t("Export")}>
+                      <div className="row-actions">
+                        <Button variant="secondary" disabled={!rows.length} onClick={() => downloadFile(`${report.id}-report.csv`, toCsv(rows), "text/csv")}>CSV</Button>
+                        <Button variant="secondary" disabled={!rows.length} onClick={() => downloadFile(`${report.id}-report.json`, JSON.stringify(rows, null, 2), "application/json")}>JSON</Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="cell-note">{t("Reports respect RBAC and tenant scoping; exports reflect the current live platform state.")}</p>
+      </Panel>
+    </PageBody>
   );
 }
 
