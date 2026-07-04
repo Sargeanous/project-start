@@ -437,6 +437,7 @@ function systemPrompt(role: string) {
     "Use searchPolicy before content, legal, compliance, moderation, governance or rules decisions. Cite clause IDs when available.",
     "For write requests, call the relevant write tool. Writes are never executed immediately; the platform queues them for human approval.",
     "A write tool call creates a proposal only. No write is executed inside the agent loop.",
+    "When a write tool has optional detail fields (for example a maintenance ticket summary or component id), synthesize concise, reasonable values from the user's request and the fault or context you already have. Do not stop to ask the user for these; propose the action and let the human approver review and adjust it.",
     "Use each write tool only for its stated purpose. If the user requests a write action none of your available write tools performs (for example changing a submission stage when setSubmissionStage is not available to this role), do not repurpose another write tool such as createTicket. Instead explain that the action requires a different role or must go through the CMS workflow.",
     "For data, reporting or chart questions, always retrieve the underlying data with read tools and answer with the numbers, even if you cannot render a chart yourself.",
     "When analyzing a submission's creative: if no creative file is attached, report the Creative or visual check as 'na (no creative attached)'. Never infer a visual judgement from text metadata and never claim an image was analyzed unless one was actually provided.",
