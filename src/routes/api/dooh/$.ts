@@ -35,6 +35,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   placeBid,
+  closeAuction,
+  confirmBookingPayment,
   playScheduleItem,
   queueEmergencyBroadcast,
   resetEmergencyAlert,
@@ -231,6 +233,16 @@ export const Route = createFileRoute("/api/dooh/$")({
               return jsonError("Lot, campaign and amount are required", 422);
             }
             return Response.json(await placeBid({ lotId: payload.lotId, campaign: payload.campaign, amount: payload.amount }, actor));
+          }
+
+          if (segments[0] === "auctions" && segments[2] === "close") {
+            return Response.json(await closeAuction({ lotId: segments[1] }, actor));
+          }
+
+          if (segments[0] === "bookings" && segments[2] === "payment") {
+            const payload = body.payload as { outcome?: "paid" | "failed" } | undefined;
+            const outcome = payload?.outcome === "failed" ? "failed" : "paid";
+            return Response.json(await confirmBookingPayment({ bookingId: segments[1], outcome }, actor));
           }
 
           if (segments[0] === "schedule" && segments[2] === "play") {

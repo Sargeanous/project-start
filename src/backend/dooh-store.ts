@@ -47,6 +47,8 @@ export interface BidderCommunication {
   status: "Unread" | "Read";
 }
 
+export type AuctionLotStatus = "Open" | "Awarded" | "No fill";
+
 export interface AuctionLot {
   id: string;
   lotName: string;
@@ -62,6 +64,53 @@ export interface AuctionLot {
   closesAt: string;
   creativeId: string;
   currency: string;
+  status: AuctionLotStatus;
+  clearingPrice?: number;
+  awardedTo?: string;
+  closedAt?: string;
+  closeNote?: string;
+}
+
+// Commercial lifecycle per RFP FIN-202/402: award -> payment gate -> governed
+// publishing handoff, with each booking tracked Booked -> Scheduled -> Played
+// -> Billed -> Paid (or Released on payment failure).
+export type BookingStatus = "Awaiting payment" | "Booked" | "Scheduled" | "Played" | "Billed" | "Paid" | "Released";
+
+export interface BookingRecord {
+  id: string;
+  lotId: string;
+  lotName: string;
+  packageName: string;
+  campaign: string;
+  bidder: string;
+  amount: number;
+  currency: string;
+  status: BookingStatus;
+  algorithm: string; // deterministic + documented per FIN-203
+  awardedAt: string;
+  updatedAt: string;
+  invoiceId?: string;
+  submissionId?: string;
+  paymentRef?: string;
+  history: Array<{ status: BookingStatus | "Awarded"; at: string; actor: string; note?: string }>;
+}
+
+export type InvoiceStatus = "Issued" | "Paid" | "Void";
+
+export interface InvoiceRecord {
+  id: string;
+  bookingId: string;
+  campaign: string;
+  bidder: string;
+  net: number;
+  vat: number;
+  total: number;
+  currency: string;
+  status: InvoiceStatus;
+  issuedAt: string;
+  paidAt?: string;
+  receiptId?: string;
+  voidReason?: string;
 }
 
 export interface BidRecord {
@@ -180,6 +229,8 @@ export interface DoohState {
   published: PublishedItem[];
   auctions: AuctionLot[];
   bids: BidRecord[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -333,6 +384,7 @@ const initialState: DoohState = {
       closesAt: "Jul 04, 2026 - 18:00",
       creativeId: "etihad-retail",
       currency: "AED",
+      status: "Open",
     },
     {
       id: "LOT-4408",
@@ -349,6 +401,7 @@ const initialState: DoohState = {
       closesAt: "Jul 03, 2026 - 12:00",
       creativeId: "mall-footfall",
       currency: "AED",
+      status: "Open",
     },
     {
       id: "LOT-4402",
@@ -365,9 +418,12 @@ const initialState: DoohState = {
       closesAt: "Jul 05, 2026 - 20:00",
       creativeId: "yas-tourism",
       currency: "AED",
+      status: "Open",
     },
   ],
   bids: [],
+  bookings: [],
+  invoices: [],
   alerts: [
     {
       id: "ALT-901",
@@ -535,6 +591,9 @@ function normalizeState(state: DoohState): DoohState {
   return {
     ...state,
     bidderMessages: state.bidderMessages ?? [],
+    bookings: state.bookings ?? [],
+    invoices: state.invoices ?? [],
+    auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
     purchaseOrders: state.purchaseOrders ?? cloneState(initialState).purchaseOrders,
     notifications: (state.notifications?.length ? state.notifications : cloneState(initialState).notifications).map((notification) => ({
@@ -812,6 +871,200 @@ export async function placeBid(payload: { lotId: string; amount: number; campaig
     addActivity(draft, actor, "Placed bid", lot.lotName);
   });
   return { state, bid };
+}
+
+/**
+ * Close an auction lot (RFP FIN-202/203). Deterministic first-price award per
+ * Technology Specification 10.6.2: the highest valid bid at or above the floor
+ * wins and is billed at its own bid. No valid bid -> "No fill" and the slot
+ * returns to the pool (no dark screen; operator/city content backfills).
+ */
+export async function closeAuction(payload: { lotId: string }, actor: string): Promise<{ state: DoohState; lot: AuctionLot; booking: BookingRecord | null }> {
+  let lot!: AuctionLot;
+  let booking: BookingRecord | null = null;
+  const state = await commit((draft) => {
+    const target = draft.auctions.find((item) => item.id === payload.lotId);
+    if (!target) throw new Error("Auction lot not found");
+    if (target.status !== "Open") throw new Error(`Auction ${target.id} is already ${target.status}`);
+    const now = formatNow();
+    target.closedAt = now;
+
+    const recorded = draft.bids.find((item) => item.lotId === target.id && item.status === "Leading");
+    // Seeded lots carry a leading bid without a BidRecord; treat that state as the standing bid.
+    const leading = recorded
+      ?? (target.bidCount > 0 && target.leadingBidder && target.currentBid > 0
+        ? { campaign: `${target.leadingBidder} - ${target.lotName}`, bidder: target.leadingBidder, amount: target.currentBid }
+        : undefined);
+    const valid = leading && leading.amount >= target.floorPrice;
+
+    if (!valid) {
+      target.status = "No fill";
+      target.closeNote = leading
+        ? `Leading bid ${target.currency} ${leading.amount.toLocaleString("en-US")} is below the floor ${target.currency} ${target.floorPrice.toLocaleString("en-US")}. Slot returned to pool; operator/city content backfills (no dark screen).`
+        : "No bids received. Slot returned to pool; operator/city content backfills (no dark screen).";
+      addNotification(draft, {
+        title: "Auction closed with no fill",
+        body: `${target.lotName}: ${target.closeNote}`,
+        subject: target.lotName,
+        recipients: ["finance", "admin"],
+        page: "financials",
+        tone: "warning",
+      });
+      addActivity(draft, actor, "Closed auction (no fill)", target.lotName);
+      lot = { ...target };
+      return;
+    }
+
+    // First-price award: winner pays their own bid (deterministic, documented).
+    target.status = "Awarded";
+    target.clearingPrice = leading.amount;
+    target.awardedTo = leading.bidder;
+    target.closeNote = `Awarded first-price to ${leading.bidder} at ${target.currency} ${leading.amount.toLocaleString("en-US")} (floor ${target.currency} ${target.floorPrice.toLocaleString("en-US")}, ${target.bidCount} bids).`;
+
+    const created: BookingRecord = {
+      id: nextId("BKG", draft.bookings),
+      lotId: target.id,
+      lotName: target.lotName,
+      packageName: target.packageName,
+      campaign: leading.campaign,
+      bidder: leading.bidder,
+      amount: leading.amount,
+      currency: target.currency,
+      status: "Awaiting payment",
+      algorithm: "First-price sealed ranking: highest valid bid >= floor wins, billed at own bid. Ties break on earliest bid time.",
+      awardedAt: now,
+      updatedAt: now,
+      history: [
+        { status: "Awarded", at: now, actor, note: target.closeNote },
+        { status: "Awaiting payment", at: now, actor, note: "Scheduling access is granted only after payment confirmation (FIN-202)." },
+      ],
+    };
+    const invoice: InvoiceRecord = {
+      id: nextId("INV", draft.invoices),
+      bookingId: created.id,
+      campaign: leading.campaign,
+      bidder: leading.bidder,
+      net: leading.amount,
+      vat: Math.round(leading.amount * 0.05),
+      total: Math.round(leading.amount * 1.05),
+      currency: target.currency,
+      status: "Issued",
+      issuedAt: now,
+    };
+    created.invoiceId = invoice.id;
+    draft.bookings = [created, ...draft.bookings];
+    draft.invoices = [invoice, ...draft.invoices];
+    booking = created;
+
+    draft.campaigns = draft.campaigns.map((campaign) =>
+      campaign.campaign === leading.campaign
+        ? { ...campaign, nextStep: `Won at ${target.currency} ${leading.amount.toLocaleString("en-US")}. Pay invoice ${invoice.id} to unlock scheduling.` }
+        : campaign,
+    );
+    addNotification(draft, {
+      title: "Auction won - payment required",
+      body: `${leading.bidder} won ${target.lotName} at ${target.currency} ${leading.amount.toLocaleString("en-US")}. Invoice ${invoice.id} issued; scheduling unlocks after payment.`,
+      subject: leading.campaign,
+      recipients: ["bidder", "finance", "admin"],
+      page: "financials",
+      tone: "action",
+    });
+    addActivity(draft, actor, "Closed auction (awarded)", target.lotName);
+    lot = { ...target };
+  });
+  return { state, lot, booking };
+}
+
+/**
+ * Payment confirmation gate (RFP FIN-202/401/402). Success books the slot,
+ * marks the invoice paid with a receipt, and hands the winning creative into
+ * the governed CMS pipeline (no auction win skips content governance, FIN-502).
+ * Failure voids the invoice and releases the slot back to the pool.
+ */
+export async function confirmBookingPayment(payload: { bookingId: string; outcome: "paid" | "failed" }, actor: string): Promise<{ state: DoohState; booking: BookingRecord }> {
+  let booking!: BookingRecord;
+  const state = await commit((draft) => {
+    const target = draft.bookings.find((item) => item.id === payload.bookingId);
+    if (!target) throw new Error("Booking not found");
+    if (target.status !== "Awaiting payment") throw new Error(`Booking ${target.id} is ${target.status}, not awaiting payment`);
+    const now = formatNow();
+    const invoice = draft.invoices.find((item) => item.id === target.invoiceId);
+    const lot = draft.auctions.find((item) => item.id === target.lotId);
+    target.updatedAt = now;
+
+    if (payload.outcome === "failed") {
+      target.status = "Released";
+      target.history = [...target.history, { status: "Released", at: now, actor, note: "Payment failed. Slot released automatically (FIN-202)." }];
+      if (invoice) {
+        invoice.status = "Void";
+        invoice.voidReason = "Payment failed; booking released";
+      }
+      if (lot) {
+        lot.status = "Open";
+        lot.closeNote = `Relisted after payment failure by ${target.bidder}.`;
+        lot.clearingPrice = undefined;
+        lot.awardedTo = undefined;
+      }
+      addNotification(draft, {
+        title: "Payment failed - slot released",
+        body: `${target.campaign}: payment for ${target.lotName} failed. Invoice ${invoice?.id ?? ""} voided and the slot returned to auction.`,
+        subject: target.campaign,
+        recipients: ["bidder", "finance", "admin"],
+        page: "financials",
+        tone: "warning",
+      });
+      addActivity(draft, actor, "Released booking (payment failed)", target.lotName);
+      booking = { ...target };
+      return;
+    }
+
+    target.status = "Booked";
+    target.paymentRef = `PAY-${Date.now().toString().slice(-8)}`;
+    if (invoice) {
+      invoice.status = "Paid";
+      invoice.paidAt = now;
+      invoice.receiptId = `RCT-${invoice.id.replace("INV-", "")}`;
+    }
+
+    // Governed publishing handoff: the winning creative enters the CMS pipeline
+    // as a normal submission and must pass AI screening + human moderation.
+    const submission: Submission = {
+      id: nextId("SUB", draft.submissions),
+      campaign: target.campaign,
+      bidder: target.bidder,
+      packageName: target.packageName,
+      owner: "ADMO CMS",
+      requestedStart: lot?.flightWindow ?? "Next window",
+      budget: `${target.currency} ${target.amount.toLocaleString("en-US")}`,
+      priority: "High",
+      stage: "Submitted",
+      creativeId: lot?.creativeId ?? "etihad-retail",
+      language: "Arabic + English",
+      notes: `Auction win handoff: ${target.lotName} awarded first-price at ${target.currency} ${target.amount.toLocaleString("en-US")} (booking ${target.id}, invoice ${target.invoiceId}). Entered the governed pipeline; scheduling requires content approval.`,
+    };
+    draft.submissions = [submission, ...draft.submissions];
+    target.submissionId = submission.id;
+    target.history = [
+      ...target.history,
+      { status: "Booked", at: now, actor, note: `Payment ${target.paymentRef} confirmed. Receipt ${invoice?.receiptId ?? ""}. Creative handed to CMS as ${submission.id}.` },
+    ];
+    draft.campaigns = draft.campaigns.map((campaign) =>
+      campaign.campaign === target.campaign
+        ? { ...campaign, status: "Submitted", nextStep: `Creative in governed review as ${submission.id}` }
+        : campaign,
+    );
+    addNotification(draft, {
+      title: "Booking confirmed - creative in review",
+      body: `${target.campaign} paid ${target.currency} ${target.amount.toLocaleString("en-US")} for ${target.lotName}. Creative entered the governed pipeline as ${submission.id}.`,
+      subject: target.campaign,
+      recipients: ["bidder", "finance", "reviewer", "admin"],
+      page: "cms",
+      tone: "success",
+    });
+    addActivity(draft, actor, "Confirmed booking payment", target.lotName);
+    booking = { ...target };
+  });
+  return { state, booking };
 }
 
 export async function updateSubmissionStage(id: string, stage: SubmissionStage, actor: string): Promise<{ state: DoohState; submission: Submission }> {

@@ -208,6 +208,8 @@ interface BidderCommunication {
   status: "Unread" | "Read";
 }
 
+type AuctionLotStatus = "Open" | "Awarded" | "No fill";
+
 interface AuctionLot {
   id: string;
   lotName: string;
@@ -223,6 +225,48 @@ interface AuctionLot {
   closesAt: string;
   creativeId: string;
   currency: string;
+  status: AuctionLotStatus;
+  clearingPrice?: number;
+  awardedTo?: string;
+  closedAt?: string;
+  closeNote?: string;
+}
+
+type BookingStatus = "Awaiting payment" | "Booked" | "Scheduled" | "Played" | "Billed" | "Paid" | "Released";
+
+interface BookingRecord {
+  id: string;
+  lotId: string;
+  lotName: string;
+  packageName: string;
+  campaign: string;
+  bidder: string;
+  amount: number;
+  currency: string;
+  status: BookingStatus;
+  algorithm: string;
+  awardedAt: string;
+  updatedAt: string;
+  invoiceId?: string;
+  submissionId?: string;
+  paymentRef?: string;
+  history: Array<{ status: BookingStatus | "Awarded"; at: string; actor: string; note?: string }>;
+}
+
+interface InvoiceRecord {
+  id: string;
+  bookingId: string;
+  campaign: string;
+  bidder: string;
+  net: number;
+  vat: number;
+  total: number;
+  currency: string;
+  status: "Issued" | "Paid" | "Void";
+  issuedAt: string;
+  paidAt?: string;
+  receiptId?: string;
+  voidReason?: string;
 }
 
 interface ScheduleItem {
@@ -330,6 +374,8 @@ interface DoohStatePayload {
   published: PublishedItem[];
   auctions: AuctionLot[];
   bids: BidRecord[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -566,6 +612,7 @@ const seedAuctions: AuctionLot[] = [
     closesAt: "Jul 04, 2026 | 18:00",
     creativeId: "etihad-retail",
     currency: "AED",
+    status: "Open",
   },
   {
     id: "LOT-4408",
@@ -582,6 +629,7 @@ const seedAuctions: AuctionLot[] = [
     closesAt: "Jul 03, 2026 | 12:00",
     creativeId: "mall-footfall",
     currency: "AED",
+    status: "Open",
   },
   {
     id: "LOT-4402",
@@ -598,6 +646,7 @@ const seedAuctions: AuctionLot[] = [
     closesAt: "Jul 05, 2026 | 20:00",
     creativeId: "yas-tourism",
     currency: "AED",
+    status: "Open",
   },
 ];
 
@@ -1413,6 +1462,42 @@ const translations: Record<string, string> = {
   "Ask MediaGPT": "اسأل MediaGPT",
   "Live AI": "ذكاء اصطناعي مباشر",
   "Offline fallback": "إجابة احتياطية دون اتصال",
+  "Auction desk": "مكتب المزادات",
+  "First-price, deterministic, audited": "بالسعر الأول، حتمي، مدقق",
+  "Close auction": "إغلاق المزاد",
+  "Confirm payment": "تأكيد الدفع",
+  "Simulate failure": "محاكاة فشل الدفع",
+  "Leading bid": "العرض المتصدر",
+  "Cleared at": "رسا عند",
+  "Awarded": "تمت الترسية",
+  "Awarded to": "رست على",
+  "No fill": "بدون ترسية",
+  "Closed with no fill": "أغلق دون ترسية",
+  "Awaiting payment": "بانتظار الدفع",
+  "Booked": "محجوز",
+  "Released": "أفرج عنه",
+  "Billed": "تمت الفوترة",
+  "Paid": "مدفوع",
+  "Issued": "صادرة",
+  "Void": "ملغاة",
+  "Booking": "الحجز",
+  "Bookings": "الحجوزات",
+  "Invoice": "الفاتورة",
+  "Invoices": "الفواتير",
+  "Receipt": "إيصال",
+  "Net": "الصافي",
+  "VAT 5%": "ضريبة القيمة المضافة 5%",
+  "Total": "الإجمالي",
+  "Pipeline": "خط النشر",
+  "Scheduling locked until payment": "الجدولة مقفلة حتى الدفع",
+  "Slot returned to auction": "أعيدت الفترة إلى المزاد",
+  "Creative in governed review as": "التصميم قيد المراجعة المحوكمة برقم",
+  "My bookings and invoices": "حجوزاتي وفواتيري",
+  "Booked to Paid, reconciled against proof-of-play": "من الحجز إلى الدفع، مطابقة مع إثبات العرض",
+  "Pay the invoice to unlock scheduling": "ادفع الفاتورة لفتح الجدولة",
+  "Awaiting playout": "بانتظار العرض",
+  "Lot": "الفترة المعروضة",
+  "Flight window": "نافذة الحملة",
   "Send": "إرسال",
   "Save output": "حفظ المخرج",
   "Export": "تصدير",
@@ -2199,6 +2284,8 @@ function App() {
   const [published, setPublished] = useState<PublishedItem[]>(seedPublished);
   const [auctions, setAuctions] = useState<AuctionLot[]>(seedAuctions);
   const [bids, setBids] = useState<BidRecord[]>([]);
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
   const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
@@ -2261,6 +2348,8 @@ function App() {
     setPublished(next.published);
     setAuctions(next.auctions);
     setBids(next.bids);
+    setBookings(next.bookings ?? []);
+    setInvoices(next.invoices ?? []);
     setAlerts(next.alerts);
     setVerificationSteps(next.verificationSteps);
     setFinanceApprovals(next.financeApprovals);
@@ -2376,6 +2465,21 @@ function App() {
       payload,
     });
     if (result) notify(`Bid placed on ${result.bid.lotName}`);
+  }
+
+  async function closeAuctionLot(lotId: string) {
+    const result = await syncMutation<{ state: DoohStatePayload; lot: AuctionLot; booking: BookingRecord | null }>(`auctions/${lotId}/close`, {
+      actor: profile?.name ?? "ADMO Finance",
+    });
+    if (result) notify(result.lot.status === "Awarded" ? `${result.lot.lotName}: awarded to ${result.lot.awardedTo}` : `${result.lot.lotName}: closed with no fill`);
+  }
+
+  async function settleBookingPayment(bookingId: string, outcome: "paid" | "failed") {
+    const result = await syncMutation<{ state: DoohStatePayload; booking: BookingRecord }>(`bookings/${bookingId}/payment`, {
+      actor: profile?.name ?? "ADMO Finance",
+      payload: { outcome },
+    });
+    if (result) notify(outcome === "paid" ? `${result.booking.campaign}: payment confirmed, creative in review` : `${result.booking.campaign}: payment failed, slot released`);
   }
 
   async function updateSubmissionStage(id: string, stage: SubmissionStage) {
@@ -2565,9 +2669,9 @@ function App() {
           {page === "accessRoles" && <AccessRolesPage t={t} />}
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
-          {page === "financials" && <FinancialsPage approvals={financeApprovals} aiAvailable={aiAvailable} onDecision={decideFinance} t={t} />}
+          {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} onNewBrief={() => setWizardOpen(true)} t={t} />}
-          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
         <MediaGptChatbot profile={profile} t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
@@ -6224,15 +6328,158 @@ function EdgeGauge({ label, value }: { label: string; value: number }) {
   );
 }
 
+const LOT_TONE: Record<AuctionLotStatus, "info" | "good" | "warn"> = { Open: "info", Awarded: "good", "No fill": "warn" };
+const BOOKING_TONE: Record<BookingStatus, "info" | "good" | "warn" | "danger"> = {
+  "Awaiting payment": "warn",
+  Booked: "good",
+  Scheduled: "info",
+  Played: "info",
+  Billed: "warn",
+  Paid: "good",
+  Released: "danger",
+};
+
+function AuctionDesk({
+  auctions,
+  bookings,
+  invoices,
+  onCloseAuction,
+  onSettlePayment,
+  t,
+}: {
+  auctions: AuctionLot[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
+  onCloseAuction: (lotId: string) => void;
+  onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
+  t: (value: string) => string;
+}) {
+  const money = (value: number, currency: string) => `${currency} ${value.toLocaleString("en-US")}`;
+  return (
+    <Panel icon={ShoppingBag} title={t("Auction desk")} action={t("First-price, deterministic, audited")}>
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("Lot")}</th>
+              <th>{t("Flight window")}</th>
+              <th>{t("Floor")}</th>
+              <th>{t("Leading bid")}</th>
+              <th>{t("Status")}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {auctions.map((lot) => (
+              <tr key={lot.id}>
+                <td data-label={t("Lot")}><strong>{t(lot.lotName)}</strong><span>{lot.id} · {t(lot.network)}</span></td>
+                <td data-label={t("Flight window")}>{t(lot.flightWindow)}</td>
+                <td data-label={t("Floor")}>{money(lot.floorPrice, lot.currency)}</td>
+                <td data-label={t("Leading bid")}>
+                  {lot.bidCount ? <><strong>{money(lot.currentBid, lot.currency)}</strong><span>{t(lot.leadingBidder)} · {lot.bidCount} {t("bids")}</span></> : t("No bids yet")}
+                </td>
+                <td data-label={t("Status")}>
+                  <StatusPill label={lot.status} tone={LOT_TONE[lot.status]} />
+                  {lot.closeNote ? <span className="cell-note">{t(lot.closeNote)}</span> : null}
+                </td>
+                <td>
+                  {lot.status === "Open" ? (
+                    <Button onClick={() => onCloseAuction(lot.id)}>{t("Close auction")}</Button>
+                  ) : lot.status === "Awarded" && lot.clearingPrice ? (
+                    <span className="cell-note">{t("Cleared at")} {money(lot.clearingPrice, lot.currency)}</span>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {bookings.length ? (
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("Booking")}</th>
+                <th>{t("Amount")}</th>
+                <th>{t("Status")}</th>
+                <th>{t("Pipeline")}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {bookings.map((booking) => (
+                <tr key={booking.id}>
+                  <td data-label={t("Booking")}><strong>{t(booking.campaign)}</strong><span>{booking.id} · {t(booking.bidder)} · {t(booking.lotName)}</span></td>
+                  <td data-label={t("Amount")}>{money(booking.amount, booking.currency)}</td>
+                  <td data-label={t("Status")}><StatusPill label={booking.status} tone={BOOKING_TONE[booking.status]} /></td>
+                  <td data-label={t("Pipeline")}>
+                    {booking.submissionId ? <span className="cell-note">{t("Creative in governed review as")} {booking.submissionId}</span> : booking.status === "Awaiting payment" ? <span className="cell-note">{t("Scheduling locked until payment")}</span> : booking.status === "Released" ? <span className="cell-note">{t("Slot returned to auction")}</span> : null}
+                  </td>
+                  <td>
+                    {booking.status === "Awaiting payment" ? (
+                      <div className="row-actions">
+                        <Button onClick={() => onSettlePayment(booking.id, "paid")}>{t("Confirm payment")}</Button>
+                        <Button variant="secondary" onClick={() => onSettlePayment(booking.id, "failed")}>{t("Simulate failure")}</Button>
+                      </div>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {invoices.length ? (
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("Invoice")}</th>
+                <th>{t("Net")}</th>
+                <th>{t("VAT 5%")}</th>
+                <th>{t("Total")}</th>
+                <th>{t("Status")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id}>
+                  <td data-label={t("Invoice")}><strong>{invoice.id}</strong><span>{t(invoice.campaign)} · {t(invoice.bidder)}{invoice.receiptId ? ` · ${t("Receipt")} ${invoice.receiptId}` : ""}</span></td>
+                  <td data-label={t("Net")}>{money(invoice.net, invoice.currency)}</td>
+                  <td data-label={t("VAT 5%")}>{money(invoice.vat, invoice.currency)}</td>
+                  <td data-label={t("Total")}><strong>{money(invoice.total, invoice.currency)}</strong></td>
+                  <td data-label={t("Status")}><StatusPill label={invoice.status} tone={invoice.status === "Paid" ? "good" : invoice.status === "Void" ? "danger" : "warn"} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
 function FinancialsPage({
   approvals,
+  auctions,
+  bookings,
+  invoices,
   aiAvailable,
   onDecision,
+  onCloseAuction,
+  onSettlePayment,
   t,
 }: {
   approvals: FinanceApproval[];
+  auctions: AuctionLot[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
   aiAvailable: boolean;
   onDecision: (id: string, state: FinanceApproval["state"]) => void;
+  onCloseAuction: (lotId: string) => void;
+  onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
   t: (value: string) => string;
 }) {
   const [budget, setBudget] = useState(420);
@@ -6312,6 +6559,8 @@ function FinancialsPage({
           action="Send finance review"
         />
       </Panel>
+
+      <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} t={t} />
 
       <div className="split-grid wide-left">
         <Panel icon={CircleDollarSign} title="Budget and revenue breakdown">
@@ -6512,12 +6761,16 @@ function MarketplacePage({
   onSubmit,
   onBid,
   auctions,
+  bookings,
+  invoices,
   onNewBrief,
   t,
 }: {
   onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string }) => void;
   onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
   auctions: AuctionLot[];
+  bookings: BookingRecord[];
+  invoices: InvoiceRecord[];
   onNewBrief: () => void;
   t: (value: string) => string;
 }) {
@@ -6564,6 +6817,7 @@ function MarketplacePage({
 
 
       {mode === "auction" ? (
+        <>
         <Panel icon={ShoppingBag} title={t("Open auctions")}>
           <div className="auction-grid">
             {auctions.map((lot) => (
@@ -6571,6 +6825,42 @@ function MarketplacePage({
             ))}
           </div>
         </Panel>
+        {bookings.length ? (
+          <Panel icon={FileText} title={t("My bookings and invoices")} action={t("Booked to Paid, reconciled against proof-of-play")}>
+            <div className="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("Booking")}</th>
+                    <th>{t("Amount")}</th>
+                    <th>{t("Status")}</th>
+                    <th>{t("Invoice")}</th>
+                    <th>{t("Next step")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((booking) => {
+                    const invoice = invoices.find((item) => item.id === booking.invoiceId);
+                    return (
+                      <tr key={booking.id}>
+                        <td data-label={t("Booking")}><strong>{t(booking.campaign)}</strong><span>{booking.id} · {t(booking.lotName)}</span></td>
+                        <td data-label={t("Amount")}>{booking.currency} {booking.amount.toLocaleString("en-US")}</td>
+                        <td data-label={t("Status")}><StatusPill label={booking.status} tone={BOOKING_TONE[booking.status]} /></td>
+                        <td data-label={t("Invoice")}>{invoice ? <><strong>{invoice.id}</strong><span>{invoice.currency} {invoice.total.toLocaleString("en-US")} · {t(invoice.status)}{invoice.receiptId ? ` · ${invoice.receiptId}` : ""}</span></> : "-"}</td>
+                        <td data-label={t("Next step")}>
+                          <span className="cell-note">
+                            {booking.status === "Awaiting payment" ? t("Pay the invoice to unlock scheduling") : booking.submissionId ? `${t("Creative in governed review as")} ${booking.submissionId}` : booking.status === "Released" ? t("Slot returned to auction") : t("Awaiting playout")}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        ) : null}
+        </>
       ) : (
         <div className="split-grid wide-left">
           <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
@@ -6664,23 +6954,30 @@ function AuctionCard({
           <small>{t("Min increment")}: {lot.currency} {lot.minIncrement.toLocaleString("en-US")}</small>
         </div>
       </div>
-      <div className="auction-form">
-        <label>
-          {t("Campaign name")}
-          <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
-        </label>
-        <label>
-          {t("Your bid")} ({lot.currency})
-          <input
-            type="number"
-            min={minNext}
-            step={lot.minIncrement}
-            value={amount}
-            onChange={(event) => setAmount(Number(event.target.value))}
-          />
-        </label>
-        <Button type="submit">{t("Place bid")}</Button>
-      </div>
+      {lot.status === "Open" ? (
+        <div className="auction-form">
+          <label>
+            {t("Campaign name")}
+            <input value={t(campaign)} onChange={(event) => setCampaign(event.target.value)} />
+          </label>
+          <label>
+            {t("Your bid")} ({lot.currency})
+            <input
+              type="number"
+              min={minNext}
+              step={lot.minIncrement}
+              value={amount}
+              onChange={(event) => setAmount(Number(event.target.value))}
+            />
+          </label>
+          <Button type="submit">{t("Place bid")}</Button>
+        </div>
+      ) : (
+        <div className="auction-closed">
+          <StatusPill label={lot.status} tone={LOT_TONE[lot.status]} />
+          <p>{lot.closeNote ? t(lot.closeNote) : lot.status === "Awarded" ? `${t("Awarded to")} ${t(lot.awardedTo ?? "")}` : t("Closed with no fill")}</p>
+        </div>
+      )}
       {error ? <p className="auction-error">{error}</p> : null}
     </form>
   );
