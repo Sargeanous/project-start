@@ -7206,7 +7206,8 @@ html[dir="rtl"] .network-tabs button.active {
 
 
 /* Linked detail: dependent detail rendered below its source (map/list) in one box */
-.linked-detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.linked-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.linked-detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+.linked-detail-head { display: flex; align-items: center; gap: 10px; }
+.linked-detail .detail-cards { gap: 12px; }
 .linked-detail-head .panel-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: var(--surface-2, #f1f5f4); color: var(--primary, #1f4a3d); flex: 0 0 auto; }
 .linked-detail-head strong { flex: 1; font-family: var(--font-serif, inherit); font-size: 17px; letter-spacing: -0.01em; }

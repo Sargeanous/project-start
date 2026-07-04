@@ -7372,7 +7372,6 @@ function CommercialMapPage({
             <Detail label="Uptime" value={asset.uptime} />
             <Detail label="Open faults" value={String(openTickets)} />
           </div>
-          <p className="notes">{t(asset.address)}</p>
 
           {allocation?.operator ? (
             <div className="detail-cards compact">
@@ -7400,8 +7399,6 @@ function CommercialMapPage({
               <p>{lot.status === "Open" ? `${t("Leading bid")} ${lot.currency} ${lot.currentBid.toLocaleString("en-US")} (${t(lot.leadingBidder)}) · ${t("floor")} ${lot.currency} ${lot.floorPrice.toLocaleString("en-US")}` : t(lot.closeNote ?? lot.status)}</p>
             </div>
           ) : null}
-
-          {allocation?.note ? <p className="notes">{t(allocation.note)}</p> : null}
 
           {assetSchedule.length ? (
             <CompactTable
