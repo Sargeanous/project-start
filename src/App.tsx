@@ -60,12 +60,14 @@ import {
 import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
+  assetAllocations,
   assets as estateAssets,
   fieldTasks,
   mediaAssets as seedMediaAssets,
   scheduleSlots,
   tickets,
   type Asset,
+  type AssetAllocation,
   type MediaAsset,
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
@@ -137,6 +139,7 @@ type Page =
   | "auditLog"
   | "edgeCompute"
   | "financials"
+  | "allocations"
   | "campaigns"
   | "marketplace";
 
@@ -405,14 +408,14 @@ const profiles: Profile[] = [
     name: "ADMO Finance",
     role: "Commercial finance",
     organization: "Abu Dhabi Media Office",
-    pages: ["financials", "control"],
+    pages: ["financials", "allocations", "control"],
   },
   {
     id: "admin",
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "financials", "mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
@@ -436,6 +439,7 @@ const navItems: Record<Page, NavItem> = {
   alerts: { id: "alerts", label: "Alerts and Emergencies", icon: ShieldAlert },
   network: { id: "network", label: "Network and Devices", icon: RadioTower },
   financials: { id: "financials", label: "Financials", icon: WalletCards },
+  allocations: { id: "allocations", label: "Commercial Map", icon: MapPinned },
   mediagpt: { id: "mediagpt", label: "MediaGPT", icon: Bot },
   knowledge: { id: "knowledge", label: "Knowledge", icon: Database },
   rules: { id: "rules", label: "Rules", icon: ShieldCheck },
@@ -458,6 +462,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "alerts", label: "Alerts and Emergencies", helper: "Emergency checks, approvals, and broadcasts" },
   { key: "network", label: "Network and Devices", helper: "Asset health, service orders, and purchase orders" },
   { key: "financials", label: "Financials", helper: "Approvals, budget risks, and commercial decisions" },
+  { key: "allocations", label: "Commercial Map", helper: "Asset allocations, availability, and commercial KPIs" },
   { key: "mediagpt", label: "MediaGPT", helper: "Agent outputs and approved AI actions" },
   { key: "knowledge", label: "Knowledge", helper: "Source ingestion and knowledge-base changes" },
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
@@ -479,7 +484,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 }, {} as NotificationPreferences);
 
 const navGroups: NavGroup[] = [
-  { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials"] },
+  { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations"] },
   { label: "Intelligence / Agentic", pages: ["mediagpt", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
@@ -1498,6 +1503,36 @@ const translations: Record<string, string> = {
   "Awaiting playout": "بانتظار العرض",
   "Lot": "الفترة المعروضة",
   "Flight window": "نافذة الحملة",
+  "Commercial Map": "الخريطة التجارية",
+  "Commercial operations map": "خريطة العمليات التجارية",
+  "Allocation status by asset": "حالة التخصيص حسب الأصل",
+  "Allocated": "مخصص",
+  "In bidding": "قيد المزايدة",
+  "Under maintenance": "قيد الصيانة",
+  "Allocation register": "سجل التخصيصات",
+  "Long-term contracts per RFP FIN-101": "عقود طويلة الأجل وفق متطلب FIN-101",
+  "Contracted value": "القيمة المتعاقد عليها",
+  "Allocated assets": "الأصول المخصصة",
+  "Available now": "متاح الآن",
+  "Sellable at rate card": "قابل للبيع بسعر التعرفة",
+  "Live auction": "مزاد مباشر",
+  "Operator": "المشغل",
+  "Contract": "العقد",
+  "Annual value": "القيمة السنوية",
+  "Revenue to date": "الإيرادات حتى الآن",
+  "Rate card / week": "التعرفة الأسبوعية",
+  "Share of voice": "حصة الظهور",
+  "Public split target": "النسبة العامة المستهدفة",
+  "Public split actual": "النسبة العامة الفعلية",
+  "Permitted categories": "الفئات المسموح بها",
+  "Fixed slots": "فترات ثابتة",
+  "Variable share-of-voice": "حصة ظهور مرنة",
+  "Open faults": "الأعطال المفتوحة",
+  "floor": "الحد الأدنى",
+  "week": "أسبوع",
+  "Active allocation contracts": "عقود التخصيص النشطة",
+  "Long-term operator contracts": "عقود المشغلين طويلة الأجل",
+  "Live auction lots on assets": "فترات مزاد مباشرة على الأصول",
   "Send": "إرسال",
   "Save output": "حفظ المخرج",
   "Export": "تصدير",
@@ -2670,6 +2705,7 @@ function App() {
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} t={t} />}
+          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
@@ -6325,6 +6361,171 @@ function EdgeGauge({ label, value }: { label: string; value: number }) {
       <strong>{value}%</strong>
       <div><i style={{ width: `${value}%` }} /></div>
     </div>
+  );
+}
+
+const ALLOCATION_TONE: Record<AssetAllocation["status"], Tone> = {
+  Allocated: "info",
+  Available: "good",
+  "In bidding": "neutral",
+  "Under maintenance": "warn",
+};
+const ALLOCATION_PIN: Record<AssetAllocation["status"], string> = {
+  Allocated: "#185fa5",
+  Available: "#1f9d57",
+  "In bidding": "#7c4ab7",
+  "Under maintenance": "#d08400",
+};
+
+// Map-based commercial operations dashboard (RFP FIN-601/602/603): per-asset
+// markers colour-coded by allocation status, click -> commercial detail panel.
+function CommercialMapPage({
+  auctions,
+  schedule,
+  t,
+}: {
+  auctions: AuctionLot[];
+  schedule: ScheduleItem[];
+  t: (value: string) => string;
+}) {
+  const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
+
+  const records = useMemo(
+    () =>
+      estateAssets.map((asset) => {
+        const allocation = assetAllocations.find((item) => item.assetId === asset.id);
+        const lot = allocation?.lotId ? auctions.find((item) => item.id === allocation.lotId) : undefined;
+        return { asset, allocation, lot };
+      }),
+    [auctions],
+  );
+  const mapAssets = useMemo(
+    () =>
+      records.map(({ asset, allocation }) => ({
+        id: asset.id,
+        name: asset.name,
+        zone: asset.zone,
+        status: allocation?.status ?? "Available",
+        lat: asset.lat,
+        lng: asset.lng,
+        x: asset.x,
+        y: asset.y,
+      })),
+    [records],
+  );
+  const selected = records.find((record) => record.asset.id === selectedAssetId) ?? records[0];
+  const { asset, allocation, lot } = selected;
+  const money = (value: number) => `AED ${value.toLocaleString("en-US")}`;
+
+  const contractedValue = records.reduce((sum, r) => sum + (r.allocation?.annualValueAed ?? 0), 0);
+  const allocatedCount = records.filter((r) => r.allocation?.status === "Allocated" || r.allocation?.status === "Under maintenance").length;
+  const inBidding = records.filter((r) => r.allocation?.status === "In bidding").length;
+  const available = records.filter((r) => (r.allocation?.status ?? "Available") === "Available").length;
+
+  const assetSchedule = schedule.filter((slot) => slot.asset === asset.id);
+  const openTickets = tickets.filter((ticket) => ticket.asset === asset.id && ticket.status !== "Resolved").length;
+
+  return (
+    <PageBody>
+      <MetricGrid>
+        <Metric label="Contracted value" value={money(contractedValue)} helper="Active allocation contracts" tone="good" />
+        <Metric label="Allocated assets" value={`${allocatedCount} / ${records.length}`} helper="Long-term operator contracts" tone="info" />
+        <Metric label="In bidding" value={String(inBidding)} helper="Live auction lots on assets" tone="neutral" />
+        <Metric label="Available now" value={String(available)} helper="Sellable at rate card" tone={available ? "warn" : "good"} />
+      </MetricGrid>
+
+      <div className="split-grid wide-left">
+        <Panel icon={MapPinned} title={t("Commercial operations map")} action={t("Allocation status by asset")}>
+          <LiveMap assets={mapAssets} selectedAssetId={selectedAssetId} onMarkerClick={setSelectedAssetId} openAlarmAssetIds={[]} t={t} />
+          <div className="alloc-legend">
+            {(Object.keys(ALLOCATION_PIN) as Array<AssetAllocation["status"]>).map((status) => (
+              <span key={status}><i style={{ background: ALLOCATION_PIN[status] }} />{t(status)}</span>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel icon={HardDrive} title={t(asset.name)} action={<StatusPill label={allocation?.status ?? "Available"} tone={ALLOCATION_TONE[allocation?.status ?? "Available"]} />}>
+          <div className="detail-cards compact">
+            <Detail label="Type" value={t(asset.type)} />
+            <Detail label="Size" value={asset.size} />
+            <Detail label="Resolution" value={asset.resolution} />
+            <Detail label="Installed" value={asset.installed} />
+            <Detail label="Uptime" value={asset.uptime} />
+            <Detail label="Open faults" value={String(openTickets)} />
+          </div>
+          <p className="notes">{t(asset.address)}</p>
+
+          {allocation?.operator ? (
+            <div className="detail-cards compact">
+              <Detail label="Operator" value={t(allocation.operator)} />
+              <Detail label="Contract" value={allocation.contractRef ?? "-"} />
+              <Detail label="Model" value={t(allocation.model ?? "-")} />
+              <Detail label="Window" value={`${allocation.effectiveDate ?? "-"} → ${allocation.expiryDate ?? "-"}`} />
+              <Detail label="Annual value" value={allocation.annualValueAed ? money(allocation.annualValueAed) : "-"} />
+              <Detail label="Revenue to date" value={allocation.revenueToDateAed ? money(allocation.revenueToDateAed) : "-"} />
+            </div>
+          ) : null}
+
+          <div className="detail-cards compact">
+            <Detail label="Rate card / week" value={allocation?.rateCardWeekAed ? money(allocation.rateCardWeekAed) : "-"} />
+            <Detail label="Share of voice" value={t(allocation?.shareOfVoice ?? "-")} />
+            <Detail label="Public split target" value={allocation?.publicSplitTarget ?? "-"} />
+            <Detail label="Public split actual" value={allocation?.publicSplitActual ?? "-"} />
+            <Detail label="Audience" value={t(asset.audience)} />
+            <Detail label="Proof-of-play" value={asset.pop} />
+          </div>
+
+          {lot ? (
+            <div className={`twin-detail tone-${lot.status === "Open" ? "degrading" : "fault"}`}>
+              <strong>{t("Live auction")}: {t(lot.lotName)}</strong>
+              <p>{lot.status === "Open" ? `${t("Leading bid")} ${lot.currency} ${lot.currentBid.toLocaleString("en-US")} (${t(lot.leadingBidder)}) · ${t("floor")} ${lot.currency} ${lot.floorPrice.toLocaleString("en-US")}` : t(lot.closeNote ?? lot.status)}</p>
+            </div>
+          ) : null}
+
+          {allocation?.note ? <p className="notes">{t(allocation.note)}</p> : null}
+
+          {assetSchedule.length ? (
+            <CompactTable
+              columns={["Time", "Campaign", "State"]}
+              rows={assetSchedule.slice(0, 4).map((slot) => [slot.time, slot.campaign, slot.state])}
+            />
+          ) : (
+            <p className="notes">{t("Next slot")}: {t(asset.nextSlot)}</p>
+          )}
+        </Panel>
+      </div>
+
+      <Panel icon={FileText} title={t("Allocation register")} action={t("Long-term contracts per RFP FIN-101")}>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("Asset")}</th>
+                <th>{t("Status")}</th>
+                <th>{t("Operator")}</th>
+                <th>{t("Contract")}</th>
+                <th>{t("Window")}</th>
+                <th>{t("Annual value")}</th>
+                <th>{t("Permitted categories")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map(({ asset: rowAsset, allocation: rowAlloc }) => (
+                <tr key={rowAsset.id} className={rowAsset.id === selectedAssetId ? "selected" : ""} onClick={() => setSelectedAssetId(rowAsset.id)}>
+                  <td data-label={t("Asset")}><strong>{t(rowAsset.name)}</strong><span>{rowAsset.id} · {t(rowAsset.zone)}</span></td>
+                  <td data-label={t("Status")}><StatusPill label={rowAlloc?.status ?? "Available"} tone={ALLOCATION_TONE[rowAlloc?.status ?? "Available"]} /></td>
+                  <td data-label={t("Operator")}>{rowAlloc?.operator ? t(rowAlloc.operator) : "-"}</td>
+                  <td data-label={t("Contract")}>{rowAlloc?.contractRef ?? "-"}</td>
+                  <td data-label={t("Window")}>{rowAlloc?.effectiveDate ? `${rowAlloc.effectiveDate} → ${rowAlloc.expiryDate ?? "-"}` : "-"}</td>
+                  <td data-label={t("Annual value")}>{rowAlloc?.annualValueAed ? money(rowAlloc.annualValueAed) : rowAlloc?.rateCardWeekAed ? `${money(rowAlloc.rateCardWeekAed)} / ${t("week")}` : "-"}</td>
+                  <td data-label={t("Permitted categories")}>{rowAlloc?.permittedCategories ? t(rowAlloc.permittedCategories) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </PageBody>
   );
 }
 

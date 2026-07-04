@@ -392,6 +392,98 @@ export const historicalCampaigns: HistoricalCampaign[] = [
   { id: "HC-2026-019", campaign: "Royal Safari winter push", advertiser: "Royal Safari", packageName: "Airport and premium roadside", zone: "Airport route", assetIds: ["AD-HWY-001", "AD-BRG-014"], startDate: "2026-02-10", endDate: "2026-03-05", budgetAed: 365000, impressions: 1390000, plays: 19700, pop: "98.9%", outcome: "Bridge asset temperature warning reduced delivered plays by 1.8%" },
 ];
 
+// Long-term asset allocation register (RFP FIN-101). Explicit assetId joins;
+// lotId links an asset to a live short-term auction (never parsed from lot text).
+export type AllocationStatus = "Allocated" | "Available" | "In bidding" | "Under maintenance";
+
+export interface AssetAllocation {
+  assetId: string;
+  status: AllocationStatus;
+  operator?: string;
+  contractRef?: string;
+  model?: "Fixed slots" | "Variable share-of-voice";
+  permittedCategories?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  annualValueAed?: number;
+  rateCardWeekAed?: number;
+  shareOfVoice?: string;
+  publicSplitTarget?: string;
+  publicSplitActual?: string;
+  revenueToDateAed?: number;
+  lotId?: string;
+  note?: string;
+}
+
+export const assetAllocations: AssetAllocation[] = [
+  {
+    assetId: "AD-HWY-001",
+    status: "Allocated",
+    operator: "Abu Dhabi Duty Free",
+    contractRef: "CTR-2024-088-R1",
+    model: "Fixed slots",
+    permittedCategories: "Retail, travel, tourism",
+    effectiveDate: "2025-07-01",
+    expiryDate: "2027-06-30",
+    annualValueAed: 1450000,
+    rateCardWeekAed: 38500,
+    shareOfVoice: "40% SOV, evening fixed slots",
+    publicSplitTarget: "30% public / 70% commercial",
+    publicSplitActual: "32% public / 68% commercial",
+    revenueToDateAed: 1180000,
+    note: "Annual route buy converted from HC-2024-088; renewal review due Q1 2027.",
+  },
+  {
+    assetId: "AD-BRG-014",
+    status: "Available",
+    rateCardWeekAed: 24000,
+    publicSplitTarget: "30% public / 70% commercial",
+    note: "Returned to pool after Royal Safari winter flight; thermal warning under monitoring.",
+  },
+  {
+    assetId: "AD-BUS-022",
+    status: "In bidding",
+    lotId: "LOT-4402",
+    operator: "Yas Tourism",
+    contractRef: "CTR-2025-104",
+    model: "Variable share-of-voice",
+    permittedCategories: "Leisure, tourism, events",
+    effectiveDate: "2025-09-01",
+    expiryDate: "2026-08-30",
+    annualValueAed: 620000,
+    rateCardWeekAed: 14500,
+    shareOfVoice: "25% SOV, flexible windows",
+    publicSplitTarget: "35% public / 65% commercial",
+    publicSplitActual: "36% public / 64% commercial",
+    revenueToDateAed: 505000,
+    note: "Current allocation expires Aug 30, 2026; successor flight in live auction LOT-4402.",
+  },
+  {
+    assetId: "AD-HWY-009",
+    status: "Available",
+    rateCardWeekAed: 11000,
+    publicSplitTarget: "40% public / 60% commercial",
+    note: "Sellable subject to edge controller restoration; listed at gateway rate card.",
+  },
+  {
+    assetId: "AD-DWT-011",
+    status: "Under maintenance",
+    operator: "Retail Majlis",
+    contractRef: "CTR-2025-071-X",
+    model: "Fixed slots",
+    permittedCategories: "Retail, F&B",
+    effectiveDate: "2025-11-01",
+    expiryDate: "2026-10-31",
+    annualValueAed: 890000,
+    rateCardWeekAed: 21500,
+    shareOfVoice: "30% SOV, weekend fixed slots",
+    publicSplitTarget: "30% public / 70% commercial",
+    publicSplitActual: "28% public / 72% commercial",
+    revenueToDateAed: 610000,
+    note: "LED module swap in progress; commercial delivery paused, make-good accruing.",
+  },
+];
+
 export const historicalBids: HistoricalBid[] = [
   { id: "HB-9001", lotId: "LOT-4411", lotName: "Corniche prime - evening rotation", bidder: "Yas Tourism", campaign: "Yas Bay summer", zone: "Corniche", amountAed: 442000, submittedAt: "2026-06-22T15:40:00Z", result: "Won" },
   { id: "HB-9002", lotId: "LOT-4411", lotName: "Corniche prime - evening rotation", bidder: "Coca-Cola", campaign: "Noor summer", zone: "Corniche", amountAed: 437000, submittedAt: "2026-06-22T15:18:00Z", result: "Outbid" },

@@ -458,6 +458,12 @@ const statusColor: Record<string, string> = {
   Warning: "#d08400",
   Maintenance: "#d08400",
   Offline: "#c0392b",
+  // Commercial allocation statuses (FIN-601 map) - additive keys so the health map is unaffected.
+  Allocated: "#185fa5",
+  Available: "#1f9d57",
+  "In bidding": "#7c4ab7",
+  "Under maintenance": "#d08400",
+  "Emergency override": "#c0392b",
 };
 
 interface LiveMapAsset {
