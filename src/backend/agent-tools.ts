@@ -96,7 +96,7 @@ export const agentTools: AgentTool[] = [
     tickets,
     fieldTasks,
   })),
-  readTool("getFinancials", "Get commercial finance, campaigns, bids and proof-of-play settlement context.", objectSchema({}), async () => {
+  readTool("getFinancials", "Get commercial finance data: monthly revenue by zone, campaigns, bids, approvals and settlement context. Use this for any revenue, billing, budget or financial reporting question.", objectSchema({}), async () => {
     const state = await getState();
     return {
       financeApprovals: state.financeApprovals,
@@ -145,12 +145,13 @@ export const agentTools: AgentTool[] = [
       bids: state.bids,
     };
   }),
-  readTool("proofOfPlay", "Get signed playback evidence for assets, zones or campaigns.", objectSchema({
+  readTool("proofOfPlay", "Get signed playback evidence for assets, zones or campaigns. Use for delivery verification and playout disputes only, never for revenue or financial reporting (use getFinancials for those).", objectSchema({
     scope: stringSchema("Asset, zone or campaign scope"),
   }), async (args) => {
     const scope = stringValue(args.scope).toLowerCase();
     const state = await getState();
     return {
+      popLedger: state.popLedger.filter((record) => !scope || `${record.assetId} ${record.campaign}`.toLowerCase().includes(scope)).slice(-12),
       proofRecords: proofRecords.filter((record) => !scope || `${record.asset} ${record.campaign}`.toLowerCase().includes(scope)),
       published: state.published.filter((record) => !scope || `${record.asset} ${record.campaign}`.toLowerCase().includes(scope)),
     };
