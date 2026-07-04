@@ -172,6 +172,45 @@ interface NavGroup {
   pages: Page[];
 }
 
+type SubmissionCategory = "routine" | "sensitive" | "high-impact";
+
+interface ApprovalSignature {
+  name: string;
+  role: string;
+  at: string;
+  mfa: boolean;
+}
+
+interface SubmissionJournalEntry {
+  at: string;
+  actor: string;
+  role: string;
+  stage: SubmissionStage;
+  decision: string;
+  reason?: string;
+  contentHash: string;
+  version: number;
+  nextAssignee?: string;
+  slaDueAt?: string;
+  diff?: string[];
+}
+
+interface NamedApprover {
+  name: string;
+  role: string;
+  canApprove: SubmissionCategory[];
+}
+
+// Mirror of backend namedApprovers (dooh-store.ts) for the approver picker.
+const namedApprovers: NamedApprover[] = [
+  { name: "Maya Haddad", role: "reviewer", canApprove: ["routine", "sensitive"] },
+  { name: "Noura Salem", role: "reviewer", canApprove: ["routine", "sensitive"] },
+  { name: "Hamad Al Ketbi", role: "reviewer", canApprove: ["routine"] },
+  { name: "Khaled Nasser", role: "control-room", canApprove: ["sensitive", "high-impact"] },
+  { name: "Sara Al Mansoori", role: "admin", canApprove: ["routine", "sensitive", "high-impact"] },
+  { name: "Khaled Mansoor", role: "admin", canApprove: ["high-impact"] },
+];
+
 interface Submission {
   id: string;
   campaign: string;
@@ -185,6 +224,12 @@ interface Submission {
   creativeId: string;
   language: string;
   notes: string;
+  version: number;
+  contentHash: string;
+  category: SubmissionCategory;
+  journal: SubmissionJournalEntry[];
+  approvals: ApprovalSignature[];
+  pendingSecondApproval?: boolean;
 }
 
 interface BidderCampaign {
@@ -554,6 +599,11 @@ const seedSubmissions: Submission[] = [
     creativeId: "etihad-retail",
     language: "Arabic and English",
     notes: "Airport retail creative with bilingual copy and weekend flight targeting.",
+    version: 1,
+    contentHash: "seed",
+    category: "routine",
+    journal: [],
+    approvals: [],
   },
   {
     id: "SUB-1047",
@@ -568,6 +618,11 @@ const seedSubmissions: Submission[] = [
     creativeId: "yas-tourism",
     language: "Arabic and English",
     notes: "Tourism campaign approved for Yas and airport routes.",
+    version: 1,
+    contentHash: "seed",
+    category: "routine",
+    journal: [],
+    approvals: [],
   },
   {
     id: "SUB-1046",
@@ -582,6 +637,11 @@ const seedSubmissions: Submission[] = [
     creativeId: "weather-alert",
     language: "Arabic first",
     notes: "Public notice scheduled after dual-control approval.",
+    version: 1,
+    contentHash: "seed",
+    category: "sensitive",
+    journal: [],
+    approvals: [],
   },
   {
     id: "SUB-1045",
@@ -596,6 +656,11 @@ const seedSubmissions: Submission[] = [
     creativeId: "holiday-notice",
     language: "Arabic and English",
     notes: "Awaiting cultural review and schedule lock.",
+    version: 1,
+    contentHash: "seed",
+    category: "high-impact",
+    journal: [],
+    approvals: [],
   },
 ];
 
@@ -1572,6 +1637,34 @@ const translations: Record<string, string> = {
   "Settled and revenue recognised": "تمت التسوية والاعتراف بالإيراد",
   "Long-term operator contracts": "عقود المشغلين طويلة الأجل",
   "Live auction lots on assets": "فترات مزاد مباشرة على الأصول",
+  "Stage journal": "سجل المراحل",
+  "Named-approver decision": "قرار المعتمد المُسمّى",
+  "Category": "الفئة",
+  "routine": "اعتيادي",
+  "sensitive": "حساس",
+  "high-impact": "عالي التأثير",
+  "Dual control (2 approvers + MFA)": "رقابة مزدوجة (معتمدان + تحقق ثنائي)",
+  "Named approver + MFA": "معتمد مُسمّى + تحقق ثنائي",
+  "Named approver": "معتمد مُسمّى",
+  "approved": "معتمد",
+  "Approving as": "الاعتماد باسم",
+  "Select a named approver": "اختر معتمداً مُسمّى",
+  "Approve with MFA": "اعتماد بالتحقق الثنائي",
+  "Second approval (MFA)": "الاعتماد الثاني (تحقق ثنائي)",
+  "Segregation of duties: the owner and the bidder cannot approve their own submission.": "الفصل بين المهام: لا يمكن للمالك أو مقدّم الطلب اعتماد طلبه.",
+  "No further eligible approvers. Dual control requires two distinct named approvers.": "لا يوجد معتمدون مؤهلون إضافيون. تتطلب الرقابة المزدوجة معتمدَين مختلفين.",
+  "MFA step-up verification": "التحقق الثنائي المعزّز",
+  "High-impact and sensitive content require multi-factor step-up. Enter the 6-digit authenticator code.": "يتطلب المحتوى الحساس وعالي التأثير تحققاً ثنائياً. أدخل رمز المصادقة المكوّن من 6 أرقام.",
+  "Authenticator code": "رمز المصادقة",
+  "Demo: any 6-digit code verifies.": "عرض توضيحي: أي رمز من 6 أرقام يُقبل.",
+  "Verify and approve": "تحقق واعتمد",
+  "first approval recorded, second approver required": "تم تسجيل الاعتماد الأول، يلزم معتمد ثانٍ",
+  "Revision resubmitted": "أُعيد تقديم التعديل",
+  "MFA": "تحقق ثنائي",
+  "Next": "التالي",
+  "SLA due": "استحقاق مستوى الخدمة",
+  "v": "إصدار ",
+  "hash": "بصمة",
   "Send": "إرسال",
   "Save output": "حفظ المخرج",
   "Export": "تصدير",
@@ -1891,7 +1984,6 @@ const translations: Record<string, string> = {
   "Proof-of-Play": "إثبات التشغيل",
   "Reconciliation": "التسوية",
 
-  "Named approver": "المعتمد المحدد",
   "Approval hash": "بصمة الاعتماد",
   "Content hash": "بصمة المحتوى",
   "Dual-control": "تحكم مزدوج",
@@ -2568,9 +2660,34 @@ function App() {
   async function updateSubmissionStage(id: string, stage: SubmissionStage) {
     const result = await syncMutation<{ state: DoohStatePayload; submission: Submission }>(`submissions/${id}/stage`, {
       actor: profile?.name ?? "ADMO",
+      role: profile?.id ?? "reviewer",
       stage,
     });
     if (result) notify(`${t(result.submission.campaign)}: ${t(stage)}`);
+  }
+
+  async function approveSubmissionAction(id: string, approverName: string, reason: string, mfaCode: string) {
+    const result = await syncMutation<{ state: DoohStatePayload; submission: Submission; pendingSecondApproval: boolean }>(`submissions/${id}/approve`, {
+      actor: profile?.name ?? "ADMO",
+      role: profile?.id ?? "reviewer",
+      approverName,
+      reason,
+      mfaCode,
+    });
+    if (result) {
+      notify(result.pendingSecondApproval
+        ? `${t(result.submission.campaign)}: ${t("first approval recorded, second approver required")}`
+        : `${t(result.submission.campaign)}: ${t("Approved")}`);
+    }
+  }
+
+  async function resubmitSubmissionAction(id: string, payload: { creativeId?: string; language?: string; notes?: string; budget?: string; message?: string }) {
+    const result = await syncMutation<{ state: DoohStatePayload; submission: Submission }>(`submissions/${id}/resubmit`, {
+      actor: profile?.name ?? "Advertiser",
+      role: profile?.id ?? "bidder",
+      payload,
+    });
+    if (result) notify(`${t(result.submission.campaign)}: ${t("Revision resubmitted")} v${result.submission.version}`);
   }
 
   async function requestBidderChanges(id: string, message: string) {
@@ -2711,8 +2828,10 @@ function App() {
               submissions={submissions}
               schedule={schedule}
               published={published}
+              profile={profile}
               onStage={updateSubmissionStage}
               onRequestChanges={requestBidderChanges}
+              onApprove={approveSubmissionAction}
               onPlaySchedule={playSchedule}
               aiAvailable={aiAvailable}
               t={t}
@@ -2754,7 +2873,7 @@ function App() {
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
           {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
-          {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
         </main>
         <MediaGptChatbot profile={profile} t={t} />
@@ -3231,8 +3350,10 @@ function CmsPage({
   submissions,
   schedule,
   published,
+  profile,
   onStage,
   onRequestChanges,
+  onApprove,
   onPlaySchedule,
   aiAvailable,
   t,
@@ -3240,8 +3361,10 @@ function CmsPage({
   submissions: Submission[];
   schedule: ScheduleItem[];
   published: PublishedItem[];
+  profile: Profile | null;
   onStage: (id: string, next: SubmissionStage) => void;
   onRequestChanges: (id: string, message: string) => void;
+  onApprove: (id: string, approverName: string, reason: string, mfaCode: string) => void;
   onPlaySchedule: (id: string) => void;
   aiAvailable: boolean;
   t: (value: string) => string;
@@ -3285,7 +3408,7 @@ function CmsPage({
             </div>
           </Panel>
           <Panel icon={ClipboardCheck} title={t(selected.campaign)} action={selected.id}>
-            <SubmissionDetail submission={selected} aiAvailable={aiAvailable} onStage={onStage} onRequestChanges={onRequestChanges} />
+            <SubmissionDetail submission={selected} profile={profile} aiAvailable={aiAvailable} onStage={onStage} onRequestChanges={onRequestChanges} onApprove={onApprove} />
           </Panel>
         </div>
       ) : null}
@@ -3298,14 +3421,18 @@ function CmsPage({
 
 function SubmissionDetail({
   submission,
+  profile,
   aiAvailable,
   onStage,
   onRequestChanges,
+  onApprove,
 }: {
   submission: Submission;
+  profile: Profile | null;
   aiAvailable: boolean;
   onStage: (id: string, stage: SubmissionStage) => void;
   onRequestChanges: (id: string, message: string) => void;
+  onApprove: (id: string, approverName: string, reason: string, mfaCode: string) => void;
 }) {
   const t = useT();
   const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
@@ -3313,6 +3440,7 @@ function SubmissionDetail({
   const [tagLoading, setTagLoading] = useState(false);
   const [triage, setTriage] = useState<SubmissionTriageResponse | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
+  const [mfaDialog, setMfaDialog] = useState<{ approverName: string; reason: string } | null>(null);
 
   // Triage/tag results belong to one submission; clear them when the reviewer
   // switches items so a stale proposal can never be acted on against the wrong one.
@@ -3321,6 +3449,7 @@ function SubmissionDetail({
     setTriageLoading(false);
     setTags(null);
     setTagLoading(false);
+    setMfaDialog(null);
   }, [submission.id]);
 
   function sendRevisionRequest(message: string) {
@@ -3414,11 +3543,26 @@ function SubmissionDetail({
 
       <ReviewerNotes submissionId={submission.id} />
 
+      {submission.stage === "In review" ? (
+        <SubmissionApprovals
+          submission={submission}
+          onRequestApproval={(approverName) => {
+            if (submission.category === "routine") {
+              onApprove(submission.id, approverName, "Named approver signed", "");
+            } else {
+              setMfaDialog({ approverName, reason: "Named approver signed with MFA step-up" });
+            }
+          }}
+          t={t}
+        />
+      ) : null}
+
+      <SubmissionJournal submission={submission} t={t} />
+
       <ActionRow>
         {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
         {submission.stage === "In review" && (
           <>
-            <Button onClick={() => onStage(submission.id, "Approved")}>Approve</Button>
             <Button variant="secondary" icon={Send} onClick={() => setRevisionDialogOpen(true)}>Prepare bidder message</Button>
             <Button variant="secondary" onClick={() => onStage(submission.id, "Submitted")}>Return to intake</Button>
           </>
@@ -3436,6 +3580,169 @@ function SubmissionDetail({
           onSend={sendRevisionRequest}
         />
       ) : null}
+      {mfaDialog ? (
+        <MfaStepUpDialog
+          approverName={mfaDialog.approverName}
+          onCancel={() => setMfaDialog(null)}
+          onVerify={(code) => {
+            onApprove(submission.id, mfaDialog.approverName, mfaDialog.reason, code);
+            setMfaDialog(null);
+          }}
+          t={t}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+const CATEGORY_TONE: Record<SubmissionCategory, Tone> = { routine: "neutral", sensitive: "warn", "high-impact": "danger" };
+
+function hashPrefix(hash: string) {
+  return hash && hash !== "seed" ? `${hash.slice(0, 10)}…` : "—";
+}
+
+function SubmissionJournal({ submission, t }: { submission: Submission; t: (value: string) => string }) {
+  const entries = [...(submission.journal ?? [])].reverse();
+  if (!entries.length) return null;
+  return (
+    <section className="journal-panel">
+      <div className="journal-head">
+        <strong>{t("Stage journal")}</strong>
+        <span>{t("v")}{submission.version} · {t("hash")} {hashPrefix(submission.contentHash)}</span>
+      </div>
+      <ol className="journal-timeline">
+        {entries.map((entry, index) => (
+          <li key={`${entry.at}-${index}`} className="journal-entry">
+            <span className="journal-dot" />
+            <div className="journal-body">
+              <div className="journal-row">
+                <strong>{t(entry.decision)}</strong>
+                <em>{entry.at.replace("T", " ").slice(0, 16)}</em>
+              </div>
+              <span className="journal-meta">{t(entry.actor)} · {t(entry.role)} · {t(entry.stage)}{entry.version ? ` · v${entry.version}` : ""}</span>
+              {entry.reason ? <p className="journal-reason">{t(entry.reason)}</p> : null}
+              {entry.diff?.length ? (
+                <ul className="journal-diff">
+                  {entry.diff.map((line) => <li key={line}>{line}</li>)}
+                </ul>
+              ) : null}
+              <span className="journal-next">
+                {entry.nextAssignee ? `${t("Next")}: ${t(entry.nextAssignee)}` : ""}
+                {entry.slaDueAt ? ` · ${t("SLA due")} ${entry.slaDueAt.replace("T", " ").slice(0, 16)}` : ""}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function SubmissionApprovals({
+  submission,
+  onRequestApproval,
+  t,
+}: {
+  submission: Submission;
+  onRequestApproval: (approverName: string) => void;
+  t: (value: string) => string;
+}) {
+  const eligible = namedApprovers.filter((approver) => approver.canApprove.includes(submission.category));
+  const alreadySigned = new Set(submission.approvals.map((signature) => signature.name));
+  const [approverName, setApproverName] = useState("");
+  const dualControl = submission.category === "high-impact";
+  const needed = dualControl ? 2 : 1;
+  const have = submission.approvals.length;
+
+  const options = eligible.filter(
+    (approver) => approver.name !== submission.owner && approver.name !== submission.bidder && !alreadySigned.has(approver.name),
+  );
+
+  return (
+    <section className="approvals-panel">
+      <div className="approvals-head">
+        <div>
+          <strong>{t("Named-approver decision")}</strong>
+          <span>
+            {t("Category")}: <StatusPill label={submission.category} tone={CATEGORY_TONE[submission.category]} />
+            {" · "}{dualControl ? t("Dual control (2 approvers + MFA)") : submission.category === "sensitive" ? t("Named approver + MFA") : t("Named approver")}
+          </span>
+        </div>
+        <StatusPill label={`${have} / ${needed} ${t("approved")}`} tone={have >= needed ? "good" : "warn"} />
+      </div>
+
+      {submission.approvals.length ? (
+        <div className="approvals-signatures">
+          {submission.approvals.map((signature) => (
+            <span key={signature.name} className="approval-sig">
+              <ShieldCheck size={14} /> {t(signature.name)} · {t(signature.role)}{signature.mfa ? ` · ${t("MFA")}` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="approvals-sod">{t("Segregation of duties: the owner and the bidder cannot approve their own submission.")}</p>
+
+      <div className="approvals-action">
+        <label>
+          {t("Approving as")}
+          <select value={approverName} onChange={(event) => setApproverName(event.target.value)}>
+            <option value="">{t("Select a named approver")}</option>
+            {options.map((approver) => (
+              <option key={approver.name} value={approver.name}>{approver.name} ({t(approver.role)})</option>
+            ))}
+          </select>
+        </label>
+        <Button
+          icon={ShieldCheck}
+          disabled={!approverName}
+          onClick={() => onRequestApproval(approverName)}
+        >
+          {submission.category === "routine" ? t("Approve") : dualControl && have >= 1 ? t("Second approval (MFA)") : t("Approve with MFA")}
+        </Button>
+      </div>
+      {!options.length ? <p className="approvals-empty">{t("No further eligible approvers. Dual control requires two distinct named approvers.")}</p> : null}
+    </section>
+  );
+}
+
+function MfaStepUpDialog({
+  approverName,
+  onCancel,
+  onVerify,
+  t,
+}: {
+  approverName: string;
+  onCancel: () => void;
+  onVerify: (code: string) => void;
+  t: (value: string) => string;
+}) {
+  const [code, setCode] = useState("");
+  const valid = /^[0-9]{6}$/.test(code);
+  return (
+    <div className="wizard-backdrop revision-backdrop mfa-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <span className="panel-icon"><ShieldCheck size={18} /></span>
+          <div>
+            <strong>{t("MFA step-up verification")}</strong>
+            <small>{t("Approving as")} {t(approverName)}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}>×</button>
+        </header>
+        <div className="revision-body">
+          <p className="revision-impact">{t("High-impact and sensitive content require multi-factor step-up. Enter the 6-digit authenticator code.")}</p>
+          <label className="revision-field">
+            {t("Authenticator code")}
+            <input inputMode="numeric" maxLength={6} value={code} placeholder="••••••" onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, ""))} />
+          </label>
+          <p className="mfa-hint">{t("Demo: any 6-digit code verifies.")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={ShieldCheck} disabled={!valid} onClick={() => onVerify(code)}>{t("Verify and approve")}</Button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -6966,12 +7273,16 @@ function FinancialsPage({
 function CampaignsPage({
   campaigns,
   bidderMessages,
+  submissions,
   onNewBrief,
+  onResubmit,
   t,
 }: {
   campaigns: BidderCampaign[];
   bidderMessages: BidderCommunication[];
+  submissions: Submission[];
   onNewBrief: () => void;
+  onResubmit: (id: string, payload: { notes?: string; message?: string }) => void;
   t: (value: string) => string;
 }) {
   const messagesByCampaign = new Map(bidderMessages.map((message) => [message.campaign, message]));
@@ -7005,7 +7316,17 @@ function CampaignsPage({
                 </div>
                 <div className="row-actions">
                   <Button variant="secondary" icon={Eye} onClick={() => setMessageNotice(`${t("Opened request")}: ${t(campaign.campaign)}`)}>{t("Review request")}</Button>
-                  <Button icon={Upload} onClick={() => setMessageNotice(`${t("Revision staged")}: ${t(campaign.campaign)}`)}>{t("Upload revision")}</Button>
+                  <Button
+                    icon={Upload}
+                    onClick={() => {
+                      const submission = submissions.find((item) => item.campaign === campaign.campaign);
+                      if (!submission) { setMessageNotice(`${t("Revision staged")}: ${t(campaign.campaign)}`); return; }
+                      onResubmit(submission.id, {
+                        notes: `Revised pack v${(submission.version ?? 1) + 1}: addressed ADMO review notes, enlarged CTA, Arabic and English aligned.`,
+                        message: "Revised creative pack uploaded per ADMO review notes.",
+                      });
+                    }}
+                  >{t("Upload revision")}</Button>
                 </div>
               </article>
             ))}

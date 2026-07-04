@@ -2985,6 +2985,40 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
   padding: 2px 6px;
   color: var(--muted);
 }
+
+/* Stage journal timeline */
+.journal-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2, #f8faf9); }
+.journal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.journal-head strong { font-size: 13.5px; }
+.journal-head span { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+.journal-timeline { list-style: none; margin: 0; padding: 0; }
+.journal-entry { position: relative; display: flex; gap: 12px; padding: 0 0 14px 4px; }
+.journal-entry:not(:last-child)::before { content: ""; position: absolute; left: 8px; top: 14px; bottom: 0; width: 2px; background: var(--line); }
+.journal-dot { flex: 0 0 auto; width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; background: var(--primary, #185fa5); box-shadow: 0 0 0 3px var(--surface, #fff); z-index: 1; }
+.journal-body { flex: 1; min-width: 0; }
+.journal-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.journal-row strong { font-size: 13px; color: #16202b; }
+.journal-row em { font-style: normal; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.journal-meta { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.journal-reason { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: #2a3a34; }
+.journal-diff { margin: 5px 0 0; padding-left: 16px; font-size: 11.5px; color: #45505c; }
+.journal-diff li { font-family: ui-monospace, monospace; }
+.journal-next { display: block; font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+
+/* Named-approver / dual-control panel */
+.approvals-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #eef4ff; border-left: 4px solid var(--primary, #185fa5); }
+.approvals-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.approvals-head strong { display: block; font-size: 14px; }
+.approvals-head > div > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.approvals-signatures { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.approval-sig { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #15803d; background: #e7f4ec; border-radius: 999px; padding: 3px 10px; }
+.approvals-sod { margin: 10px 0; font-size: 11.5px; color: var(--muted); font-style: italic; }
+.approvals-action { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.approvals-action label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+.approvals-action select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; background: #fff; min-width: 240px; }
+.approvals-empty { margin: 8px 0 0; font-size: 11.5px; color: #8a5a08; }
+.mfa-backdrop { z-index: 240; }
+.mfa-hint { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
 .alloc-legend i {
   width: 10px;
   height: 10px;
