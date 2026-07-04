@@ -71,6 +71,8 @@ import {
   type MediaAsset,
 } from "./data";
 import { creativeBackground, feedBackground, LiveMap } from "./visuals";
+import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
+import type { RuleVerdict } from "./rules-engine";
 import {
   demoScenarios,
   doohOntology,
@@ -335,6 +337,18 @@ interface PopRecord {
   hash: string;
 }
 
+interface EnforcementEvent {
+  id: string;
+  at: string;
+  kind: "booking" | "scheduling" | "emergency";
+  subject: string;
+  outcome: "blocked" | "warned" | "overridden" | "cleared";
+  reasonCodes: string[];
+  firedRuleIds: string[];
+  detail: string;
+  actor: string;
+}
+
 interface ScheduleItem {
   id: string;
   time: string;
@@ -443,6 +457,7 @@ interface DoohStatePayload {
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
   popLedger: PopRecord[];
+  enforcementEvents: EnforcementEvent[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -1637,6 +1652,42 @@ const translations: Record<string, string> = {
   "Settled and revenue recognised": "تمت التسوية والاعتراف بالإيراد",
   "Long-term operator contracts": "عقود المشغلين طويلة الأجل",
   "Live auction lots on assets": "فترات مزاد مباشرة على الأصول",
+  "Rules engine simulator": "محاكي محرك القواعد",
+  "Server-enforced, deterministic": "مُطبّق على الخادم، حتمي",
+  "Content category": "فئة المحتوى",
+  "Requester tier": "مستوى مقدّم الطلب",
+  "Evaluate booking": "تقييم الحجز",
+  "Evaluating": "جارٍ التقييم",
+  "Blocked": "محظور",
+  "Allowed with warnings": "مسموح مع تحذيرات",
+  "overridden by": "تم تجاوزه بواسطة",
+  "No rules fired for this context.": "لم تُفعّل أي قاعدة لهذا السياق.",
+  "Choose a context and evaluate to see live enforcement.": "اختر سياقاً وقيّمه لعرض التطبيق المباشر.",
+  "Live ruleset": "مجموعة القواعد الحية",
+  "machine rules": "قواعد آلية",
+  "Proximity exclusions": "استثناءات القرب",
+  "Category and zoning": "الفئة والتقسيم",
+  "Network-wide": "على مستوى الشبكة",
+  "Recent enforcement events": "أحداث التطبيق الأخيرة",
+  "Outcome": "النتيجة",
+  "Reason codes": "رموز الأسباب",
+  "Mosque": "مسجد",
+  "School": "مدرسة",
+  "Diplomatic site": "موقع دبلوماسي",
+  "Military site": "موقع عسكري",
+  "Hospital": "مستشفى",
+  "Emergency": "طوارئ",
+  "Public Safety": "السلامة العامة",
+  "Civic": "مدني",
+  "Regulatory": "تنظيمي",
+  "Alcohol": "كحول",
+  "Gambling": "مقامرة",
+  "Energy drink": "مشروب طاقة",
+  "Political": "سياسي",
+  "Civic notice": "إشعار مدني",
+  "PROHIBITED_CATEGORY": "فئة محظورة",
+  "SCHOOL_DAYPART_RESTRICTED": "قيود ساعات الدراسة",
+  "SENSITIVE_ZONE_POLITICAL": "منطقة حساسة سياسياً",
   "Stage journal": "سجل المراحل",
   "Named-approver decision": "قرار المعتمد المُسمّى",
   "Category": "الفئة",
@@ -1897,9 +1948,7 @@ const translations: Record<string, string> = {
   "Overnight": "الليل",
   "English first": "الإنجليزية أولاً",
   "Bilingual": "ثنائي اللغة",
-  "Civic": "مدني",
   "Cultural": "ثقافي",
-  "Emergency": "طارئ",
   "Standard": "قياسي",
   "Deep": "معمق",
   "Cultural review": "مراجعة ثقافية",
@@ -2190,7 +2239,6 @@ const translations: Record<string, string> = {
   "All layers": "كل الطبقات",
   "Technical layers only": "الطبقات التقنية فقط",
   "Allowed": "مسموح",
-  "Blocked": "محظور",
   "Limited": "محدود",
   "Audit events": "أحداث التدقيق",
   "AI decisions": "قرارات الذكاء الاصطناعي",
@@ -2452,6 +2500,7 @@ function App() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [popLedger, setPopLedger] = useState<PopRecord[]>([]);
+  const [enforcementEvents, setEnforcementEvents] = useState<EnforcementEvent[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
   const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
@@ -2517,6 +2566,7 @@ function App() {
     setBookings(next.bookings ?? []);
     setInvoices(next.invoices ?? []);
     setPopLedger(next.popLedger ?? []);
+    setEnforcementEvents(next.enforcementEvents ?? []);
     setAlerts(next.alerts);
     setVerificationSteps(next.verificationSteps);
     setFinanceApprovals(next.financeApprovals);
@@ -2862,7 +2912,7 @@ function App() {
           )}
           {page === "mediagpt" && <MediaGptSuite aiAvailable={aiAvailable} t={t} />}
           {page === "knowledge" && <KnowledgeBasePage t={t} />}
-          {page === "rules" && <RulesPage t={t} />}
+          {page === "rules" && <RulesPage enforcementEvents={enforcementEvents} t={t} />}
           {page === "skillsCatalogue" && <SkillsCataloguePage t={t} />}
           {page === "skillWorkflows" && <SkillWorkflowsPage t={t} />}
           {page === "skillRuns" && <SkillRunsPage t={t} />}
@@ -5877,7 +5927,110 @@ function emptyRuleDraft(): DoohRule {
   };
 }
 
-function RulesPage({ t }: { t: (value: string) => string }) {
+const ENFORCEMENT_TONE: Record<EnforcementEvent["outcome"], Tone> = { blocked: "danger", overridden: "info", warned: "warn", cleared: "good" };
+const SENSITIVE_LABEL: Record<SensitiveKind, string> = { mosque: "Mosque", school: "School", embassy: "Diplomatic site", military: "Military site", hospital: "Hospital" };
+const RULE_ZONES = ["Abu Dhabi City", "Yas Island", "Industrial Zone", "Al Ain", "Downtown"];
+const RULE_CATEGORIES = ["Retail", "Tourism", "Alcohol", "Gambling", "Energy drink", "Political", "Civic notice"];
+const RULE_TIERS: OverrideTier[] = ["Commercial", "Regulatory", "Civic", "Public Safety", "Emergency"];
+
+function RulesEnforcementPanel({ enforcementEvents, t }: { enforcementEvents: EnforcementEvent[]; t: (value: string) => string }) {
+  const [zone, setZone] = useState(RULE_ZONES[0]);
+  const [category, setCategory] = useState(RULE_CATEGORIES[2]); // Alcohol - fires by default for a clear demo
+  const [tier, setTier] = useState<OverrideTier>("Commercial");
+  const [verdict, setVerdict] = useState<RuleVerdict | null>(null);
+  const [running, setRunning] = useState(false);
+
+  async function runCheck() {
+    setRunning(true);
+    try {
+      const response = await fetch("/api/dooh/rules/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: { kind: "booking", zones: [zone], category, requesterTier: tier } }),
+      });
+      const data = await response.json();
+      setVerdict(data.verdict ?? null);
+    } catch {
+      setVerdict(null);
+    }
+    setRunning(false);
+  }
+
+  return (
+    <div className="split-grid wide-left">
+      <Panel icon={ShieldCheck} title={t("Rules engine simulator")} action={t("Server-enforced, deterministic")}>
+        <div className="rules-sim-form">
+          <label>{t("Zone")}
+            <select value={zone} onChange={(e) => setZone(e.target.value)}>{RULE_ZONES.map((z) => <option key={z} value={z}>{t(z)}</option>)}</select>
+          </label>
+          <label>{t("Content category")}
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>{RULE_CATEGORIES.map((c) => <option key={c} value={c}>{t(c)}</option>)}</select>
+          </label>
+          <label>{t("Requester tier")}
+            <select value={tier} onChange={(e) => setTier(e.target.value as OverrideTier)}>{RULE_TIERS.map((r) => <option key={r} value={r}>{t(r)}</option>)}</select>
+          </label>
+          <Button icon={Zap} disabled={running} onClick={runCheck}>{running ? t("Evaluating") : t("Evaluate booking")}</Button>
+        </div>
+        {verdict ? (
+          <div className={`rules-verdict ${verdict.blocked ? "blocked" : verdict.warnings.length ? "warned" : "cleared"}`}>
+            <StatusPill label={verdict.blocked ? t("Blocked") : verdict.warnings.length ? t("Allowed with warnings") : t("Cleared")} tone={verdict.blocked ? "danger" : verdict.warnings.length ? "warn" : "good"} />
+            {[...verdict.hits, ...verdict.warnings].map((hit, i) => (
+              <div key={`${hit.ruleId}-${i}`} className={`rules-hit ${hit.severity}`}>
+                <strong>{t(hit.label)}</strong>
+                <span>{hit.detail}</span>
+                <em>{hit.ruleId} · {hit.reasonCode}{hit.overriddenBy ? ` · ${t("overridden by")} ${t(hit.overriddenBy)}` : ""}</em>
+              </div>
+            ))}
+            {!verdict.hits.length && !verdict.warnings.length ? <p className="cell-note">{t("No rules fired for this context.")}</p> : null}
+          </div>
+        ) : <p className="cell-note">{t("Choose a context and evaluate to see live enforcement.")}</p>}
+      </Panel>
+
+      <Panel icon={MapPinned} title={t("Live ruleset")} action={`${sensitiveSites.length + zoneContentRules.length} ${t("machine rules")}`}>
+        <div className="rules-list">
+          <div className="rules-list-head">{t("Proximity exclusions")}</div>
+          {sensitiveSites.map((site) => (
+            <div key={site.id} className="rules-list-row">
+              <span>{t(SENSITIVE_LABEL[site.kind])}: {t(site.name)}</span>
+              <em>{site.radiusM}m</em>
+            </div>
+          ))}
+          <div className="rules-list-head">{t("Category and zoning")}</div>
+          {zoneContentRules.map((rule) => (
+            <div key={rule.ruleId} className="rules-list-row">
+              <span>{rule.ruleId} · {t(rule.reasonCode)}</span>
+              <em>{rule.zone ? t(rule.zone) : t("Network-wide")}</em>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      {enforcementEvents.length ? (
+        <Panel icon={FileText} title={t("Recent enforcement events")} action={String(enforcementEvents.length)}>
+          <div className="table-card">
+            <table>
+              <thead>
+                <tr><th>{t("Subject")}</th><th>{t("Stage")}</th><th>{t("Outcome")}</th><th>{t("Reason codes")}</th></tr>
+              </thead>
+              <tbody>
+                {enforcementEvents.slice(0, 8).map((event) => (
+                  <tr key={event.id}>
+                    <td data-label={t("Subject")}><strong>{t(event.subject)}</strong><span>{event.at.replace("T", " ").slice(0, 16)} · {t(event.actor)}</span></td>
+                    <td data-label={t("Stage")}>{t(event.kind)}</td>
+                    <td data-label={t("Outcome")}><StatusPill label={event.outcome} tone={ENFORCEMENT_TONE[event.outcome]} /></td>
+                    <td data-label={t("Reason codes")}><span className="cell-note">{event.reasonCodes.join(", ")}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      ) : null}
+    </div>
+  );
+}
+
+function RulesPage({ enforcementEvents, t }: { enforcementEvents: EnforcementEvent[]; t: (value: string) => string }) {
   const [rules, setRules] = useState<DoohRule[]>(ruleCatalogue);
   const [selectedId, setSelectedId] = useState(ruleCatalogue[0].id);
   const [creating, setCreating] = useState(false);
@@ -5950,6 +6103,9 @@ function RulesPage({ t }: { t: (value: string) => string }) {
         <Metric label="Recommendation rules" value={String(rules.filter((rule) => rule.mode === "Recommend" && rule.enabled).length)} helper="Guide AI outputs" tone="warn" />
         <Metric label="Simulation scenarios" value={String(simulationCatalogue.length)} helper="Ready to test rule firing" tone="info" />
       </MetricGrid>
+
+      <RulesEnforcementPanel enforcementEvents={enforcementEvents} t={t} />
+
       <div className="utility-action-strip">
         <Button icon={Layers3} variant="secondary" onClick={() => setCoverageOpen((value) => !value)}>{coverageOpen ? "Hide coverage" : "Show coverage"}</Button>
         <Button icon={Zap} variant="secondary" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "Hide simulator" : "Show simulator"}</Button>

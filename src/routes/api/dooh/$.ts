@@ -40,6 +40,7 @@ import {
   reconcileBooking,
   approveSubmission,
   resubmitSubmission,
+  evaluateRulesPreview,
   verifyPopChain,
   playScheduleItem,
   queueEmergencyBroadcast,
@@ -258,6 +259,18 @@ export const Route = createFileRoute("/api/dooh/$")({
             const message = stringValue(body.message, "");
             if (!message) return jsonError("Revision message is required", 422);
             return Response.json(await requestSubmissionChanges(segments[1], message, actor));
+          }
+
+          if (segments[0] === "rules" && segments[1] === "evaluate") {
+            const ctx = (typeof body.context === "object" && body.context !== null ? body.context : {}) as Record<string, unknown>;
+            return Response.json({ verdict: await evaluateRulesPreview({
+              kind: (ctx.kind as "booking" | "scheduling" | "emergency") || "booking",
+              zones: Array.isArray(ctx.zones) ? ctx.zones.map(String) : undefined,
+              assetIds: Array.isArray(ctx.assetIds) ? ctx.assetIds.map(String) : undefined,
+              daypart: typeof ctx.daypart === "string" ? ctx.daypart : undefined,
+              category: typeof ctx.category === "string" ? ctx.category : undefined,
+              requesterTier: ctx.requesterTier as never,
+            }) });
           }
 
           if (segments[0] === "bids") {

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
 
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Broadcast queued" | "Broadcasting" | "Live on network";
@@ -279,6 +280,18 @@ export interface PurchaseOrder {
   createdAt: string;
 }
 
+export interface EnforcementEvent {
+  id: string;
+  at: string;
+  kind: RuleContext["kind"];
+  subject: string;
+  outcome: "blocked" | "warned" | "overridden" | "cleared";
+  reasonCodes: string[];
+  firedRuleIds: string[];
+  detail: string;
+  actor: string;
+}
+
 export interface DoohState {
   submissions: Submission[];
   campaigns: BidderCampaign[];
@@ -290,6 +303,7 @@ export interface DoohState {
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
   popLedger: PopRecord[];
+  enforcementEvents: EnforcementEvent[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -503,6 +517,7 @@ const initialState: DoohState = {
   bids: [],
   bookings: [],
   invoices: [],
+  enforcementEvents: [],
   popLedger: [],
   alerts: [
     {
@@ -674,6 +689,7 @@ function normalizeState(state: DoohState): DoohState {
     bookings: state.bookings ?? [],
     invoices: state.invoices ?? [],
     popLedger: state.popLedger ?? [],
+    enforcementEvents: state.enforcementEvents ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
     submissions: (state.submissions ?? []).map(withGovernanceDefaults),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
@@ -814,6 +830,21 @@ export async function markAllNotificationsRead(profileId: NotificationRecipient)
 export async function createSubmission(payload: BriefPayload, actor: string): Promise<{ state: DoohState; submission: Submission }> {
   let created!: Submission;
   const state = await commit((draft) => {
+    // Rules engine at booking (RFP SCH-003/005): category and zoning rules hard-block;
+    // proximity is recorded as a warning here (bookings target broad zones, so
+    // per-asset proximity is enforced at explicit targeting/scheduling instead).
+    const verdict = evaluateRules({
+      kind: "booking",
+      zones: payload.targetZones,
+      category: payload.vertical,
+      daypart: payload.daypart,
+      requesterTier: "Commercial",
+    });
+    recordEnforcement(draft, { kind: "booking", subject: payload.campaign.trim(), verdict, actor });
+    const hardBlocks = verdict.hits.filter((hit) => !hit.reasonCode.startsWith("PROX_"));
+    if (hardBlocks.length) {
+      throw new Error(`Booking blocked by the rules engine: ${hardBlocks.map((hit) => `${hit.label} (${hit.reasonCode})`).join("; ")}`);
+    }
     created = {
       id: nextId("SUB", draft.submissions),
       campaign: payload.campaign.trim(),
@@ -1047,6 +1078,42 @@ function withGovernanceDefaults(submission: Submission): Submission {
           slaDueAt: slaDueFrom(category),
         }],
   };
+}
+
+/* ---- Rules engine enforcement (RFP SCH-003..006) ---- */
+
+function recordEnforcement(
+  draft: DoohState,
+  entry: { kind: RuleContext["kind"]; subject: string; verdict: RuleVerdict; actor: string },
+): void {
+  const overridden = entry.verdict.warnings.some((hit) => hit.overriddenBy);
+  const outcome: EnforcementEvent["outcome"] = entry.verdict.blocked
+    ? "blocked"
+    : overridden
+      ? "overridden"
+      : entry.verdict.warnings.length
+        ? "warned"
+        : "cleared";
+  if (outcome === "cleared") return; // only log non-trivial evaluations
+  draft.enforcementEvents = [
+    {
+      id: nextId("ENF", draft.enforcementEvents),
+      at: formatNow(),
+      kind: entry.kind,
+      subject: entry.subject,
+      outcome,
+      reasonCodes: entry.verdict.reasonCodes,
+      firedRuleIds: entry.verdict.firedRuleIds,
+      detail: [...entry.verdict.hits, ...entry.verdict.warnings].map((hit) => `${hit.label}: ${hit.detail}${hit.overriddenBy ? ` (overridden by ${hit.overriddenBy})` : ""}`).join(" | "),
+      actor: entry.actor,
+    },
+    ...draft.enforcementEvents,
+  ].slice(0, 60);
+}
+
+// Public stateless evaluation for the RulesPage simulator (no state write).
+export async function evaluateRulesPreview(context: RuleContext): Promise<RuleVerdict> {
+  return evaluateRules(context);
 }
 
 /* ---- Proof-of-play hash chain (Tech Spec 10.3) ---- */
