@@ -7172,3 +7172,14 @@ html[dir="rtl"] .network-tabs button.active {
 .agent-triage-panel .agent-action-card {
   margin-top: 8px;
 }
+
+
+/* Kill switch */
+.kill-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.kill-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+.kill-form select, .kill-form input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; background: #fff; min-width: 160px; }
+.kill-sla { font-size: 11.5px; color: var(--muted); align-self: center; }
+.kill-confirm { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 12.5px; color: #b3261e; font-weight: 600; }
+.kill-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kill-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #b3261e; background: #fdecea; border-radius: 999px; padding: 3px 6px 3px 10px; }
+.kill-chip button { border: none; background: rgba(179,38,30,0.15); color: #b3261e; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; line-height: 1; }

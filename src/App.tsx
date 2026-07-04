@@ -477,6 +477,7 @@ interface DoohStatePayload {
   invoices: InvoiceRecord[];
   popLedger: PopRecord[];
   enforcementEvents: EnforcementEvent[];
+  killedAssetIds: string[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -1131,6 +1132,19 @@ const translations: Record<string, string> = {
   "Rows": "الصفوف",
   "Export": "تصدير",
   "Reports respect RBAC and tenant scoping; exports reflect the current live platform state.": "تحترم التقارير صلاحيات الوصول ونطاق المستأجر؛ وتعكس الصادرات الحالة الحية للمنصة.",
+  "Remote display control (kill switch)": "التحكم عن بُعد بالشاشات (مفتاح الإيقاف)",
+  "blanked": "معطّلة",
+  "All live": "الكل يعمل",
+  "Per asset": "لكل أصل",
+  "Per zone": "لكل منطقة",
+  "Emirate-wide": "على مستوى الإمارة",
+  "Reason code": "رمز السبب",
+  "Maintenance / incident / directive": "صيانة / حادث / توجيه",
+  "Target SLA": "مستوى الخدمة المستهدف",
+  "I confirm dual-control authorisation for an emirate-wide blackout": "أؤكد التفويض بالرقابة المزدوجة لإيقاف على مستوى الإمارة",
+  "Blank displays": "تعطيل الشاشات",
+  "Re-enable all": "إعادة تفعيل الكل",
+  "Re-enable": "إعادة تفعيل",
   "Emergency alert live on network": "التنبيه الطارئ مباشر على الشبكة",
   "Alert reset. Re-run checks.": "تم إعادة تعيين التنبيه. أعد تشغيل الفحوصات.",
   "Live on network": "مباشر على الشبكة",
@@ -2571,6 +2585,7 @@ function App() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [popLedger, setPopLedger] = useState<PopRecord[]>([]);
   const [enforcementEvents, setEnforcementEvents] = useState<EnforcementEvent[]>([]);
+  const [killedAssetIds, setKilledAssetIds] = useState<string[]>([]);
   const [alerts, setAlerts] = useState<EmergencyAlert[]>(seedAlerts);
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>(initialVerificationSteps);
   const [financeApprovals, setFinanceApprovals] = useState<FinanceApproval[]>(seedFinanceApprovals);
@@ -2637,6 +2652,7 @@ function App() {
     setInvoices(next.invoices ?? []);
     setPopLedger(next.popLedger ?? []);
     setEnforcementEvents(next.enforcementEvents ?? []);
+    setKilledAssetIds(next.killedAssetIds ?? []);
     setAlerts(next.alerts);
     setVerificationSteps(next.verificationSteps);
     setFinanceApprovals(next.financeApprovals);
@@ -2852,6 +2868,24 @@ function App() {
     if (result) notify("Emergency acknowledged");
   }
 
+  async function remoteKill(payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) {
+    const result = await syncMutation<{ state: DoohStatePayload; affected: number }>("control/kill", {
+      actor: profile?.name ?? "Supervisor",
+      role: profile?.id ?? "control-room",
+      payload,
+    });
+    if (result) notify(result.affected + " display(s) blanked");
+  }
+
+  async function restoreDisplays(payload: { scope: "asset" | "zone" | "emirate"; target?: string }) {
+    const result = await syncMutation<{ state: DoohStatePayload }>("control/restore", {
+      actor: profile?.name ?? "Supervisor",
+      role: profile?.id ?? "control-room",
+      payload,
+    });
+    if (result) notify("Displays re-enabled");
+  }
+
   async function runAlertChecks(id: string) {
     const result = await syncMutation<{ state: DoohStatePayload }>(`alerts/${id}/checks`, {
       actor: profile?.name ?? "Duty officer",
@@ -2959,7 +2993,7 @@ function App() {
             t={t}
           />
           {page === "control" && (
-            <ControlCentre submissions={submissions} published={published} aiAvailable={aiAvailable} notify={notify} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
+            <ControlCentre submissions={submissions} published={published} killedAssetIds={killedAssetIds} aiAvailable={aiAvailable} notify={notify} onKill={remoteKill} onRestore={restoreDisplays} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
           )}
           {page === "cms" && (
             <CmsPage
@@ -3327,18 +3361,86 @@ function NotificationDrawer({
   );
 }
 
+const KILL_ZONES = ["Abu Dhabi City", "Yas Island", "Industrial Zone", "Al Ain", "Downtown"];
+
+function KillSwitchPanel({
+  killedAssetIds,
+  onKill,
+  onRestore,
+  t,
+}: {
+  killedAssetIds: string[];
+  onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
+  onRestore: (payload: { scope: "asset" | "zone" | "emirate"; target?: string }) => void;
+  t: (value: string) => string;
+}) {
+  const [scope, setScope] = useState<"asset" | "zone" | "emirate">("asset");
+  const [target, setTarget] = useState(estateAssets[0].id);
+  const [reason, setReason] = useState("");
+  const [confirmEmirate, setConfirmEmirate] = useState(false);
+  const slaLabel = scope === "asset" ? "<=10s" : scope === "zone" ? "<=30s" : "<=60s, dual-control";
+
+  function submit() {
+    onKill({ scope, target: scope === "asset" ? target : scope === "zone" ? zoneTarget : undefined, reason, confirm: confirmEmirate });
+    setReason("");
+    setConfirmEmirate(false);
+  }
+  const [zoneTarget, setZoneTarget] = useState(KILL_ZONES[0]);
+
+  return (
+    <Panel icon={LockKeyhole} title={t("Remote display control (kill switch)")} action={<StatusPill label={killedAssetIds.length ? String(killedAssetIds.length) + " " + t("blanked") : t("All live")} tone={killedAssetIds.length ? "danger" : "good"} />}>
+      <div className="kill-form">
+        <label>{t("Scope")}
+          <select value={scope} onChange={(e) => setScope(e.target.value as "asset" | "zone" | "emirate")}>
+            <option value="asset">{t("Per asset")}</option>
+            <option value="zone">{t("Per zone")}</option>
+            <option value="emirate">{t("Emirate-wide")}</option>
+          </select>
+        </label>
+        {scope === "asset" ? (
+          <label>{t("Asset")}<select value={target} onChange={(e) => setTarget(e.target.value)}>{estateAssets.map((a) => <option key={a.id} value={a.id}>{a.id} - {t(a.name)}</option>)}</select></label>
+        ) : scope === "zone" ? (
+          <label>{t("Zone")}<select value={zoneTarget} onChange={(e) => setZoneTarget(e.target.value)}>{KILL_ZONES.map((z) => <option key={z} value={z}>{t(z)}</option>)}</select></label>
+        ) : null}
+        <label>{t("Reason code")}<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("Maintenance / incident / directive")} /></label>
+        <span className="kill-sla">{t("Target SLA")}: {slaLabel}</span>
+      </div>
+      {scope === "emirate" ? (
+        <label className="kill-confirm"><input type="checkbox" checked={confirmEmirate} onChange={(e) => setConfirmEmirate(e.target.checked)} /> {t("I confirm dual-control authorisation for an emirate-wide blackout")}</label>
+      ) : null}
+      <ActionRow>
+        <Button icon={LockKeyhole} disabled={!reason.trim() || (scope === "emirate" && !confirmEmirate)} onClick={submit}>{t("Blank displays")}</Button>
+        {killedAssetIds.length ? <Button variant="secondary" onClick={() => onRestore({ scope: "emirate" })}>{t("Re-enable all")}</Button> : null}
+      </ActionRow>
+      {killedAssetIds.length ? (
+        <div className="kill-list">
+          {killedAssetIds.map((id) => (
+            <span key={id} className="kill-chip">{id}<button type="button" onClick={() => onRestore({ scope: "asset", target: id })} aria-label={t("Re-enable")}>×</button></span>
+          ))}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
 function ControlCentre({
   submissions,
   published,
+  killedAssetIds,
   aiAvailable,
   notify,
+  onKill,
+  onRestore,
   goToAlerts,
   t,
 }: {
   submissions: Submission[];
   published: PublishedItem[];
+  killedAssetIds: string[];
   aiAvailable: boolean;
   notify: (message: string) => void;
+  onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
+  onRestore: (payload: { scope: "asset" | "zone" | "emirate"; target?: string }) => void;
   goToAlerts: () => void;
   t: (value: string) => string;
 }) {
@@ -3391,6 +3493,7 @@ function ControlCentre({
           <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}>{digestLoading ? t("Summarizing") : t("Summarize")}</Button>
         </div>
       </div>
+      <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} t={t} />
       {digest ? (
         <section className="ai-review-card clear">
           <div className="ai-review-summary">

@@ -43,6 +43,8 @@ import {
   evaluateRulesPreview,
   approveEmergencyAlert,
   acknowledgeAlert,
+  remoteKill,
+  restoreDisplays,
   zonesToAssetIds,
   verifyPopChain,
   playScheduleItem,
@@ -262,6 +264,24 @@ export const Route = createFileRoute("/api/dooh/$")({
             const message = stringValue(body.message, "");
             if (!message) return jsonError("Revision message is required", 422);
             return Response.json(await requestSubmissionChanges(segments[1], message, actor));
+          }
+
+          if (segments[0] === "control" && segments[1] === "kill") {
+            const p = (typeof body.payload === "object" && body.payload !== null ? body.payload : {}) as Record<string, unknown>;
+            return Response.json(await remoteKill({
+              scope: (p.scope as "asset" | "zone" | "emirate") || "asset",
+              target: typeof p.target === "string" ? p.target : undefined,
+              reason: stringValue(p.reason, ""),
+              confirm: p.confirm === true,
+            }, actor));
+          }
+
+          if (segments[0] === "control" && segments[1] === "restore") {
+            const p = (typeof body.payload === "object" && body.payload !== null ? body.payload : {}) as Record<string, unknown>;
+            return Response.json({ state: await restoreDisplays({
+              scope: (p.scope as "asset" | "zone" | "emirate") || "asset",
+              target: typeof p.target === "string" ? p.target : undefined,
+            }, actor) });
           }
 
           if (segments[0] === "rules" && segments[1] === "evaluate") {

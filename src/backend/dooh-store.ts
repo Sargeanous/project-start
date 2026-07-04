@@ -323,6 +323,7 @@ export interface DoohState {
   invoices: InvoiceRecord[];
   popLedger: PopRecord[];
   enforcementEvents: EnforcementEvent[];
+  killedAssetIds: string[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -548,6 +549,7 @@ const initialState: DoohState = {
   bookings: [],
   invoices: [],
   enforcementEvents: [],
+  killedAssetIds: [],
   popLedger: [],
   alerts: [
     {
@@ -720,6 +722,7 @@ function normalizeState(state: DoohState): DoohState {
     invoices: state.invoices ?? [],
     popLedger: state.popLedger ?? [],
     enforcementEvents: state.enforcementEvents ?? [],
+    killedAssetIds: state.killedAssetIds ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
     submissions: (state.submissions ?? []).map(withGovernanceDefaults),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
@@ -2118,6 +2121,60 @@ export async function broadcastEmergencyNow(id: string, actor: string): Promise<
       tone: "critical",
     });
     addActivity(draft, actor, "Broadcast emergency alert", alert.title);
+  });
+}
+
+// Remote display control / kill switch (Tech Spec 12.7). Three escalating
+// scopes with response-time targets; emirate-wide requires dual-control
+// confirmation. Kill commands override all content except NCEMA alerts.
+export async function remoteKill(
+  payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean },
+  actor: string,
+): Promise<{ state: DoohState; affected: number }> {
+  let affected = 0;
+  const state = await commit((draft) => {
+    if (!payload.reason?.trim()) throw new Error("A reason code is required for remote display control");
+    let ids: string[] = [];
+    let sla = "";
+    if (payload.scope === "asset") {
+      if (!payload.target) throw new Error("Select an asset to disable");
+      ids = [payload.target];
+      sla = "<=10s";
+    } else if (payload.scope === "zone") {
+      if (!payload.target) throw new Error("Select a zone to disable");
+      ids = dataAssets.filter((a) => a.zone === payload.target).map((a) => a.id);
+      sla = "<=30s for up to 100 assets";
+    } else {
+      if (!payload.confirm) throw new Error("Emirate-wide kill requires dual-control confirmation");
+      ids = dataAssets.map((a) => a.id);
+      sla = "<=60s for the full fleet";
+    }
+    const set = new Set(draft.killedAssetIds);
+    ids.forEach((id) => set.add(id));
+    affected = ids.length;
+    draft.killedAssetIds = [...set];
+    addNotification(draft, {
+      title: `Remote kill: ${payload.scope}`,
+      body: `${affected} display(s) blanked (${payload.reason}). Target SLA ${sla}. Command signed by ${actor}.`,
+      subject: payload.target ?? "Emirate-wide",
+      recipients: ["control-room", "admin", "technical"],
+      page: "control",
+      tone: "critical",
+    });
+    addActivity(draft, actor, `Remote kill (${payload.scope}, ${sla})`, payload.target ?? "Emirate-wide");
+  });
+  return { state, affected };
+}
+
+export async function restoreDisplays(payload: { scope: "asset" | "zone" | "emirate"; target?: string }, actor: string): Promise<DoohState> {
+  return commit((draft) => {
+    let ids: string[] = [];
+    if (payload.scope === "asset" && payload.target) ids = [payload.target];
+    else if (payload.scope === "zone" && payload.target) ids = dataAssets.filter((a) => a.zone === payload.target).map((a) => a.id);
+    else ids = draft.killedAssetIds;
+    const remove = new Set(ids);
+    draft.killedAssetIds = draft.killedAssetIds.filter((id) => !remove.has(id));
+    addActivity(draft, actor, "Re-enabled displays", payload.target ?? "All");
   });
 }
 
