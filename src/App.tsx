@@ -7350,17 +7350,20 @@ function CommercialMapPage({
         <Metric label="Available now" value={String(available)} helper="Sellable at rate card" tone={available ? "warn" : "good"} />
       </MetricGrid>
 
-      <div className="split-grid wide-left">
-        <Panel icon={MapPinned} title={t("Commercial operations map")} action={t("Allocation status by asset")}>
-          <LiveMap assets={mapAssets} selectedAssetId={selectedAssetId} onMarkerClick={setSelectedAssetId} openAlarmAssetIds={[]} t={t} />
-          <div className="alloc-legend">
-            {(Object.keys(ALLOCATION_PIN) as Array<AssetAllocation["status"]>).map((status) => (
-              <span key={status}><i style={{ background: ALLOCATION_PIN[status] }} />{t(status)}</span>
-            ))}
-          </div>
-        </Panel>
+      <Panel icon={MapPinned} title={t("Commercial operations map")} action={t("Allocation status by asset")}>
+        <LiveMap assets={mapAssets} selectedAssetId={selectedAssetId} onMarkerClick={setSelectedAssetId} openAlarmAssetIds={[]} t={t} />
+        <div className="alloc-legend">
+          {(Object.keys(ALLOCATION_PIN) as Array<AssetAllocation["status"]>).map((status) => (
+            <span key={status}><i style={{ background: ALLOCATION_PIN[status] }} />{t(status)}</span>
+          ))}
+        </div>
 
-        <Panel icon={HardDrive} title={t(asset.name)} action={<StatusPill label={allocation?.status ?? "Available"} tone={ALLOCATION_TONE[allocation?.status ?? "Available"]} />}>
+        <div className="linked-detail">
+          <div className="linked-detail-head">
+            <span className="panel-icon"><HardDrive size={18} /></span>
+            <strong>{t(asset.name)}</strong>
+            <StatusPill label={allocation?.status ?? "Available"} tone={ALLOCATION_TONE[allocation?.status ?? "Available"]} />
+          </div>
           <div className="detail-cards compact">
             <Detail label="Type" value={t(asset.type)} />
             <Detail label="Size" value={asset.size} />
@@ -7408,8 +7411,8 @@ function CommercialMapPage({
           ) : (
             <p className="notes">{t("Next slot")}: {t(asset.nextSlot)}</p>
           )}
-        </Panel>
-      </div>
+        </div>
+      </Panel>
 
       <Panel icon={FileText} title={t("Allocation register")} action={t("Long-term contracts per RFP FIN-101")}>
         <div className="table-card">
