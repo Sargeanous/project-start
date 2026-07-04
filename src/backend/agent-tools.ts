@@ -1,5 +1,5 @@
 import { assets, campaigns, fieldTasks, historicalBids, historicalCampaigns, historicalRuns, proofRecords, tickets } from "../data";
-import { createAlert, getState, updateSubmissionStage } from "./dooh-store";
+import { createAlert, getState, namedApprovers, updateSubmissionStage } from "./dooh-store";
 import type { OpenAIToolDefinition } from "./openai";
 import { retrievePolicy } from "./policy-rag";
 
@@ -194,11 +194,29 @@ export const agentTools: AgentTool[] = [
     escalatedBy: ctx.actor,
     note: stringValue(args.note),
   }), (args) => `Escalate ticket ${stringValue(args.id)} to ${stringValue(args.severity, "higher priority")}`),
-  writeTool("setSubmissionStage", "Move a CMS submission to another workflow stage.", cmsRoles, objectSchema({
+  writeTool("setSubmissionStage", "Move a CMS submission to another workflow stage. Approval is governed: 'Approved' requires a named approver (segregation of duties) plus dual control and MFA for high-impact content, so it routes into the CMS approval workflow rather than applying directly.", cmsRoles, objectSchema({
     id: stringSchema("Submission ID"),
     stage: stringSchema("Submitted, In review, Changes requested, Approved, Scheduled or Published"),
   }, ["id", "stage"]), async (args, ctx) => {
-    const result = await updateSubmissionStage(stringValue(args.id), stringValue(args.stage) as never, ctx.actor);
+    const stage = stringValue(args.stage);
+    if (stage === "Approved") {
+      // The human approving this agent action is not necessarily a named
+      // approver; report the governed path honestly instead of bypassing
+      // SoD/dual control (RFP APP-006/009).
+      const state = await getState();
+      const submission = state.submissions.find((item) => item.id === stringValue(args.id));
+      if (!submission) throw new Error("Submission not found");
+      return {
+        id: submission.id,
+        status: "approval_workflow_required",
+        category: submission.category,
+        note: submission.category === "high-impact"
+          ? "High-impact content requires dual control: two distinct named approvers with MFA step-up, via the CMS approval panel."
+          : "Approval requires a named approver (segregation of duties enforced) via the CMS approval panel.",
+        namedApprovers: namedApprovers.filter((approver) => approver.canApprove.includes(submission.category)).map((approver) => approver.name),
+      };
+    }
+    const result = await updateSubmissionStage(stringValue(args.id), stage as never, ctx.actor, { role: ctx.role });
     return result.submission;
   }, (args) => `Move ${stringValue(args.id)} to ${stringValue(args.stage)}`),
   writeTool("sendSubmissionNudge", "Send a reminder or clarification request for a stale CMS submission.", cmsRoles, objectSchema({

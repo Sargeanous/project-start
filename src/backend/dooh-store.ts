@@ -10,6 +10,33 @@ type FinanceState = "Pending" | "Approved" | "On hold" | "Rejected";
 type NotificationRecipient = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
 type NotificationTone = "info" | "action" | "success" | "warning" | "critical";
 
+// Content category drives the approval ceremony (RFP APP-008/009):
+// routine -> one named approver; sensitive -> one senior named approver;
+// high-impact -> dual-control (two distinct named approvers, MFA step-up).
+export type SubmissionCategory = "routine" | "sensitive" | "high-impact";
+
+export interface ApprovalSignature {
+  name: string;
+  role: string;
+  at: string;
+  mfa: boolean;
+}
+
+// One row per lifecycle event: the stage journal (RFP CLP-001 / APP-004).
+export interface SubmissionJournalEntry {
+  at: string;
+  actor: string;
+  role: string;
+  stage: SubmissionStage;
+  decision: string;
+  reason?: string;
+  contentHash: string;
+  version: number;
+  nextAssignee?: string;
+  slaDueAt?: string;
+  diff?: string[];
+}
+
 export interface Submission {
   id: string;
   campaign: string;
@@ -23,6 +50,12 @@ export interface Submission {
   creativeId: string;
   language: string;
   notes: string;
+  version: number;
+  contentHash: string;
+  category: SubmissionCategory;
+  journal: SubmissionJournalEntry[];
+  approvals: ApprovalSignature[];
+  pendingSecondApproval?: boolean;
 }
 
 export interface BidderCampaign {
@@ -317,6 +350,11 @@ const initialState: DoohState = {
       creativeId: "etihad-retail",
       language: "Arabic and English",
       notes: "Airport retail creative with bilingual copy and weekend flight targeting.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
     },
     {
       id: "SUB-1047",
@@ -331,6 +369,11 @@ const initialState: DoohState = {
       creativeId: "yas-tourism",
       language: "Arabic and English",
       notes: "Tourism campaign approved for Yas and airport routes.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
     },
     {
       id: "SUB-1046",
@@ -345,6 +388,11 @@ const initialState: DoohState = {
       creativeId: "weather-alert",
       language: "Arabic first",
       notes: "Public notice scheduled after dual-control approval.",
+      version: 1,
+      contentHash: "",
+      category: "sensitive",
+      journal: [],
+      approvals: [],
     },
     {
       id: "SUB-1045",
@@ -359,6 +407,11 @@ const initialState: DoohState = {
       creativeId: "holiday-notice",
       language: "Arabic and English",
       notes: "Awaiting cultural review and schedule lock.",
+      version: 1,
+      contentHash: "",
+      category: "high-impact",
+      journal: [],
+      approvals: [],
     },
   ],
   campaigns: [
@@ -622,6 +675,7 @@ function normalizeState(state: DoohState): DoohState {
     invoices: state.invoices ?? [],
     popLedger: state.popLedger ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
+    submissions: (state.submissions ?? []).map(withGovernanceDefaults),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
     purchaseOrders: state.purchaseOrders ?? cloneState(initialState).purchaseOrders,
     notifications: (state.notifications?.length ? state.notifications : cloneState(initialState).notifications).map((notification) => ({
@@ -773,7 +827,15 @@ export async function createSubmission(payload: BriefPayload, actor: string): Pr
       creativeId: payload.creativeId,
       language: payload.languages,
       notes: payload.objective || "Submitted from the bidder workspace and waiting for ADMO CMS review.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
     };
+    created.category = inferSubmissionCategory(created.packageName);
+    created.contentHash = submissionContentHash(created);
+    created = withGovernanceDefaults(created);
     draft.submissions = [created, ...draft.submissions];
     draft.campaigns = [
       {
@@ -899,6 +961,92 @@ export async function placeBid(payload: { lotId: string; amount: number; campaig
     addActivity(draft, actor, "Placed bid", lot.lotName);
   });
   return { state, bid };
+}
+
+/* ---- Submission governance: content hash, journal, named approvers ---- */
+
+// Hash only the stable content fields (never stage/version), so the hash
+// identifies WHAT was approved and changes only when the content changes.
+export function submissionContentHash(submission: Pick<Submission, "campaign" | "packageName" | "creativeId" | "language" | "notes" | "budget">): string {
+  const payload = [submission.campaign, submission.packageName, submission.creativeId, submission.language, submission.notes, submission.budget].join("|");
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+export function inferSubmissionCategory(packageName: string): SubmissionCategory {
+  const name = packageName.toLowerCase();
+  if (name.includes("takeover") || name.includes("estate")) return "high-impact";
+  if (name.includes("civic") || name.includes("emergency")) return "sensitive";
+  return "routine";
+}
+
+// Named-approver registry per content category (RFP APP-008). Appointments
+// are demo-seeded; in production these come from the tenant admin workflow.
+export interface NamedApprover {
+  name: string;
+  role: string;
+  canApprove: SubmissionCategory[];
+}
+
+export const namedApprovers: NamedApprover[] = [
+  { name: "Maya Haddad", role: "reviewer", canApprove: ["routine", "sensitive"] },
+  { name: "Noura Salem", role: "reviewer", canApprove: ["routine", "sensitive"] },
+  { name: "Hamad Al Ketbi", role: "reviewer", canApprove: ["routine"] },
+  { name: "Khaled Nasser", role: "control-room", canApprove: ["sensitive", "high-impact"] },
+  { name: "Sara Al Mansoori", role: "admin", canApprove: ["routine", "sensitive", "high-impact"] },
+  { name: "Khaled Mansoor", role: "admin", canApprove: ["high-impact"] },
+];
+
+const SLA_HOURS: Record<SubmissionCategory, number> = { routine: 24, sensitive: 12, "high-impact": 4 };
+
+function slaDueFrom(category: SubmissionCategory): string {
+  return new Date(Date.now() + SLA_HOURS[category] * 3_600_000).toISOString();
+}
+
+function appendJournal(
+  submission: Submission,
+  entry: { actor: string; role: string; decision: string; reason?: string; nextAssignee?: string; diff?: string[]; sla?: boolean },
+): void {
+  submission.journal = [
+    ...submission.journal,
+    {
+      at: formatNow(),
+      actor: entry.actor,
+      role: entry.role,
+      stage: submission.stage,
+      decision: entry.decision,
+      reason: entry.reason,
+      contentHash: submission.contentHash,
+      version: submission.version,
+      nextAssignee: entry.nextAssignee,
+      slaDueAt: entry.sla ? slaDueFrom(submission.category) : undefined,
+      diff: entry.diff,
+    },
+  ];
+}
+
+function withGovernanceDefaults(submission: Submission): Submission {
+  const category = submission.category || inferSubmissionCategory(submission.packageName);
+  const contentHash = submission.contentHash || submissionContentHash(submission);
+  return {
+    ...submission,
+    version: submission.version ?? 1,
+    contentHash,
+    category,
+    approvals: submission.approvals ?? [],
+    journal: submission.journal?.length
+      ? submission.journal
+      : [{
+          at: formatNow(),
+          actor: submission.bidder,
+          role: "bidder",
+          stage: submission.stage,
+          decision: "Submitted",
+          contentHash,
+          version: submission.version ?? 1,
+          nextAssignee: submission.owner,
+          slaDueAt: slaDueFrom(category),
+        }],
+  };
 }
 
 /* ---- Proof-of-play hash chain (Tech Spec 10.3) ---- */
@@ -1169,7 +1317,15 @@ export async function confirmBookingPayment(payload: { bookingId: string; outcom
       creativeId: lot?.creativeId ?? "etihad-retail",
       language: "Arabic + English",
       notes: `Auction win handoff: ${target.lotName} awarded first-price at ${target.currency} ${target.amount.toLocaleString("en-US")} (booking ${target.id}, invoice ${target.invoiceId}). Entered the governed pipeline; scheduling requires content approval.`,
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
     };
+    submission.category = inferSubmissionCategory(submission.packageName);
+    submission.contentHash = submissionContentHash(submission);
+    Object.assign(submission, withGovernanceDefaults(submission));
     draft.submissions = [submission, ...draft.submissions];
     target.submissionId = submission.id;
     target.history = [
@@ -1195,12 +1351,36 @@ export async function confirmBookingPayment(payload: { bookingId: string; outcom
   return { state, booking };
 }
 
-export async function updateSubmissionStage(id: string, stage: SubmissionStage, actor: string): Promise<{ state: DoohState; submission: Submission }> {
+const SUBMISSION_STAGES: SubmissionStage[] = ["Submitted", "In review", "Approved", "Scheduled", "Published", "Changes requested"];
+
+export async function updateSubmissionStage(id: string, stage: SubmissionStage, actor: string, options?: { role?: string; viaApproval?: boolean; reason?: string }): Promise<{ state: DoohState; submission: Submission }> {
   let submission!: Submission;
   const state = await commit((draft) => {
     const item = draft.submissions.find((entry) => entry.id === id);
     if (!item) throw new Error("Submission not found");
+    if (!SUBMISSION_STAGES.includes(stage)) throw new Error(`Unknown stage: ${stage}`);
+    // Governance gates (RFP APP-006/009). Approval must go through the named-
+    // approver workflow (SoD + dual control); nothing schedules unapproved
+    // content. Guards live in the store so the REST route, the agent tools and
+    // any future caller are all covered - no bypass path.
+    if (stage === "Approved" && !options?.viaApproval) {
+      throw new Error("Direct approval is disabled. Use the approval workflow: named approver, segregation of duties, and dual control for high-impact content.");
+    }
+    if (stage === "Scheduled" && item.stage !== "Approved") {
+      throw new Error(`Cannot schedule ${item.id}: content is ${item.stage}, not Approved.`);
+    }
+    const previousStage = item.stage;
     item.stage = stage;
+    if (stage !== "Approved" && previousStage !== stage) {
+      appendJournal(item, {
+        actor,
+        role: options?.role ?? "operator",
+        decision: stage === "Changes requested" ? "Changes requested" : `Moved to ${stage}`,
+        reason: options?.reason,
+        nextAssignee: campaignNextStep(stage),
+        sla: stage === "In review" || stage === "Submitted",
+      });
+    }
     submission = { ...item };
     draft.campaigns = draft.campaigns.map((campaign) =>
       campaign.campaign === item.campaign
@@ -1304,6 +1484,153 @@ export async function updateSubmissionStage(id: string, stage: SubmissionStage, 
       });
     }
     addActivity(draft, actor, `Moved submission to ${stage}`, item.campaign);
+  });
+  return { state, submission };
+}
+
+/**
+ * Named-approver workflow (RFP APP-006/008/009). Segregation of duties: the
+ * uploader/owner can never approve their own submission. High-impact content
+ * requires DUAL CONTROL: two distinct named approvers, each MFA-verified.
+ * The store is the single enforcement point for every caller (UI, agent, API).
+ */
+export async function approveSubmission(
+  payload: { id: string; approverName: string; role: string; reason?: string; mfaVerified?: boolean },
+  actor: string,
+): Promise<{ state: DoohState; submission: Submission; pendingSecondApproval: boolean }> {
+  let submission!: Submission;
+  let finalize = false;
+  const firstState = await commit((draft) => {
+    const item = draft.submissions.find((entry) => entry.id === payload.id);
+    if (!item) throw new Error("Submission not found");
+    if (item.stage !== "In review" && item.stage !== "Submitted") {
+      throw new Error(`${item.id} is ${item.stage}; approval requires an item in review`);
+    }
+    const approver = namedApprovers.find((entry) => entry.name === payload.approverName);
+    if (!approver) throw new Error(`${payload.approverName} is not a named approver (APP-008)`);
+    if (!approver.canApprove.includes(item.category)) {
+      throw new Error(`${approver.name} is not appointed for ${item.category} content`);
+    }
+    if (payload.approverName === item.owner || payload.approverName === item.bidder) {
+      throw new Error(`Segregation of duties: ${payload.approverName} owns or submitted ${item.id} and cannot approve it (APP-006)`);
+    }
+    const mfaRequired = item.category !== "routine";
+    if (mfaRequired && !payload.mfaVerified) {
+      throw new Error(`MFA step-up required to approve ${item.category} content`);
+    }
+    if (item.approvals.some((signature) => signature.name === payload.approverName)) {
+      throw new Error(`${payload.approverName} has already signed ${item.id}; dual control requires a different approver`);
+    }
+    item.approvals = [...item.approvals, { name: payload.approverName, role: approver.role, at: formatNow(), mfa: Boolean(payload.mfaVerified) }];
+
+    if (item.category === "high-impact" && item.approvals.length < 2) {
+      item.pendingSecondApproval = true;
+      appendJournal(item, {
+        actor: payload.approverName,
+        role: approver.role,
+        decision: "First approval recorded (dual control 1 of 2)",
+        reason: payload.reason,
+        nextAssignee: "Second named approver (MFA)",
+        sla: true,
+      });
+      addNotification(draft, {
+        title: "Second approval required",
+        body: `${item.campaign} (${item.category}) has one of two required approvals. A different named approver must complete dual control.`,
+        subject: item.campaign,
+        recipients: ["reviewer", "admin"],
+        page: "cms",
+        tone: "action",
+      });
+      addActivity(draft, actor, "Recorded first dual-control approval", item.campaign);
+      submission = { ...item };
+      return;
+    }
+    item.pendingSecondApproval = false;
+    finalize = true;
+    submission = { ...item };
+  });
+  if (!finalize) return { state: firstState, submission, pendingSecondApproval: true };
+
+  await updateSubmissionStage(payload.id, "Approved", payload.approverName, { viaApproval: true, role: payload.role });
+  let approved!: Submission;
+  const state = await commit((draft) => {
+    const item = draft.submissions.find((entry) => entry.id === payload.id);
+    if (!item) throw new Error("Submission not found");
+    const ceremony = item.category === "high-impact"
+      ? `Dual control complete: ${item.approvals.map((signature) => signature.name).join(" + ")}, both MFA-verified (simulated step-up).`
+      : item.category === "sensitive"
+        ? "Named approver signed with MFA step-up (simulated)."
+        : "Named approver signed.";
+    appendJournal(item, {
+      actor: payload.approverName,
+      role: payload.role,
+      decision: item.category === "high-impact" ? "Approved (dual control 2 of 2)" : "Approved",
+      reason: [payload.reason, ceremony].filter(Boolean).join(" "),
+      nextAssignee: "Scheduling",
+    });
+    addActivity(draft, actor, "Approved submission", item.campaign);
+    approved = { ...item };
+  });
+  return { state, submission: approved, pendingSecondApproval: false };
+}
+
+/**
+ * Bidder resubmission (RFP APP-005): applies the revised fields, bumps the
+ * version, records a field-level diff in the journal, resets approvals and
+ * returns the item to the head of the review pipeline.
+ */
+export async function resubmitSubmission(
+  payload: { id: string; creativeId?: string; language?: string; notes?: string; budget?: string; message?: string },
+  actor: string,
+): Promise<{ state: DoohState; submission: Submission }> {
+  let submission!: Submission;
+  const state = await commit((draft) => {
+    const item = draft.submissions.find((entry) => entry.id === payload.id);
+    if (!item) throw new Error("Submission not found");
+    if (item.stage !== "Changes requested") {
+      throw new Error(`${item.id} is ${item.stage}; resubmission requires Changes requested`);
+    }
+    const diff: string[] = [];
+    const apply = (field: "creativeId" | "language" | "notes" | "budget", value?: string) => {
+      if (value !== undefined && value !== item[field]) {
+        diff.push(`${field}: "${item[field]}" -> "${value}"`);
+        item[field] = value;
+      }
+    };
+    apply("creativeId", payload.creativeId);
+    apply("language", payload.language);
+    apply("notes", payload.notes);
+    apply("budget", payload.budget);
+    const previousHash = item.contentHash;
+    item.version += 1;
+    item.contentHash = submissionContentHash(item);
+    item.approvals = [];
+    item.pendingSecondApproval = false;
+    item.stage = "Submitted";
+    appendJournal(item, {
+      actor,
+      role: "bidder",
+      decision: `Resubmitted (v${item.version})`,
+      reason: payload.message,
+      nextAssignee: item.owner,
+      diff: diff.length ? diff : [`content unchanged (hash ${previousHash.slice(0, 10)}... retained history)`],
+      sla: true,
+    });
+    draft.campaigns = draft.campaigns.map((campaign) =>
+      campaign.campaign === item.campaign
+        ? { ...campaign, status: "Submitted", nextStep: "ADMO content review", revisionMessage: undefined, revisionRequestedAt: undefined, revisionFrom: undefined }
+        : campaign,
+    );
+    addNotification(draft, {
+      title: "Revision resubmitted",
+      body: `${item.campaign} v${item.version} is back in review (${diff.length} field change${diff.length === 1 ? "" : "s"}).`,
+      subject: item.campaign,
+      recipients: ["reviewer", "admin"],
+      page: "cms",
+      tone: "action",
+    });
+    addActivity(draft, actor, `Resubmitted revision v${item.version}`, item.campaign);
+    submission = { ...item };
   });
   return { state, submission };
 }

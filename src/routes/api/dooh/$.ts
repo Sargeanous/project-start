@@ -38,6 +38,8 @@ import {
   closeAuction,
   confirmBookingPayment,
   reconcileBooking,
+  approveSubmission,
+  resubmitSubmission,
   verifyPopChain,
   playScheduleItem,
   queueEmergencyBroadcast,
@@ -223,7 +225,33 @@ export const Route = createFileRoute("/api/dooh/$")({
           if (segments[0] === "submissions" && segments[2] === "stage") {
             const stage = stringValue(body.stage, "");
             if (!stage) return jsonError("Stage is required", 422);
-            return Response.json(await updateSubmissionStage(segments[1], stage as never, actor));
+            return Response.json(await updateSubmissionStage(segments[1], stage as never, actor, { role }));
+          }
+
+          if (segments[0] === "submissions" && segments[2] === "approve") {
+            const approverName = stringValue(body.approverName, "");
+            if (!approverName) return jsonError("Approver name is required", 422);
+            // Simulated MFA step-up: any 6-digit code verifies (demo only).
+            const mfaVerified = /^[0-9]{6}$/.test(stringValue(body.mfaCode, ""));
+            return Response.json(await approveSubmission({
+              id: segments[1],
+              approverName,
+              role,
+              reason: stringValue(body.reason, "") || undefined,
+              mfaVerified,
+            }, actor));
+          }
+
+          if (segments[0] === "submissions" && segments[2] === "resubmit") {
+            const payload = (typeof body.payload === "object" && body.payload !== null ? body.payload : {}) as Record<string, unknown>;
+            return Response.json(await resubmitSubmission({
+              id: segments[1],
+              creativeId: typeof payload.creativeId === "string" ? payload.creativeId : undefined,
+              language: typeof payload.language === "string" ? payload.language : undefined,
+              notes: typeof payload.notes === "string" ? payload.notes : undefined,
+              budget: typeof payload.budget === "string" ? payload.budget : undefined,
+              message: typeof payload.message === "string" ? payload.message : undefined,
+            }, actor));
           }
 
           if (segments[0] === "submissions" && segments[2] === "request-changes") {
