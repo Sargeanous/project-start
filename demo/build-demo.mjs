@@ -59,9 +59,9 @@ const SCENES = [
   },
   {
     id: "s2-request",
-    title: "The request: a campaign is born",
+    title: "The request: an advertiser bids for airtime",
     narration:
-      "Across town, an advertiser needs airtime. He picks a package from the marketplace, names his campaign, and submits. That is it. The request now exists inside the platform, already routed to review. For premium inventory he plays the auction instead, raising his bid on the Corniche evening rotation moments before it closes.",
+      "Across town, an advertiser wants premium airtime. In the marketplace he opens the live auctions, names his campaign, and raises his bid on the Corniche evening rotation moments before it closes. The request now exists inside the platform, on the record and routed to review.",
   },
   {
     id: "s3-award",
@@ -80,6 +80,12 @@ const SCENES = [
     title: "The copilot: ask the platform anything",
     narration:
       "Everyone on the platform has the same copilot. Ask it anything: it reads the live estate and answers with sources. Ask it to act, and it drafts the action but never executes it. Every write waits for a human decision. Here, the operator approves the maintenance ticket it drafted. Intelligence, with a leash.",
+  },
+  {
+    id: "s5b-twin",
+    title: "The twin: every screen has a digital double",
+    narration:
+      "The copilot flagged a screen offline. Before a crew rolls, the technical team opens that asset as a live 3D twin. They inspect each panel, controller and power unit, and rotate the full model to check its health, all without leaving the control room.",
   },
   {
     id: "s6-proof",
@@ -172,6 +178,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function injectOverlays(page) {
   await page.evaluate(() => {
     if (document.getElementById("__cur")) return;
+    // Overlays live on <html>, outside the app root we zoom, so the cursor
+    // and captions stay pinned to the viewport when the app scales.
+    const layer = document.documentElement;
+    const app = () => document.querySelector(".app") || document.body;
+
     const c = document.createElement("div");
     c.id = "__cur";
     Object.assign(c.style, {
@@ -181,7 +192,7 @@ async function injectOverlays(page) {
       transform: "translate(-50%,-50%)",
       transition: "left 0.65s cubic-bezier(.22,.61,.36,1), top 0.65s cubic-bezier(.22,.61,.36,1), opacity 0.4s ease",
     });
-    document.body.appendChild(c);
+    layer.appendChild(c);
     window.__cursorTo = (x, y) => { c.style.left = `${x}px`; c.style.top = `${y}px`; };
     window.__ripple = (x, y) => {
       const r = document.createElement("div");
@@ -191,24 +202,80 @@ async function injectOverlays(page) {
         pointerEvents: "none", transform: "translate(-50%,-50%)", opacity: "1",
         transition: "width .45s ease-out, height .45s ease-out, opacity .45s ease-out",
       });
-      document.body.appendChild(r);
+      layer.appendChild(r);
       requestAnimationFrame(() => { r.style.width = "70px"; r.style.height = "70px"; r.style.opacity = "0"; });
       setTimeout(() => r.remove(), 600);
     };
+
+    // Zoom: scale the app root toward a panel's centre so the viewer can
+    // follow a detail interaction. boundingBox read after this reflects the
+    // scaled screen position, so clicks still land correctly.
+    const appEl = app();
+    appEl.style.transition = "transform 0.7s cubic-bezier(.22,.61,.36,1)";
+    window.__zoomTo = (sel, scale) => {
+      const el = document.querySelector(sel);
+      const root = app();
+      if (!el || !root) return;
+      const r = el.getBoundingClientRect();
+      const rr = root.getBoundingClientRect();
+      const ox = r.left + r.width / 2 - rr.left;
+      const oy = r.top + r.height / 2 - rr.top;
+      root.style.transformOrigin = `${ox}px ${oy}px`;
+      root.style.transform = `scale(${scale})`;
+    };
+    window.__zoomReset = () => {
+      const root = app();
+      if (root) root.style.transform = "scale(1)";
+    };
+
     const lt = document.createElement("div");
     lt.id = "__lt";
     Object.assign(lt.style, {
-      position: "fixed", left: "30px", bottom: "30px", padding: "11px 20px", borderRadius: "12px",
+      position: "fixed", left: "30px", top: "26px", padding: "9px 18px", borderRadius: "12px",
       background: "rgba(13,31,25,0.85)", color: "#fff", fontFamily: "Segoe UI, sans-serif",
-      fontSize: "16px", fontWeight: "600", letterSpacing: "0.02em", zIndex: "2147483647",
+      fontSize: "15px", fontWeight: "600", letterSpacing: "0.02em", zIndex: "2147483647",
       pointerEvents: "none", opacity: "0", transition: "opacity .4s ease", backdropFilter: "blur(4px)",
     });
-    document.body.appendChild(lt);
+    layer.appendChild(lt);
     window.__lowerThird = (text) => {
       if (!text) { lt.style.opacity = "0"; return; }
       lt.textContent = text;
       lt.style.opacity = "1";
     };
+
+    // Subtitle caption bar (bottom centre) + a self-driving scheduler so the
+    // captions tick in the browser without per-line round trips from Node.
+    const sub = document.createElement("div");
+    sub.id = "__sub";
+    Object.assign(sub.style, {
+      position: "fixed", left: "50%", bottom: "42px", transform: "translateX(-50%)",
+      maxWidth: "1100px", width: "max-content", padding: "10px 22px", borderRadius: "10px",
+      background: "rgba(8,20,16,0.82)", color: "#fff", fontFamily: "Segoe UI, sans-serif",
+      fontSize: "22px", fontWeight: "500", lineHeight: "1.35", textAlign: "center",
+      zIndex: "2147483647", pointerEvents: "none", opacity: "0", transition: "opacity .25s ease",
+      textShadow: "0 1px 3px rgba(0,0,0,0.5)", boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
+    });
+    layer.appendChild(sub);
+    window.__subtitle = (text) => {
+      if (!text) { sub.style.opacity = "0"; return; }
+      sub.textContent = text;
+      sub.style.opacity = "1";
+    };
+    window.__captionTimers = [];
+    window.__runCaptions = (lines, totalMs) => {
+      (window.__captionTimers || []).forEach(clearTimeout);
+      window.__captionTimers = [];
+      const totalChars = lines.reduce((s, l) => s + l.length, 0) || 1;
+      let acc = 0;
+      for (const line of lines) {
+        const dur = Math.max(1400, Math.round(totalMs * (line.length / totalChars)));
+        const at = acc;
+        window.__captionTimers.push(setTimeout(() => window.__subtitle(line), at));
+        acc += dur;
+      }
+      window.__captionTimers.push(setTimeout(() => window.__subtitle(""), acc));
+    };
+
     window.__card = (title, subtitle) => {
       let el = document.getElementById("__card");
       c.style.opacity = title ? "0" : "1"; // hide the demo cursor while a card is up
@@ -227,9 +294,27 @@ async function injectOverlays(page) {
       el.innerHTML =
         `<div style="font-size:58px;font-weight:700;letter-spacing:-0.01em;max-width:1200px">${title}</div>` +
         `<div style="font-family:Segoe UI,sans-serif;font-size:19px;opacity:.72;letter-spacing:.16em;text-transform:uppercase">${subtitle || ""}</div>`;
-      document.body.appendChild(el);
+      layer.appendChild(el);
     };
   });
+}
+
+// Split a scene's narration into caption-sized lines: sentence-first, then
+// break long sentences at commas so no caption is a wall of text.
+function captionLines(narration) {
+  const sentences = narration.match(/[^.?!]+[.?!]+/g) || [narration];
+  const lines = [];
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (s.length <= 96) { lines.push(s); continue; }
+    let buf = "";
+    for (const clause of s.split(/,\s*/)) {
+      const piece = buf ? `${buf}, ${clause}` : clause;
+      if (piece.length > 96 && buf) { lines.push(buf); buf = clause; } else { buf = piece; }
+    }
+    if (buf) lines.push(buf);
+  }
+  return lines;
 }
 
 // fast=true: preflight mode. Cosmetic waits collapse, and every missing
@@ -273,9 +358,9 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     }
     throw new Error("element never became visible");
   }
-  async function click(locator, { settle = 650 } = {}) {
+  async function click(locator, { settle = 650, noScroll = false } = {}) {
     await healIfCrashed();
-    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    if (!noScroll) await locator.scrollIntoViewIfNeeded().catch(() => {});
     await pace(350);
     const box = await boxOf(locator);
     const x = box.x + box.width / 2;
@@ -319,6 +404,15 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     await page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), toY);
     await pace(1200);
   }
+  // Zoom into a panel, run an interaction inside it, then zoom back out.
+  async function zoomInto(selector, scale = 1.35) {
+    await page.evaluate(([s, k]) => window.__zoomTo(s, k), [selector, scale]);
+    await pace(900);
+  }
+  async function zoomOut() {
+    await page.evaluate(() => window.__zoomReset());
+    await pace(900);
+  }
   async function mfa(code = "482913") {
     const dialog = page.locator(".revision-dialog").last();
     await typeInto(dialog.locator("input").first(), code);
@@ -345,7 +439,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     if (!answered) issues.push(`chat did not answer in time: "${question.slice(0, 40)}..."`);
     await pace(800);
   }
-  return { pace, has, cursorTo, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, mfa, askChat, healIfCrashed, page, issues };
+  return { pace, has, cursorTo, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, zoomInto, zoomOut, mfa, askChat, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\
@@ -380,35 +474,22 @@ const ACTIONS = {
 
   async "s2-request"(h) {
     await h.switchProfile("Advertiser");
-    await h.lowerThird("The request: a campaign is born");
+    await h.lowerThird("The request: an advertiser bids for airtime");
     await h.nav("Marketplace");
-    await h.pace(1200);
-    // Fixed-rate package request
-    await h.click(h.page.locator("button", { hasText: "Fixed-rate packages" }).first(), { settle: 1000 });
-    const packages = h.page.locator(".package-grid button");
-    if (await h.has(packages.nth(1), "s2: package card")) {
-      await h.click(packages.nth(1), { settle: 900 });
-    }
-    const nameInput = h.page.locator(".linked-detail form label", { hasText: "Campaign name" }).locator("input").first();
-    if (await h.has(nameInput, "s2: campaign name input")) {
-      await h.typeInto(nameInput, "Summer Family Offer");
-      const submit = h.page.locator("button[type=submit]", { hasText: "Submit campaign" }).first();
-      if (await h.has(submit, "s2: submit campaign button")) {
-        await h.click(submit, { settle: 1400 });
-      }
-    }
-    // Premium inventory: raise the bid on the Corniche lot before it closes.
-    // Submitting the package brief navigates to Campaigns, so go back first.
-    await h.nav("Marketplace");
-    await h.pace(900);
+    await h.pace(1000);
+    // Bidding-only: stay on Open auctions and raise the Corniche bid.
     await h.click(h.page.locator("button", { hasText: "Open auctions" }).first(), { settle: 1000 });
     const lot = h.page.locator(".auction-card").first();
     if (await h.has(lot, "s2: auction lot card")) {
       await lot.scrollIntoViewIfNeeded().catch(() => {});
+      await h.pace(1000);
+      await h.zoomInto(".auction-card", 1.3);
       const bidName = lot.locator("label", { hasText: "Campaign name" }).locator("input").first();
       if (await h.has(bidName, "s2: bid campaign name input")) await h.typeInto(bidName, "Corniche Summer Nights");
       const placeBid = lot.locator("button", { hasText: "Place bid" }).first();
       if (await h.has(placeBid, "s2: place bid button")) await h.click(placeBid, { settle: 1500 });
+      await h.pace(1000);
+      await h.zoomOut();
     }
   },
 
@@ -425,11 +506,15 @@ const ACTIONS = {
     }
     await h.nav("Commercial Map");
     await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
-    await h.pace(1400);
+    // One calm camera path: settle at the top on the map, click a pin
+    // in place (no jump), then a single smooth scroll to the detail.
+    await h.page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+    await h.pace(1600);
     const marker = h.page.locator(".leaflet-marker-icon").nth(2);
-    await h.click(marker, { settle: 1000 });
-    await h.page.locator(".linked-detail").scrollIntoViewIfNeeded().catch(() => {});
-    await h.pace(1200);
+    await h.click(marker, { settle: 1200, noScroll: true });
+    await h.pace(1000);
+    await h.smoothScroll(360);
+    await h.pace(1400);
   },
 
   async "s4-gate"(h) {
@@ -442,15 +527,21 @@ const ACTIONS = {
     const aiReview = h.page.locator(".ai-review-card").first();
     if (await h.has(aiReview, "s4: AI review card")) {
       await aiReview.scrollIntoViewIfNeeded().catch(() => {});
-      await h.pace(1500);
+      await h.pace(1200);
+      // Zoom into the AI review block so the recommendation and the
+      // Run MediaGPT check action are easy to follow.
+      await h.zoomInto(".ai-review-card", 1.35);
       const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
       if (await h.has(aiCheck, "s4: run MediaGPT check button")) {
         await h.click(aiCheck, { settle: 1200 });
         await h.pace(2500); // let the refreshed findings land on camera
       }
+      await h.zoomOut();
     }
     const panel = h.page.locator(".approvals-panel").first();
     await panel.scrollIntoViewIfNeeded().catch(() => {});
+    await h.pace(600);
+    await h.zoomInto(".approvals-panel", 1.3);
     // first approval
     let select = panel.locator("select").first();
     await h.click(select, { settle: 250 });
@@ -470,7 +561,9 @@ const ACTIONS = {
         await h.mfa("915530");
       }
     }
-    await h.pace(1200);
+    await h.pace(1000);
+    await h.zoomOut();
+    await h.pace(600);
   },
 
   async "s5-copilot"(h) {
@@ -486,6 +579,29 @@ const ACTIONS = {
     }
     await h.pace(1200);
     await h.click(h.page.locator(".chat-panel header button", { hasText: "Close" }).first(), { settle: 700 });
+  },
+
+  async "s5b-twin"(h) {
+    await h.lowerThird("The twin: every screen has a digital double");
+    await h.nav("Network and Devices");
+    await h.pace(1000);
+    // Select the asset the copilot flagged, then open its 3D twin.
+    const asset = h.page.locator(".asset-registry button", { hasText: "Al Ain Gateway" }).first();
+    if (await h.has(asset, "twin: AD-HWY-009 registry row")) {
+      await h.click(asset, { settle: 1000 });
+    }
+    const twinPane = h.page.locator(".asset-twin-pane").first();
+    await twinPane.scrollIntoViewIfNeeded().catch(() => {});
+    await h.pace(1200);
+    const fs = h.page.locator(".asset-twin-pane button", { hasText: "Full screen" }).first();
+    if (await h.has(fs, "twin: Full screen button")) {
+      await h.click(fs, { settle: 1200 });
+      await h.page.locator(".twin-fullscreen").first().waitFor({ timeout: 12000 }).catch(() => h.issues.push("twin: fullscreen did not open"));
+      await h.pace(4500); // let the 3D model render and settle on camera
+      const close = h.page.locator(".twin-fullscreen .icon-button").first();
+      if (await close.count()) await h.click(close, { settle: 900 });
+      else { await h.page.keyboard.press("Escape"); await h.pace(600); }
+    }
   },
 
   async "s6-proof"(h) {
@@ -630,6 +746,13 @@ async function record(browser) {
       const sceneStart = Date.now() - t0;
       offsets.push(sceneStart);
       console.log(`  ${scene.id} @ ${(sceneStart / 1000).toFixed(1)}s (clip ${scene.duration.toFixed(1)}s)`);
+      // Fire the subtitle schedule for this scene (self-driving in the
+      // browser) so captions track the narration that gets muxed at this
+      // same offset. Non-blocking; the scene actions run alongside.
+      await page.evaluate(
+        ([lines, totalMs]) => window.__runCaptions(lines, totalMs),
+        [captionLines(scene.narration), Math.round(scene.duration * 1000)],
+      ).catch(() => {});
       await ACTIONS[scene.id](h);
       const elapsed = Date.now() - t0 - sceneStart;
       const target = scene.duration * 1000 + SCENE_DWELL_MS;
