@@ -255,12 +255,29 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     await page.evaluate(([cx, cy]) => window.__cursorTo(cx, cy), [x, y]);
     await pace(700);
   }
+  // Wait for a locator to be visible with a box, healing the error boundary
+  // and retrying once. Route transitions plus the occasional dev-server
+  // crash mean an element can be briefly absent; this rides that out.
+  async function boxOf(locator) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await healIfCrashed();
+      try {
+        await locator.waitFor({ state: "visible", timeout: 12000 });
+        const box = await locator.boundingBox();
+        if (box) return box;
+      } catch {
+        // fall through to heal + retry
+      }
+      await healIfCrashed();
+      await sleep(1200);
+    }
+    throw new Error("element never became visible");
+  }
   async function click(locator, { settle = 650 } = {}) {
     await healIfCrashed();
     await locator.scrollIntoViewIfNeeded().catch(() => {});
     await pace(350);
-    const box = await locator.boundingBox();
-    if (!box) throw new Error("no bounding box for locator");
+    const box = await boxOf(locator);
     const x = box.x + box.width / 2;
     const y = box.y + Math.min(box.height / 2, 40);
     await cursorTo(x, y);
@@ -282,6 +299,10 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
   async function nav(label) {
     const loc = page.locator("nav button, aside button").filter({ hasText: label }).first();
     await click(loc, { settle: 1100 });
+    // Let the route's chunk mount and the page heading settle before the
+    // next scene step queries for an element on it.
+    await page.locator("h1").first().waitFor({ state: "visible", timeout: 12000 }).catch(() => {});
+    await pace(600);
   }
   async function switchProfile(name) {
     const sw = page.locator("button", { hasText: "Switch profile" }).first();
