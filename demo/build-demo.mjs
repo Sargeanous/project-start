@@ -140,10 +140,12 @@ const SCENES = [
         async do(h) {
           await h.nav("Commercial Map");
           await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
-          await h.page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" }));
-          await h.pace(1200);
-          await h.click(h.page.locator(".leaflet-marker-icon").nth(2), { settle: 1000, noScroll: true });
-          await h.smoothScroll(360);
+          // Show the map still, then a single slow pan down to the
+          // allocation detail beneath it. No marker click (leaflet's own
+          // recentering was the up-and-down jump).
+          await h.page.evaluate(() => window.scrollTo(0, 0));
+          await h.pace(2400);
+          await h.panToElement(".linked-detail", { headroom: 130, ms: 4200 });
         },
       },
     ],
@@ -154,31 +156,34 @@ const SCENES = [
     title: "The gate: AI reviews, humans decide",
     beats: [
       {
-        say: "Now the gate. MediaGPT reads the creative first: bilingual copy, rights, restricted categories.",
+        say: "Now the gate. Before any human looks, MediaGPT reads the creative and scores it on brand safety, cultural fit, Arabic accuracy and legibility.",
         async do(h) {
           await h.switchProfile("ADMO Content Reviewer");
           await h.click(h.page.locator(".submission-list button", { hasText: "National observance takeover" }).first(), { settle: 1000 });
           const start = h.page.locator("button", { hasText: "Start review" }).first();
           if (await h.has(start, "s4: start review")) await h.click(start, { settle: 1000 });
           await h.page.locator(".ai-review-card").first().scrollIntoViewIfNeeded().catch(() => {});
+          const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
+          if (await h.has(aiCheck, "s4: run MediaGPT check")) await h.click(aiCheck, { settle: 1200 });
         },
       },
       {
-        say: "It flags what a human should look at and cites the exact policy clause. But AI only proposes; people decide.",
+        say: "It clears the campaign on brand safety and copyright, but flags the call to action as too small for highway screens, and cites the creative-standards clause behind that rule.",
         async do(h) {
-          const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
-          if (await h.has(aiCheck, "s4: run MediaGPT check")) {
-            await h.click(aiCheck, { settle: 1200 });
-            await h.pace(2200);
+          const details = h.page.locator("button", { hasText: "Show AI details" }).first();
+          if (await h.has(details, "s4: show AI details")) {
+            await h.click(details, { settle: 800 });
+            await h.page.locator(".deepscan-panel").first().scrollIntoViewIfNeeded().catch(() => {});
+            await h.pace(2600); // hold on the scores + findings
           }
         },
       },
       {
-        say: "High-impact content takes two named approvers, each with a one-time code, and neither the owner nor the bidder may sign their own work.",
+        say: "The reviewer reads the finding and decides. Because AI only proposes, high-impact content still needs two named approvers, each with a one-time code, and neither owner nor bidder may sign their own work.",
         async do(h) {
           const panel = h.page.locator(".approvals-panel").first();
           await panel.scrollIntoViewIfNeeded().catch(() => {});
-          let select = panel.locator("select").first();
+          const select = panel.locator("select").first();
           await h.click(select, { settle: 250 });
           await select.selectOption({ index: 1 });
           await h.pace(500);
@@ -520,6 +525,20 @@ async function injectOverlays(page) {
       sub.textContent = text;
       sub.style.opacity = "1";
     };
+    // Controlled one-directional pan with easing, so a scroll reveal reads
+    // as a slow camera move and never bounces.
+    window.__panTo = (targetY, ms) => new Promise((res) => {
+      const startY = window.scrollY;
+      const dist = targetY - startY;
+      const t0 = performance.now();
+      function step(now) {
+        const p = Math.min(1, (now - t0) / ms);
+        const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        window.scrollTo(0, startY + dist * e);
+        if (p < 1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
     window.__card = (title, subtitle) => {
       let el = document.getElementById("__card");
       c.style.opacity = title ? "0" : "1";
@@ -626,6 +645,21 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     await page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), toY);
     await pace(1200);
   }
+  // Slow, eased, one-directional pan to an absolute Y (px).
+  async function slowPan(toY, ms = 3800) {
+    if (fast) { await page.evaluate((y) => window.scrollTo(0, y), toY); return; }
+    await page.evaluate(([y, d]) => window.__panTo(y, d), [toY, ms]);
+    await pace(300);
+  }
+  // Slow pan so a target element sits `headroom` px below the top.
+  async function panToElement(selector, { headroom = 120, ms = 3800 } = {}) {
+    const y = await page.evaluate(([sel, hr]) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      return Math.max(0, window.scrollY + el.getBoundingClientRect().top - hr);
+    }, [selector, headroom]);
+    if (y != null) await slowPan(y, ms);
+  }
   async function mfa(code = "482913") {
     const dialog = page.locator(".revision-dialog").last();
     await typeInto(dialog.locator("input").first(), code);
@@ -679,7 +713,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     }
     await pace(500);
   }
-  return { pace, has, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, mfa, askChat, dragRotate, slide, healIfCrashed, page, issues };
+  return { pace, has, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, slowPan, panToElement, mfa, askChat, dragRotate, slide, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\
