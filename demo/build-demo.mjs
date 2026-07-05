@@ -1,14 +1,18 @@
 // Autonomous demo-video pipeline for the Unified DOOH Platform.
 //
-//   node demo/build-demo.mjs            -> demo/output/dooh-platform-demo.mp4
+//   node demo/build-demo.mjs            -> preflight, then record if clean
+//   node demo/build-demo.mjs --check    -> preflight only, no recording
 //
 // Stages:
 //   1. Narration script -> OpenAI TTS (wav per scene, cached by text hash)
-//   2. Playwright drives the running dev server (http://localhost:8080) in a
-//      headed browser, records video, injects a visible cursor, click
-//      ripples, lower-thirds and title cards; each scene is paced to its
-//      narration clip plus a viewing dwell.
-//   3. ffmpeg (ffmpeg-static) muxes the narration onto the recording.
+//   2. PREFLIGHT: a fast headless dry run of every scene. Any missing
+//      element, skipped step, scene error or error-boundary hit is
+//      reported, and the recording does not start unless the path is
+//      100% clean. The dry run also warms every dev-server route.
+//   3. RECORD: Playwright drives a headed browser, records video, injects
+//      a visible cursor, click ripples, lower-thirds and title cards;
+//      each scene is paced to its narration clip plus a viewing dwell.
+//   4. ffmpeg (ffmpeg-static) muxes the narration onto the recording.
 //
 // Requirements: dev server on :8080, OPENAI_API_KEY in .env, internet for
 // map tiles and TTS. Leave the browser window alone while it records.
@@ -24,6 +28,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "demo", "output");
 const AUDIO_DIR = join(ROOT, "demo", "audio");
 const BASE_URL = process.env.DEMO_BASE_URL || "http://localhost:8080";
+const CHECK_ONLY = process.argv.includes("--check");
 const FFMPEG = (await import("ffmpeg-static")).default;
 
 // Extra seconds the viewer gets on each scene after the narration ends.
@@ -50,7 +55,7 @@ const SCENES = [
     id: "s1-control",
     title: "Seven a.m. The network wakes up",
     narration:
-      "Abu Dhabi, seven a.m. Fourteen digital displays across five zones wake up under one system. In the control room, operators watch the estate breathe: every screen, its health, and what it is playing, live on the map. And before the day starts, MediaGPT has already written the shift handover.",
+      "Abu Dhabi, seven a.m. Fourteen digital displays across five zones wake up under one system. In the control room, operators watch the estate breathe: every screen, its health, and what it is playing, live on the map. And any display is one click away, exactly as it looks on the street.",
   },
   {
     id: "s2-request",
@@ -159,7 +164,7 @@ async function tts(text, file) {
 }
 
 /* ------------------------------------------------------------------ *\
-   3. Recording helpers
+   3. Overlays and helpers
 \* ------------------------------------------------------------------ */
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -227,39 +232,52 @@ async function injectOverlays(page) {
   });
 }
 
-function makeHelpers(page) {
-  async function cursorTo(x, y) {
-    await page.evaluate(([cx, cy]) => window.__cursorTo(cx, cy), [x, y]);
-    await sleep(700);
-  }
-  // The dev server occasionally trips the app's error boundary; recover
-  // instead of failing the recording.
+// fast=true: preflight mode. Cosmetic waits collapse, and every missing
+// element or recovery is recorded in `issues` instead of silently skipped.
+function makeHelpers(page, { fast = false, issues = [] } = {}) {
+  const pace = (ms) => sleep(fast ? Math.min(ms * 0.15, 250) : ms);
+
   async function healIfCrashed() {
     const retry = page.locator("button", { hasText: "Try again" }).first();
     if (await retry.count().catch(() => 0)) {
+      issues.push("error boundary appeared (This page didn't load)");
+      console.log("  [heal] error boundary appeared, recovering");
       await retry.click().catch(() => {});
       await sleep(2000);
     }
   }
+  async function has(locator, label) {
+    const n = await locator.count().catch(() => 0);
+    if (!n) issues.push(`missing: ${label}`);
+    return n > 0;
+  }
+  async function cursorTo(x, y) {
+    await page.evaluate(([cx, cy]) => window.__cursorTo(cx, cy), [x, y]);
+    await pace(700);
+  }
   async function click(locator, { settle = 650 } = {}) {
     await healIfCrashed();
     await locator.scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(350);
+    await pace(350);
     const box = await locator.boundingBox();
     if (!box) throw new Error("no bounding box for locator");
     const x = box.x + box.width / 2;
     const y = box.y + Math.min(box.height / 2, 40);
     await cursorTo(x, y);
     await page.evaluate(([cx, cy]) => window.__ripple(cx, cy), [x, y]);
-    await sleep(160);
+    await pace(160);
     await locator.click({ timeout: 6000 }).catch(() => page.mouse.click(x, y));
-    await sleep(settle);
+    await pace(settle);
   }
   async function typeInto(locator, text) {
     await click(locator, { settle: 250 });
     await locator.fill("");
-    await locator.pressSequentially(text, { delay: 65 });
-    await sleep(350);
+    if (fast) {
+      await locator.fill(text);
+    } else {
+      await locator.pressSequentially(text, { delay: 65 });
+    }
+    await pace(350);
   }
   async function nav(label) {
     const loc = page.locator("nav button, aside button").filter({ hasText: label }).first();
@@ -278,19 +296,20 @@ function makeHelpers(page) {
   }
   async function smoothScroll(toY) {
     await page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), toY);
-    await sleep(1200);
+    await pace(1200);
   }
   async function mfa(code = "482913") {
     const dialog = page.locator(".revision-dialog").last();
     await typeInto(dialog.locator("input").first(), code);
     await click(dialog.locator("button", { hasText: "Verify and approve" }).first(), { settle: 1000 });
   }
-  // Ask the MediaGPT chat dock a question and wait until it finishes answering.
+  // Ask the MediaGPT chat dock a question and wait until it finishes
+  // answering. AI latency is real in both modes.
   async function askChat(question, timeout = 50000) {
     const before = await page.locator(".chat-panel .chat-log article.assistant").count();
     await typeInto(page.locator(".chat-panel footer input"), question);
     await click(page.locator(".chat-panel footer button").first(), { settle: 500 });
-    await page
+    const answered = await page
       .waitForFunction(
         (n) => {
           const articles = document.querySelectorAll(".chat-panel .chat-log article.assistant");
@@ -300,10 +319,12 @@ function makeHelpers(page) {
         before,
         { timeout },
       )
-      .catch(() => {});
-    await sleep(800);
+      .then(() => true)
+      .catch(() => false);
+    if (!answered) issues.push(`chat did not answer in time: "${question.slice(0, 40)}..."`);
+    await pace(800);
   }
-  return { cursorTo, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, mfa, askChat, page };
+  return { pace, has, cursorTo, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, mfa, askChat, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\
@@ -313,26 +334,26 @@ function makeHelpers(page) {
 const ACTIONS = {
   async "s1-control"(h) {
     await h.card("Unified DOOH Platform", "Abu Dhabi Media Office · one day on the network");
-    await sleep(4200);
+    await h.pace(4200);
     await h.card(null);
-    await sleep(500);
+    await h.pace(500);
     await h.click(h.page.locator("button", { hasText: "ADMO Control Room" }).first(), { settle: 1400 });
     await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
     await h.lowerThird("Seven a.m. The network wakes up");
-    await sleep(1800);
+    await h.pace(1800);
     await h.page.locator(".asset-board").scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(1600);
+    await h.pace(1600);
     await h.page.locator(".control-estate-group").scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(1600);
+    await h.pace(1600);
     const zones = h.page.locator(".zone-list button");
     await h.click(zones.nth(1), { settle: 1100 });
     await h.click(zones.nth(2), { settle: 1100 });
-    await h.smoothScroll(0);
-    const summarize = h.page.locator(".operator-actions-row button", { hasText: "Summarize" }).first();
-    if (await summarize.count()) {
-      await h.click(summarize, { settle: 800 });
-      await h.page.locator(".ai-review-card").first().waitFor({ timeout: 12000 }).catch(() => {});
-      await sleep(1500);
+    const fullScreen = h.page.locator("button", { hasText: "Full screen" }).first();
+    if (await h.has(fullScreen, "s1: live view Full screen button")) {
+      await h.click(fullScreen, { settle: 1200 });
+      await h.pace(2600);
+      await h.page.keyboard.press("Escape");
+      await h.pace(800);
     }
   },
 
@@ -340,29 +361,33 @@ const ACTIONS = {
     await h.switchProfile("Advertiser");
     await h.lowerThird("The request: a campaign is born");
     await h.nav("Marketplace");
-    await sleep(1200);
+    await h.pace(1200);
     // Fixed-rate package request
     await h.click(h.page.locator("button", { hasText: "Fixed-rate packages" }).first(), { settle: 1000 });
     const packages = h.page.locator(".package-grid button");
-    if (await packages.count()) {
+    if (await h.has(packages.nth(1), "s2: package card")) {
       await h.click(packages.nth(1), { settle: 900 });
     }
     const nameInput = h.page.locator(".linked-detail form label", { hasText: "Campaign name" }).locator("input").first();
-    if (await nameInput.count()) {
+    if (await h.has(nameInput, "s2: campaign name input")) {
       await h.typeInto(nameInput, "Summer Family Offer");
-      await h.click(h.page.locator("button[type=submit]", { hasText: "Submit campaign" }).first(), { settle: 1400 });
+      const submit = h.page.locator("button[type=submit]", { hasText: "Submit campaign" }).first();
+      if (await h.has(submit, "s2: submit campaign button")) {
+        await h.click(submit, { settle: 1400 });
+      }
     }
     // Premium inventory: raise the bid on the Corniche lot before it closes.
     // Submitting the package brief navigates to Campaigns, so go back first.
     await h.nav("Marketplace");
-    await sleep(900);
+    await h.pace(900);
     await h.click(h.page.locator("button", { hasText: "Open auctions" }).first(), { settle: 1000 });
     const lot = h.page.locator(".auction-card").first();
-    if (await lot.count()) {
+    if (await h.has(lot, "s2: auction lot card")) {
       await lot.scrollIntoViewIfNeeded().catch(() => {});
       const bidName = lot.locator("label", { hasText: "Campaign name" }).locator("input").first();
-      if (await bidName.count()) await h.typeInto(bidName, "Corniche Summer Nights");
-      await h.click(lot.locator("button", { hasText: "Place bid" }).first(), { settle: 1500 });
+      if (await h.has(bidName, "s2: bid campaign name input")) await h.typeInto(bidName, "Corniche Summer Nights");
+      const placeBid = lot.locator("button", { hasText: "Place bid" }).first();
+      if (await h.has(placeBid, "s2: place bid button")) await h.click(placeBid, { settle: 1500 });
     }
   },
 
@@ -370,55 +395,61 @@ const ACTIONS = {
     await h.switchProfile("ADMO Finance");
     await h.lowerThird("The award: money clears before delivery");
     const closeBtn = h.page.locator("button", { hasText: "Close auction" }).first();
-    if (await closeBtn.count()) {
+    if (await h.has(closeBtn, "s3: close auction button")) {
       await h.click(closeBtn, { settle: 1500 });
     }
     const pay = h.page.locator("button", { hasText: "Confirm payment" }).first();
-    if (await pay.count()) {
+    if (await h.has(pay, "s3: confirm payment button")) {
       await h.click(pay, { settle: 1500 });
     }
     await h.nav("Commercial Map");
     await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
-    await sleep(1400);
+    await h.pace(1400);
     const marker = h.page.locator(".leaflet-marker-icon").nth(2);
     await h.click(marker, { settle: 1000 });
     await h.page.locator(".linked-detail").scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(1200);
+    await h.pace(1200);
   },
 
   async "s4-gate"(h) {
     await h.switchProfile("ADMO Content Reviewer");
     await h.lowerThird("The gate: AI reviews, humans decide");
     await h.click(h.page.locator(".submission-list button", { hasText: "National observance takeover" }).first(), { settle: 1100 });
-    const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
-    if (await aiCheck.count()) {
-      await h.click(aiCheck, { settle: 900 });
-      await sleep(9000); // let the AI review land on camera
-    }
+    // The AI review card renders once the submission is In review.
     const start = h.page.locator("button", { hasText: "Start review" }).first();
-    if (await start.count()) await h.click(start, { settle: 1000 });
+    if (await h.has(start, "s4: start review button")) await h.click(start, { settle: 1000 });
+    const aiReview = h.page.locator(".ai-review-card").first();
+    if (await h.has(aiReview, "s4: AI review card")) {
+      await aiReview.scrollIntoViewIfNeeded().catch(() => {});
+      await h.pace(1500);
+      const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
+      if (await h.has(aiCheck, "s4: run MediaGPT check button")) {
+        await h.click(aiCheck, { settle: 1200 });
+        await h.pace(2500); // let the refreshed findings land on camera
+      }
+    }
     const panel = h.page.locator(".approvals-panel").first();
     await panel.scrollIntoViewIfNeeded().catch(() => {});
     // first approval
     let select = panel.locator("select").first();
     await h.click(select, { settle: 250 });
     await select.selectOption({ index: 1 });
-    await sleep(600);
+    await h.pace(600);
     await h.click(panel.locator("button", { hasText: "Approve with MFA" }).first(), { settle: 900 });
     await h.mfa();
     // second approval (dual control)
     select = h.page.locator(".approvals-panel select").first();
-    if (await select.count()) {
+    if (await h.has(select, "s4: second approver select")) {
       await h.click(select, { settle: 250 });
       await select.selectOption({ index: 1 });
-      await sleep(600);
+      await h.pace(600);
       const second = h.page.locator(".approvals-panel button", { hasText: "Second approval (MFA)" }).first();
-      if (await second.count()) {
+      if (await h.has(second, "s4: second approval button")) {
         await h.click(second, { settle: 900 });
         await h.mfa("915530");
       }
     }
-    await sleep(1200);
+    await h.pace(1200);
   },
 
   async "s5-copilot"(h) {
@@ -426,13 +457,13 @@ const ACTIONS = {
     await h.lowerThird("The copilot: ask the platform anything");
     await h.click(h.page.locator(".chat-fab").first(), { settle: 900 });
     await h.askChat("Which assets are offline or need attention right now?");
-    await sleep(1500);
+    await h.pace(1500);
     await h.askChat("Draft a maintenance ticket for AD-HWY-009 with high severity.");
     const approve = h.page.locator(".chat-panel .agent-action-card button", { hasText: "Approve" }).first();
-    if (await approve.count()) {
+    if (await h.has(approve, "s5: chat proposal approve button")) {
       await h.click(approve, { settle: 1400 });
     }
-    await sleep(1200);
+    await h.pace(1200);
     await h.click(h.page.locator(".chat-panel header button", { hasText: "Close" }).first(), { settle: 700 });
   },
 
@@ -441,11 +472,11 @@ const ACTIONS = {
     await h.lowerThird("It plays, and proves it");
     await h.click(h.page.locator("button", { hasText: "Scheduling" }).first(), { settle: 1000 });
     const play = h.page.locator("button", { hasText: "Play now" }).first();
-    if (await play.count()) await h.click(play, { settle: 1400 });
+    if (await h.has(play, "s6: play now button")) await h.click(play, { settle: 1400 });
     await h.switchProfile("ADMO Finance");
     const verify = h.page.locator("button", { hasText: "Verify hash chain" }).first();
     await verify.scrollIntoViewIfNeeded().catch(() => {});
-    await sleep(900);
+    await h.pace(900);
     await h.click(verify, { settle: 1600 });
     const reconcile = h.page.locator("button", { hasText: "Reconcile against PoP" }).first();
     if (await reconcile.count()) {
@@ -453,7 +484,7 @@ const ACTIONS = {
       const settleBtn = h.page.locator("button", { hasText: "Close settlement" }).first();
       if (await settleBtn.count()) await h.click(settleBtn, { settle: 1200 });
     }
-    await sleep(1000);
+    await h.pace(1000);
   },
 
   async "s7-emergency"(h) {
@@ -462,37 +493,37 @@ const ACTIONS = {
     await h.lowerThird("The interruption: an alert outranks everything");
     // Follow the narration: the NCEMA weather alert, checked then approved.
     const row = h.page.locator("tbody tr", { hasText: "Weather alert broadcast" }).first();
-    if (await row.count()) await h.click(row, { settle: 1100 });
+    if (await h.has(row, "s7: NCEMA weather alert row")) await h.click(row, { settle: 1100 });
     const checks = h.page.locator("button", { hasText: "Run MediaGPT checks" }).first();
-    if (await checks.count()) {
+    if (await h.has(checks, "s7: run MediaGPT checks button")) {
       await h.click(checks, { settle: 1600 });
-      await sleep(1500);
+      await h.pace(1500);
     }
     const assist = h.page.locator("button", { hasText: "Run AI assist" }).first();
-    if (await assist.count()) {
+    if (await h.has(assist, "s7: run AI assist button")) {
       await h.click(assist, { settle: 900 });
-      await h.page.locator(".emg-assist-body").first().waitFor({ timeout: 25000 }).catch(() => {});
-      await sleep(2000);
+      await h.page.locator(".emg-assist-body").first().waitFor({ timeout: 25000 }).catch(() => h.issues.push("s7: AI assist did not answer in time"));
+      await h.pace(2000);
     }
     const select = h.page.locator(".approvals-action select").first();
-    if (await select.count()) {
+    if (await h.has(select, "s7: alert approver select")) {
       await select.scrollIntoViewIfNeeded().catch(() => {});
       await h.click(select, { settle: 250 });
       await select.selectOption({ index: 1 });
-      await sleep(500);
+      await h.pace(500);
       await h.click(h.page.locator("button", { hasText: "Approve with MFA" }).first(), { settle: 900 });
       await h.mfa("774201");
     }
     const broadcast = h.page.locator("button", { hasText: "Broadcast now (preempt)" }).first();
-    if (await broadcast.count()) await h.click(broadcast, { settle: 1800 });
-    await sleep(1400);
+    if (await h.has(broadcast, "s7: broadcast now button")) await h.click(broadcast, { settle: 1800 });
+    await h.pace(1400);
   },
 
   async "s8-safety"(h) {
     await h.nav("Control Centre");
     await h.lowerThird("The response: crews out, screens dark on command");
     await h.click(h.page.locator(".operator-actions-row button", { hasText: "Dispatch technician" }).first(), { settle: 1000 });
-    await sleep(1800);
+    await h.pace(1800);
     const dispatchCta = h.page.locator(".dispatch-dialog button", { hasText: "Dispatch to" }).first();
     await h.click(dispatchCta, { settle: 1300 });
     await h.click(h.page.locator(".operator-actions-row button", { hasText: "Kill switch" }).first(), { settle: 1000 });
@@ -510,36 +541,56 @@ const ACTIONS = {
     await h.switchProfile("ADMO Finance");
     await h.nav("Reports & BI");
     await h.lowerThird("The close: the day on the books");
-    await sleep(2200);
+    await h.pace(2200);
     await h.smoothScroll(420);
-    await sleep(2000);
+    await h.pace(2000);
     await h.lowerThird(null);
     await h.card("One platform. One closed loop.", "From dirham · to display · to proof");
   },
 };
 
 /* ------------------------------------------------------------------ *\
-   5. Main
+   5. Run stages
 \* ------------------------------------------------------------------ */
 
-async function main() {
-  console.log("1/3 Generating narration...");
-  for (const scene of SCENES) {
-    scene.audioFile = join(AUDIO_DIR, `${scene.id}.wav`);
-    scene.duration = await tts(scene.narration, scene.audioFile);
-    console.log(`  ${scene.id}: ${scene.duration.toFixed(1)}s`);
-  }
-  const totalNarration = SCENES.reduce((s, x) => s + x.duration, 0);
-  console.log(`  total narration: ${totalNarration.toFixed(0)}s`);
-
-  console.log("2/3 Recording...");
+async function resetPlatform() {
   const reset = await fetch(`${BASE_URL}/api/dooh/reset`, { method: "POST" });
   if (!reset.ok) throw new Error("state reset failed; is the dev server running on :8080?");
   // The agent approval queue persists separately from platform state; start
-  // the demo with a clean inbox so only on-camera proposals appear.
+  // with a clean inbox so only on-camera proposals appear.
   writeFileSync(join(ROOT, ".dooh-data", "agent-actions.json"), "[]\n");
+}
 
-  const browser = await chromium.launch({ headless: false });
+async function preflight(browser) {
+  console.log("2/4 Preflight: dry-running every scene...");
+  await resetPlatform();
+  const issues = [];
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const page = await context.newPage();
+  await page.goto(BASE_URL, { waitUntil: "networkidle" });
+  await injectOverlays(page);
+  const h = makeHelpers(page, { fast: true, issues });
+  for (const scene of SCENES) {
+    const started = Date.now();
+    try {
+      await ACTIONS[scene.id](h);
+      console.log(`  ok ${scene.id} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+    } catch (err) {
+      issues.push(`${scene.id} failed: ${String(err.message || err).split("\n")[0]}`);
+      console.log(`  FAIL ${scene.id}: ${String(err.message || err).split("\n")[0]}`);
+      await page.screenshot({ path: join(OUT_DIR, `preflight-${scene.id}.png`) }).catch(() => {});
+      // try to recover for the remaining scenes
+      await page.goto(BASE_URL, { waitUntil: "networkidle" }).catch(() => {});
+      await injectOverlays(page).catch(() => {});
+    }
+  }
+  await context.close();
+  return issues;
+}
+
+async function record(browser) {
+  console.log("3/4 Recording...");
+  await resetPlatform();
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     recordVideo: { dir: OUT_DIR, size: { width: 1920, height: 1080 } },
@@ -549,7 +600,8 @@ async function main() {
   const t0 = Date.now();
   await page.goto(BASE_URL, { waitUntil: "networkidle" });
   await injectOverlays(page);
-  const h = makeHelpers(page);
+  const issues = [];
+  const h = makeHelpers(page, { fast: false, issues });
 
   const offsets = [];
   try {
@@ -566,17 +618,18 @@ async function main() {
   } catch (err) {
     await page.screenshot({ path: join(OUT_DIR, "error.png"), fullPage: false }).catch(() => {});
     await context.close();
-    await browser.close();
     throw err;
   }
 
   const video = page.video();
   await context.close();
-  await browser.close();
   const rawVideo = await video.path();
   console.log(`  raw video: ${rawVideo}`);
+  return { rawVideo, offsets, issues };
+}
 
-  console.log("3/3 Muxing audio...");
+function mux(rawVideo, offsets) {
+  console.log("4/4 Muxing audio...");
   const args = ["-y", "-i", rawVideo];
   for (const scene of SCENES) args.push("-i", scene.audioFile);
   const delays = SCENES.map((s, i) => {
@@ -599,7 +652,47 @@ async function main() {
     throw new Error("ffmpeg failed");
   }
   rmSync(rawVideo, { force: true });
-  console.log(`\nDone: ${outFile}`);
+  return outFile;
+}
+
+async function main() {
+  console.log("1/4 Generating narration...");
+  for (const scene of SCENES) {
+    scene.audioFile = join(AUDIO_DIR, `${scene.id}.wav`);
+    scene.duration = await tts(scene.narration, scene.audioFile);
+    console.log(`  ${scene.id}: ${scene.duration.toFixed(1)}s`);
+  }
+
+  const browser = await chromium.launch({ headless: false });
+  try {
+    const preflightIssues = await preflight(browser);
+    if (preflightIssues.length) {
+      console.log(`\nPREFLIGHT FAILED with ${preflightIssues.length} issue(s):`);
+      for (const issue of preflightIssues) console.log(`  - ${issue}`);
+      console.log("\nNot recording. Fix the issues and run again.");
+      process.exitCode = 1;
+      return;
+    }
+    console.log("  preflight clean.");
+    if (CHECK_ONLY) {
+      console.log("\n--check: skipping the recording stage.");
+      return;
+    }
+
+    const { rawVideo, offsets, issues } = await record(browser);
+    if (issues.length) {
+      console.log(`\nRECORDING TAINTED with ${issues.length} issue(s):`);
+      for (const issue of issues) console.log(`  - ${issue}`);
+      console.log("The take is flawed. Not muxing. Run again.");
+      rmSync(rawVideo, { force: true });
+      process.exitCode = 1;
+      return;
+    }
+    const outFile = mux(rawVideo, offsets);
+    console.log(`\nDone: ${outFile}`);
+  } finally {
+    await browser.close();
+  }
 }
 
 main().catch((err) => {
