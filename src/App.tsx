@@ -27,6 +27,7 @@ import {
   MonitorPlay,
   Maximize2,
   PlugZap,
+  Power,
   RadioTower,
   RefreshCcw,
   PanelLeftClose,
@@ -61,6 +62,7 @@ import {
 import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
+  alerts,
   assetAllocations,
   assets as estateAssets,
   fieldTasks,
@@ -2389,7 +2391,25 @@ const translations: Record<string, string> = {
   "Moved submission to Scheduled": "نقل الطلب إلى مجدول",
   "Moved submission to Published": "نقل الطلب إلى منشور",
   "Moved submission to Changes requested": "نقل الطلب إلى مطلوب تعديل",
-  "Summer retail launch": "إطلاق التجزئة الصيفي"
+  "Summer retail launch": "إطلاق التجزئة الصيفي",
+  "Kill switch": "مفتاح الإيقاف",
+  "Restricted": "صلاحية مقيدة",
+  "Blanks live displays in the field within seconds. Password confirmation is required and every activation is written to the audit trail.": "يقوم بتعتيم الشاشات الحية في الميدان خلال ثوانٍ. يتطلب تأكيد كلمة المرور، ويُسجَّل كل تفعيل في سجل التدقيق.",
+  "Confirm display blackout": "تأكيد تعتيم الشاشات",
+  "Takes effect immediately on live screens": "يسري فورًا على الشاشات الحية",
+  "Target": "الهدف",
+  "Displays affected": "الشاشات المتأثرة",
+  "Every display in the emirate": "جميع الشاشات في الإمارة",
+  "Operator password": "كلمة مرور المشغل",
+  "Demo: any password of 6+ characters verifies.": "تجريبي: أي كلمة مرور من 6 أحرف فأكثر تُقبل.",
+  "Blank displays now": "تعتيم الشاشات الآن",
+  "Dispatch technicians": "إرسال الفنيين",
+  "Review where field crews will be sent before confirming.": "راجع المواقع التي سترسل إليها الفرق الميدانية قبل التأكيد.",
+  "No open alarms. Nothing to dispatch.": "لا توجد إنذارات مفتوحة. لا حاجة لإرسال فنيين.",
+  "Dispatch to": "إرسال إلى",
+  "site": "موقع",
+  "sites": "مواقع",
+  "Technicians dispatched to": "تم إرسال الفنيين إلى"
 };
 
 const I18nContext = createContext<Translator>((value) => value);
@@ -3373,28 +3393,51 @@ function KillSwitchPanel({
   killedAssetIds,
   onKill,
   onRestore,
+  flash,
+  panelRef,
   t,
 }: {
   killedAssetIds: string[];
   onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
   onRestore: (payload: { scope: "asset" | "zone" | "emirate"; target?: string }) => void;
+  flash: boolean;
+  panelRef: React.RefObject<HTMLElement | null>;
   t: (value: string) => string;
 }) {
   const [scope, setScope] = useState<"asset" | "zone" | "emirate">("asset");
   const [target, setTarget] = useState(estateAssets[0].id);
+  const [zoneTarget, setZoneTarget] = useState(KILL_ZONES[0]);
   const [reason, setReason] = useState("");
   const [confirmEmirate, setConfirmEmirate] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const slaLabel = scope === "asset" ? "<=10s" : scope === "zone" ? "<=30s" : "<=60s, dual-control";
+  const affectedCount = scope === "asset" ? 1 : scope === "zone" ? estateAssets.filter((asset) => asset.zone === zoneTarget).length : estateAssets.length;
+  const selectedAsset = estateAssets.find((asset) => asset.id === target);
+  const targetLabel = scope === "asset" ? `${target} - ${t(selectedAsset?.name ?? "")}` : scope === "zone" ? t(zoneTarget) : t("Every display in the emirate");
 
-  function submit() {
+  function executeKill() {
     onKill({ scope, target: scope === "asset" ? target : scope === "zone" ? zoneTarget : undefined, reason, confirm: confirmEmirate });
+    setConfirmOpen(false);
     setReason("");
     setConfirmEmirate(false);
   }
-  const [zoneTarget, setZoneTarget] = useState(KILL_ZONES[0]);
 
   return (
-    <Panel icon={LockKeyhole} title={t("Remote display control (kill switch)")} action={<StatusPill label={killedAssetIds.length ? String(killedAssetIds.length) + " " + t("blanked") : t("All live")} tone={killedAssetIds.length ? "danger" : "good"} />}>
+    <section ref={panelRef} className={`panel kill-panel${flash ? " kill-flash" : ""}`}>
+      <header className="panel-header kill-header">
+        <div>
+          <span className="panel-icon"><Power size={18} /></span>
+          <h2>{t("Kill switch")}</h2>
+          <span className="kill-tag">{t("Restricted")}</span>
+        </div>
+        <div className="panel-action">
+          <StatusPill label={killedAssetIds.length ? String(killedAssetIds.length) + " " + t("blanked") : t("All live")} tone={killedAssetIds.length ? "danger" : "good"} />
+        </div>
+      </header>
+      <p className="kill-caution">
+        <ShieldAlert size={14} />
+        {t("Blanks live displays in the field within seconds. Password confirmation is required and every activation is written to the audit trail.")}
+      </p>
       <div className="kill-form">
         <label>{t("Scope")}
           <select value={scope} onChange={(e) => setScope(e.target.value as "asset" | "zone" | "emirate")}>
@@ -3415,7 +3458,7 @@ function KillSwitchPanel({
         <label className="kill-confirm"><input type="checkbox" checked={confirmEmirate} onChange={(e) => setConfirmEmirate(e.target.checked)} /> {t("I confirm dual-control authorisation for an emirate-wide blackout")}</label>
       ) : null}
       <ActionRow>
-        <Button icon={LockKeyhole} disabled={!reason.trim() || (scope === "emirate" && !confirmEmirate)} onClick={submit}>{t("Blank displays")}</Button>
+        <Button icon={Power} variant="danger" disabled={!reason.trim() || (scope === "emirate" && !confirmEmirate)} onClick={() => setConfirmOpen(true)}>{t("Blank displays")}</Button>
         {killedAssetIds.length ? <Button variant="secondary" onClick={() => onRestore({ scope: "emirate" })}>{t("Re-enable all")}</Button> : null}
       </ActionRow>
       {killedAssetIds.length ? (
@@ -3425,7 +3468,169 @@ function KillSwitchPanel({
           ))}
         </div>
       ) : null}
-    </Panel>
+      {confirmOpen ? (
+        <KillConfirmDialog
+          scopeLabel={scope === "asset" ? t("Per asset") : scope === "zone" ? t("Per zone") : t("Emirate-wide")}
+          targetLabel={targetLabel}
+          affectedCount={affectedCount}
+          slaLabel={slaLabel}
+          reason={reason}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={executeKill}
+          t={t}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function KillConfirmDialog({
+  scopeLabel,
+  targetLabel,
+  affectedCount,
+  slaLabel,
+  reason,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  scopeLabel: string;
+  targetLabel: string;
+  affectedCount: number;
+  slaLabel: string;
+  reason: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  t: (value: string) => string;
+}) {
+  const [password, setPassword] = useState("");
+  const valid = password.length >= 6;
+  return (
+    <div className="wizard-backdrop revision-backdrop mfa-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog kill-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header kill-dialog-header">
+          <span className="panel-icon"><Power size={18} /></span>
+          <div>
+            <strong>{t("Confirm display blackout")}</strong>
+            <small>{t("Takes effect immediately on live screens")}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}>×</button>
+        </header>
+        <div className="revision-body">
+          <dl className="kill-summary">
+            <div><dt>{t("Scope")}</dt><dd>{scopeLabel}</dd></div>
+            <div><dt>{t("Target")}</dt><dd>{targetLabel}</dd></div>
+            <div><dt>{t("Displays affected")}</dt><dd>{String(affectedCount)}</dd></div>
+            <div><dt>{t("Target SLA")}</dt><dd>{slaLabel}</dd></div>
+            <div><dt>{t("Reason code")}</dt><dd>{reason}</dd></div>
+          </dl>
+          <label className="revision-field">
+            {t("Operator password")}
+            <input type="password" value={password} placeholder="••••••••" onChange={(event) => setPassword(event.target.value)} />
+          </label>
+          <p className="mfa-hint">{t("Demo: any password of 6+ characters verifies.")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={Power} variant="danger" disabled={!valid} onClick={onConfirm}>{t("Blank displays now")}</Button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+type DispatchItem = {
+  id: string;
+  asset: string;
+  zone: string;
+  title: string;
+  severity: string;
+  team: string;
+  action: string;
+};
+
+function buildDispatchItems(): DispatchItem[] {
+  const items: DispatchItem[] = tickets
+    .filter((ticket) => ticket.status !== "Resolved")
+    .map((ticket) => ({
+      id: ticket.id,
+      asset: ticket.asset,
+      zone: estateAssets.find((asset) => asset.id === ticket.asset)?.zone ?? "",
+      title: ticket.title,
+      severity: ticket.severity,
+      team: ticket.team,
+      action: ticket.sla,
+    }));
+  for (const alert of alerts) {
+    if (alert.status !== "Open") continue;
+    if (items.some((item) => item.asset === alert.assetId && item.title === alert.title)) continue;
+    items.push({
+      id: alert.id,
+      asset: alert.assetId,
+      zone: alert.zone,
+      title: alert.title,
+      severity: alert.severity,
+      team: "Field Engineering",
+      action: alert.action,
+    });
+  }
+  return items;
+}
+
+function DispatchDialog({
+  onCancel,
+  onDispatch,
+  t,
+}: {
+  onCancel: () => void;
+  onDispatch: (items: DispatchItem[]) => void;
+  t: (value: string) => string;
+}) {
+  const items = useMemo(buildDispatchItems, []);
+  const [selected, setSelected] = useState<string[]>(items.map((item) => item.id));
+  const chosen = items.filter((item) => selected.includes(item.id));
+
+  function toggle(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]));
+  }
+
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog dispatch-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <span className="panel-icon"><Wrench size={18} /></span>
+          <div>
+            <strong>{t("Dispatch technicians")}</strong>
+            <small>{t("Review where field crews will be sent before confirming.")}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}>×</button>
+        </header>
+        <div className="revision-body">
+          {items.length ? (
+            <div className="dispatch-list">
+              {items.map((item) => (
+                <label key={item.id} className="dispatch-item">
+                  <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} />
+                  <span className="dispatch-main">
+                    <strong>{item.asset} - {t(item.title)}</strong>
+                    <small>{t(item.zone)} · {t(item.team)} · {t(item.action)}</small>
+                  </span>
+                  <StatusPill label={item.severity} tone={item.severity === "Critical" ? "danger" : item.severity === "Major" ? "warn" : "info"} />
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="mfa-hint">{t("No open alarms. Nothing to dispatch.")}</p>
+          )}
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={Wrench} disabled={!chosen.length} onClick={() => onDispatch(chosen)}>
+            {t("Dispatch to")} {String(chosen.length)} {chosen.length === 1 ? t("site") : t("sites")}
+          </Button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -3454,6 +3659,9 @@ function ControlCentre({
   const [liveViewFullscreen, setLiveViewFullscreen] = useState(false);
   const [digest, setDigest] = useState<{ en: string; ar: string; source?: string } | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
+  const [dispatchOpen, setDispatchOpen] = useState(false);
+  const [killFlash, setKillFlash] = useState(false);
+  const killPanelRef = useRef<HTMLElement | null>(null);
   const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? estateAssets[0];
   const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
   const queuedCount = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled").length;
@@ -3484,6 +3692,17 @@ function ControlCentre({
     if (result.source === "offline") notify(t("MediaGPT is offline. Showing fallback summary."));
   }
 
+  function jumpToKillSwitch() {
+    killPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setKillFlash(true);
+    window.setTimeout(() => setKillFlash(false), 1600);
+  }
+
+  function handleDispatch(items: DispatchItem[]) {
+    setDispatchOpen(false);
+    notify(t("Technicians dispatched to") + " " + items.map((item) => item.asset).join(", "));
+  }
+
   return (
     <PageBody>
       <div className="operator-actions">
@@ -3493,13 +3712,15 @@ function ControlCentre({
         </div>
         <div className="operator-actions-row">
           <Button icon={ShieldAlert} onClick={goToAlerts}>{t("Launch emergency alert")}</Button>
+          <Button icon={Power} variant="danger" onClick={jumpToKillSwitch}>{t("Kill switch")}</Button>
           <Button icon={Send} variant="secondary" onClick={() => notify(t("Refresh forced on all edge caches"))}>{t("Refresh edge feeds")}</Button>
-          <Button icon={Wrench} variant="secondary" onClick={() => notify(t("Field team dispatched to open alarms"))}>{t("Dispatch technician")}</Button>
+          <Button icon={Wrench} variant="secondary" onClick={() => setDispatchOpen(true)}>{t("Dispatch technician")}</Button>
           <Button icon={LockKeyhole} variant="secondary" onClick={() => notify(t("Schedule frozen. New publishes are blocked."))}>{t("Freeze schedule")}</Button>
           <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}>{digestLoading ? t("Summarizing") : t("Summarize")}</Button>
         </div>
       </div>
-      <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} t={t} />
+      <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} flash={killFlash} panelRef={killPanelRef} t={t} />
+      {dispatchOpen ? <DispatchDialog onCancel={() => setDispatchOpen(false)} onDispatch={handleDispatch} t={t} /> : null}
       {digest ? (
         <section className="ai-review-card clear">
           <div className="ai-review-summary">
@@ -8590,7 +8811,7 @@ function Button({
 }: {
   children: ReactNode;
   icon?: LucideIcon;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "danger";
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const t = useT();
   return (
