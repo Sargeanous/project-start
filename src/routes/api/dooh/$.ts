@@ -32,6 +32,7 @@ import {
   createSubmission,
   decideFinanceApproval,
   getState,
+  isRealSubmission,
   markAllNotificationsRead,
   markNotificationRead,
   placeBid,
@@ -91,7 +92,12 @@ export const Route = createFileRoute("/api/dooh/$")({
     handlers: {
       GET: async ({ params }) => {
         const segments = splitPath(params._splat);
-        if (segments[0] === "state") return Response.json(await getState());
+        if (segments[0] === "state") {
+          const state = await getState();
+          // Eval-harness submissions stay actionable via the API but never
+          // reach the UI payload.
+          return Response.json({ ...state, submissions: state.submissions.filter(isRealSubmission) });
+        }
         if (segments[0] === "ai" && segments[1] === "status") {
           return Response.json({ available: hasOpenAIKey(), source: hasOpenAIKey() ? "openai" : "offline" });
         }

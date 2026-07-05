@@ -383,6 +383,82 @@ const initialVerificationSteps: VerificationStep[] = [
 const initialState: DoohState = {
   submissions: [
     {
+      id: "SUB-1052",
+      campaign: "Louvre summer exhibition",
+      bidder: "Louvre Abu Dhabi",
+      packageName: "Cultural district loop",
+      owner: "Sara Al Mansouri",
+      requestedStart: "Jul 18, 2026",
+      budget: "AED 210,000",
+      priority: "Medium",
+      stage: "Submitted",
+      creativeId: "saadiyat-beach",
+      language: "Arabic and English",
+      notes: "Museum exhibition flight targeting the cultural district and Corniche panels.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
+    },
+    {
+      id: "SUB-1051",
+      campaign: "5G family bundle",
+      bidder: "e& Telecom",
+      packageName: "Downtown retail loop",
+      owner: "Omar Rashed",
+      requestedStart: "Jul 15, 2026",
+      budget: "AED 340,000",
+      priority: "High",
+      stage: "In review",
+      creativeId: "mall-footfall",
+      language: "Arabic and English",
+      notes: "Telecom bundle creative; CTA legibility under review for highway variants.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
+    },
+    {
+      id: "SUB-1050",
+      campaign: "Eid family staycation",
+      bidder: "Emirates Palace",
+      packageName: "Leisure loop",
+      owner: "Latifa Al Suwaidi",
+      requestedStart: "Jul 25, 2026",
+      budget: "AED 180,000",
+      priority: "Low",
+      stage: "Changes requested",
+      creativeId: "eid-family-retail",
+      language: "Arabic and English",
+      notes: "Arabic copy revision requested; imagery approved by CMS review.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
+    },
+    {
+      id: "SUB-1049",
+      campaign: "National reading month",
+      bidder: "ADMO",
+      packageName: "Civic bilingual pack",
+      owner: "Khalid Al Marri",
+      requestedStart: "Jul 10, 2026",
+      budget: "Non-billed",
+      priority: "Medium",
+      stage: "Published",
+      creativeId: "experience-abu-dhabi",
+      language: "Arabic and English",
+      notes: "Civic awareness rotation live across community panels.",
+      version: 1,
+      contentHash: "",
+      category: "routine",
+      journal: [],
+      approvals: [],
+    },
+    {
       id: "SUB-1048",
       campaign: "Airport retail launch",
       bidder: "Advertiser",
@@ -714,7 +790,25 @@ function cloneInitialState(): DoohState {
   return cloneState(initialState);
 }
 
-function normalizeState(state: DoohState): DoohState {
+// Eval harnesses (promptfoo, QA scripts) exercise the real API, so their
+// synthetic submissions would otherwise accumulate in the persisted demo
+// state and flood the CMS list. They are swept when the state is first
+// loaded from disk (so a running eval can still triage what it just
+// created) and always hidden from the UI state payload.
+const TEST_BIDDERS = new Set(["promptfoo", "Codex QA", "QA"]);
+export function isRealSubmission(submission: Submission): boolean {
+  if (TEST_BIDDERS.has(submission.bidder)) return false;
+  return !/^(QA |Injection attempt|Test )/i.test(submission.campaign);
+}
+
+function normalizeSubmissions(persisted: Submission[], sweepTestData: boolean): Submission[] {
+  const kept = (sweepTestData ? persisted.filter(isRealSubmission) : persisted).map(withGovernanceDefaults);
+  const existingIds = new Set(kept.map((submission) => submission.id));
+  const missingSeeds = cloneState(initialState).submissions.filter((submission) => !existingIds.has(submission.id));
+  return [...missingSeeds, ...kept];
+}
+
+function normalizeState(state: DoohState, opts?: { sweepTestData?: boolean }): DoohState {
   return {
     ...state,
     bidderMessages: state.bidderMessages ?? [],
@@ -724,7 +818,7 @@ function normalizeState(state: DoohState): DoohState {
     enforcementEvents: state.enforcementEvents ?? [],
     killedAssetIds: state.killedAssetIds ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
-    submissions: (state.submissions ?? []).map(withGovernanceDefaults),
+    submissions: normalizeSubmissions(state.submissions ?? [], opts?.sweepTestData ?? false),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
     purchaseOrders: state.purchaseOrders ?? cloneState(initialState).purchaseOrders,
     notifications: (state.notifications?.length ? state.notifications : cloneState(initialState).notifications).map((notification) => ({
@@ -820,7 +914,7 @@ async function writePersistedState(state: DoohState) {
 
 export async function getState(): Promise<DoohState> {
   if (!globalThis.__doohBackendState) {
-    globalThis.__doohBackendState = normalizeState((await readPersistedState()) ?? cloneInitialState());
+    globalThis.__doohBackendState = normalizeState((await readPersistedState()) ?? cloneInitialState(), { sweepTestData: true });
     await writePersistedState(globalThis.__doohBackendState);
   }
   globalThis.__doohBackendState = normalizeState(globalThis.__doohBackendState);

@@ -2409,7 +2409,38 @@ const translations: Record<string, string> = {
   "Dispatch to": "إرسال إلى",
   "site": "موقع",
   "sites": "مواقع",
-  "Technicians dispatched to": "تم إرسال الفنيين إلى"
+  "Technicians dispatched to": "تم إرسال الفنيين إلى",
+  "Corniche Beach Gateway": "بوابة شاطئ الكورنيش",
+  "Airport Road Gantry East": "جسر شارع المطار الشرقي",
+  "Hamdan Street Digital": "شاشة شارع حمدان الرقمية",
+  "WTC Souk Panel": "لوحة سوق المركز التجاري العالمي",
+  "Yas Mall North Face": "واجهة ياس مول الشمالية",
+  "Ferrari World Approach": "مدخل عالم فيراري",
+  "Mussafah Gate Pylon": "برج بوابة مصفح",
+  "Al Ain Clock Tower Gateway": "بوابة برج ساعة العين",
+  "Jimi Mall Corridor": "ممر الجيمي مول",
+  "Digital pylon": "برج رقمي",
+  "Highway gantry": "جسر طريق سريع",
+  "Street unipole": "عمود شارع إعلاني",
+  "Mall facade LED": "واجهة مركز تجاري LED",
+  "Louvre summer exhibition": "معرض اللوفر الصيفي",
+  "5G family bundle": "باقة العائلة 5G",
+  "Eid family staycation": "إقامة العيد العائلية",
+  "National reading month": "شهر القراءة الوطني",
+  "Louvre Abu Dhabi": "اللوفر أبوظبي",
+  "e& Telecom": "اتصالات e&",
+  "Emirates Palace": "قصر الإمارات",
+  "Sara Al Mansouri": "سارة المنصوري",
+  "Omar Rashed": "عمر راشد",
+  "Latifa Al Suwaidi": "لطيفة السويدي",
+  "Khalid Al Marri": "خالد المري",
+  "Cultural district loop": "حلقة المنطقة الثقافية",
+  "Civic bilingual pack": "الحزمة المدنية ثنائية اللغة",
+  "Non-billed": "غير مفوتر",
+  "Museum exhibition flight targeting the cultural district and Corniche panels.": "حملة معرض متحفي تستهدف شاشات المنطقة الثقافية والكورنيش.",
+  "Telecom bundle creative; CTA legibility under review for highway variants.": "إعلان باقة اتصالات؛ وضوح عبارة الحث قيد المراجعة لنسخ الطرق السريعة.",
+  "Arabic copy revision requested; imagery approved by CMS review.": "طُلب تعديل النص العربي؛ تمت الموافقة على الصور من مراجعة نظام المحتوى.",
+  "Civic awareness rotation live across community panels.": "دورة توعية مدنية تعمل على الشاشات المجتمعية."
 };
 
 const I18nContext = createContext<Translator>((value) => value);
@@ -3393,15 +3424,13 @@ function KillSwitchPanel({
   killedAssetIds,
   onKill,
   onRestore,
-  flash,
-  panelRef,
+  onClose,
   t,
 }: {
   killedAssetIds: string[];
   onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
   onRestore: (payload: { scope: "asset" | "zone" | "emirate"; target?: string }) => void;
-  flash: boolean;
-  panelRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
   t: (value: string) => string;
 }) {
   const [scope, setScope] = useState<"asset" | "zone" | "emirate">("asset");
@@ -3423,7 +3452,8 @@ function KillSwitchPanel({
   }
 
   return (
-    <section ref={panelRef} className={`panel kill-panel${flash ? " kill-flash" : ""}`}>
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onClose}>
+    <section className="revision-dialog panel kill-panel kill-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
       <header className="panel-header kill-header">
         <div>
           <span className="panel-icon"><Power size={18} /></span>
@@ -3432,6 +3462,7 @@ function KillSwitchPanel({
         </div>
         <div className="panel-action">
           <StatusPill label={killedAssetIds.length ? String(killedAssetIds.length) + " " + t("blanked") : t("All live")} tone={killedAssetIds.length ? "danger" : "good"} />
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}>×</button>
         </div>
       </header>
       <p className="kill-caution">
@@ -3481,6 +3512,7 @@ function KillSwitchPanel({
         />
       ) : null}
     </section>
+    </div>
   );
 }
 
@@ -3660,8 +3692,7 @@ function ControlCentre({
   const [digest, setDigest] = useState<{ en: string; ar: string; source?: string } | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
-  const [killFlash, setKillFlash] = useState(false);
-  const killPanelRef = useRef<HTMLElement | null>(null);
+  const [killOpen, setKillOpen] = useState(false);
   const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? estateAssets[0];
   const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
   const queuedCount = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled").length;
@@ -3692,12 +3723,6 @@ function ControlCentre({
     if (result.source === "offline") notify(t("MediaGPT is offline. Showing fallback summary."));
   }
 
-  function jumpToKillSwitch() {
-    killPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setKillFlash(true);
-    window.setTimeout(() => setKillFlash(false), 1600);
-  }
-
   function handleDispatch(items: DispatchItem[]) {
     setDispatchOpen(false);
     notify(t("Technicians dispatched to") + " " + items.map((item) => item.asset).join(", "));
@@ -3712,14 +3737,14 @@ function ControlCentre({
         </div>
         <div className="operator-actions-row">
           <Button icon={ShieldAlert} onClick={goToAlerts}>{t("Launch emergency alert")}</Button>
-          <Button icon={Power} variant="danger" onClick={jumpToKillSwitch}>{t("Kill switch")}</Button>
+          <Button icon={Power} variant="danger" onClick={() => setKillOpen(true)}>{killedAssetIds.length ? `${t("Kill switch")} (${killedAssetIds.length})` : t("Kill switch")}</Button>
           <Button icon={Send} variant="secondary" onClick={() => notify(t("Refresh forced on all edge caches"))}>{t("Refresh edge feeds")}</Button>
           <Button icon={Wrench} variant="secondary" onClick={() => setDispatchOpen(true)}>{t("Dispatch technician")}</Button>
           <Button icon={LockKeyhole} variant="secondary" onClick={() => notify(t("Schedule frozen. New publishes are blocked."))}>{t("Freeze schedule")}</Button>
           <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}>{digestLoading ? t("Summarizing") : t("Summarize")}</Button>
         </div>
       </div>
-      <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} flash={killFlash} panelRef={killPanelRef} t={t} />
+      {killOpen ? <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} onClose={() => setKillOpen(false)} t={t} /> : null}
       {dispatchOpen ? <DispatchDialog onCancel={() => setDispatchOpen(false)} onDispatch={handleDispatch} t={t} /> : null}
       {digest ? (
         <section className="ai-review-card clear">

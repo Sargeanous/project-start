@@ -7246,10 +7246,12 @@ html[dir="rtl"] .network-tabs button.active {
   border-radius: 10px;
 }
 .kill-caution svg { flex-shrink: 0; }
-.kill-flash { animation: kill-flash-pulse 0.7s ease-in-out 2; }
-@keyframes kill-flash-pulse {
-  50% { box-shadow: 0 0 0 6px rgba(179, 38, 30, 0.3); }
+.kill-modal {
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
+.kill-modal .panel-action { display: flex; align-items: center; gap: 10px; }
 
 /* Kill confirmation dialog */
 .kill-dialog-header strong { color: #8f1d17; }

@@ -153,15 +153,23 @@ function creativeSvg(spec: CreativeSpec): string {
 
 const creativeUriCache = new Map<string, string>();
 
+// Rendered when a submission has no matching creative asset yet, so the
+// detail view never shows an empty frame.
+const placeholderCreativeSpec: CreativeSpec = {
+  from: "#22333d", to: "#3d5a68", ink: "#ffffff", accent: "#a9d3cb",
+  kicker: "ADMO CMS | AWAITING CREATIVE", titleEn: "PREVIEW PENDING", titleAr: "المعاينة قيد التجهيز",
+  brand: "CREATIVE PACK NOT YET UPLOADED", motif: "doc",
+};
+
 export function creativeBackground(id: string): string {
   const demoVisual = demoCreativeBackgrounds[id];
   if (demoVisual) return demoVisual;
-  const spec = creativeCatalog[id];
-  if (!spec) return "";
-  let uri = creativeUriCache.get(id);
+  const spec = creativeCatalog[id] ?? placeholderCreativeSpec;
+  const cacheKey = creativeCatalog[id] ? id : "__placeholder__";
+  let uri = creativeUriCache.get(cacheKey);
   if (!uri) {
     uri = enc(creativeSvg(spec));
-    creativeUriCache.set(id, uri);
+    creativeUriCache.set(cacheKey, uri);
   }
   return uri;
 }
