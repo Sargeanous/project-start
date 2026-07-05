@@ -5707,6 +5707,23 @@ html[dir="rtl"] .network-tabs button.active {
   scrollbar-width: thin;
 }
 
+/* Side-by-side layout: lock the registry pane to the twin pane's height so
+   the list only scrolls when it is taller than the 3D view + details.
+   height: 0 keeps the pane out of the grid row sizing; min-height: 100%
+   then stretches it to the row height the twin pane defines. */
+@media (min-width: 1241px) {
+  .asset-registry-pane {
+    height: 0;
+    min-height: 100%;
+    overflow: hidden;
+  }
+  .asset-registry-pane .asset-registry {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
 .asset-registry-pane .asset-registry::-webkit-scrollbar {
   width: 6px;
 }
@@ -5717,7 +5734,6 @@ html[dir="rtl"] .network-tabs button.active {
 }
 
 .asset-registry-pane .asset-registry button {
-  min-height: 62px;
   padding: 10px 12px;
   gap: 8px;
   border-radius: 12px;
