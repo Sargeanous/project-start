@@ -6620,20 +6620,7 @@ function RulesPage({ enforcementEvents, t }: { enforcementEvents: EnforcementEve
 
       <RulesEnforcementPanel enforcementEvents={enforcementEvents} t={t} />
 
-      <div className="utility-action-strip">
-        <Button icon={Layers3} variant="secondary" onClick={() => setCoverageOpen((value) => !value)}>{coverageOpen ? "Hide coverage" : "Show coverage"}</Button>
-        <Button icon={Zap} variant="secondary" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "Hide simulator" : "Show simulator"}</Button>
-      </div>
-      {coverageOpen ? (
-        <Panel icon={Layers3} title="Rule coverage by workflow">
-          <CompactTable
-            columns={["Workflow stage", "Rules", "Enforced", "Recommended", "Monitored", "Sources linked"]}
-            rows={workflowCoverageRows}
-          />
-        </Panel>
-      ) : null}
-      <div className="split-grid cms-grid">
-        <Panel icon={ShieldCheck} title="Rules" action={<Button icon={Plus} variant="secondary" onClick={() => setCreating((value) => !value)}>Create rule</Button>}>
+      <Panel icon={ShieldCheck} title="Rules" action={<Button icon={Plus} variant="secondary" onClick={() => setCreating((value) => !value)}>Create rule</Button>}>
           {creating ? (
             <div className="rule-form">
               <label><span>{t("Rule name EN")}</span><input value={draft.title.en} onChange={(event) => updateDraftText("title", "en", event.target.value)} placeholder={t("New governance rule")} /></label>
@@ -6659,7 +6646,7 @@ function RulesPage({ enforcementEvents, t }: { enforcementEvents: EnforcementEve
               </button>
             ))}
           </div>
-          <div className="knowledge-list">
+          <div className="knowledge-list rules-catalogue">
             {filteredRules.map((rule) => (
               <button key={rule.id} type="button" className={selected.id === rule.id ? "selected" : ""} onClick={() => setSelectedId(rule.id)}>
                 <strong>{localized(rule.title, t)}</strong>
@@ -6668,19 +6655,17 @@ function RulesPage({ enforcementEvents, t }: { enforcementEvents: EnforcementEve
               </button>
             ))}
           </div>
-        </Panel>
-        <Panel
-          icon={ClipboardCheck}
-          title={localized(selected.title, t)}
-          action={
-            <div className="panel-action-row">
-              <StatusPill label={selected.status} tone={ruleTone(selected.status)} />
-              <Button icon={ruleDetailsOpen ? X : Eye} variant="secondary" onClick={() => setRuleDetailsOpen((value) => !value)}>
-                {ruleDetailsOpen ? "Hide details" : "Show details"}
-              </Button>
+          <div className="linked-detail">
+            <div className="linked-detail-head">
+              <span className="panel-icon"><ClipboardCheck size={18} /></span>
+              <strong>{localized(selected.title, t)}</strong>
+              <div className="panel-action-row">
+                <StatusPill label={selected.status} tone={ruleTone(selected.status)} />
+                <Button icon={ruleDetailsOpen ? X : Eye} variant="secondary" onClick={() => setRuleDetailsOpen((value) => !value)}>
+                  {ruleDetailsOpen ? "Hide details" : "Show details"}
+                </Button>
+              </div>
             </div>
-          }
-        >
           {ruleDetailsOpen ? (
             <div className="rule-detail">
               <Detail label="Mode" value={selected.mode} />
@@ -6731,8 +6716,21 @@ function RulesPage({ enforcementEvents, t }: { enforcementEvents: EnforcementEve
             <Button icon={Save} onClick={saveRule}>Save changes</Button>
             <Button icon={Trash2} variant="secondary" onClick={() => deleteRule(selected.id)} disabled={rules.length < 2}>Delete rule</Button>
           </ActionRow>
-        </Panel>
+          </div>
+      </Panel>
+
+      <div className="utility-action-strip">
+        <Button icon={Layers3} variant="secondary" onClick={() => setCoverageOpen((value) => !value)}>{coverageOpen ? "Hide coverage" : "Show coverage"}</Button>
+        <Button icon={Zap} variant="secondary" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "Hide simulator" : "Show simulator"}</Button>
       </div>
+      {coverageOpen ? (
+        <Panel icon={Layers3} title="Rule coverage by workflow">
+          <CompactTable
+            columns={["Workflow stage", "Rules", "Enforced", "Recommended", "Monitored", "Sources linked"]}
+            rows={workflowCoverageRows}
+          />
+        </Panel>
+      ) : null}
 
       {simulationOpen ? (
         <div className="split-grid cms-grid">
