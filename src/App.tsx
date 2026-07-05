@@ -3863,9 +3863,8 @@ function CmsPage({
       ]} />
 
       {tab === "submissions" && selected ? (
-        <div className="split-grid cms-grid cms-submissions-grid">
-          <Panel icon={FileCheck2} title={t("Submissions")} action={itemCountLabel(submissions.length, t)}>
-            <div className="submission-list">
+        <Panel icon={FileCheck2} title={t("Submissions")} action={itemCountLabel(submissions.length, t)}>
+            <div className="submission-list submissions-catalogue">
               {submissions.map((item) => (
                 <button key={item.id} className={item.id === selected.id ? "selected" : ""} type="button" onClick={() => setSelectedId(item.id)}>
                   <span className={`dot ${priorityTone(item.priority)}`} />
@@ -3877,11 +3876,10 @@ function CmsPage({
                 </button>
               ))}
             </div>
-          </Panel>
-          <Panel icon={ClipboardCheck} title={t(selected.campaign)} action={selected.id}>
+          <LinkedDetail icon={ClipboardCheck} title={t(selected.campaign)} action={<span className="head-meta">{selected.id}</span>}>
             <SubmissionDetail submission={selected} profile={profile} aiAvailable={aiAvailable} onStage={onStage} onRequestChanges={onRequestChanges} onApprove={onApprove} />
-          </Panel>
-        </div>
+          </LinkedDetail>
+        </Panel>
       ) : null}
 
       {tab === "library" && <MediaLibrary t={t} />}
@@ -4769,8 +4767,7 @@ function AlertsPage({
         <Metric label="Awaiting checks" value={String(alerts.filter((a) => a.state === "Check required").length)} helper="Needs action" tone="warn" />
       </MetricGrid>
 
-      <div className="split-grid wide-left">
-        <Panel icon={Bell} title={t("NCEMA CAP alerts")}>
+      <Panel icon={Bell} title={t("NCEMA CAP alerts")}>
           <div className="table-card">
             <table>
               <thead>
@@ -4793,31 +4790,7 @@ function AlertsPage({
               </tbody>
             </table>
           </div>
-        </Panel>
-
-        <Panel icon={Megaphone} title={t("Ingest CAP alert")}>
-          <form className="stack-form" onSubmit={ingestCap}>
-            <div className="cap-grid">
-              <label>{t("CAP identifier")}<input value={draft.identifier} onChange={(e) => setDraft({ ...draft, identifier: e.target.value })} placeholder="NCEMA-2026-..." /></label>
-              <label>{t("Sender")}<input value={draft.sender} onChange={(e) => setDraft({ ...draft, sender: e.target.value })} /></label>
-              <label>{t("Area")}<input value={draft.area} onChange={(e) => setDraft({ ...draft, area: e.target.value })} placeholder={t("Zone or Citywide")} /></label>
-              <label>{t("Scope")}<select value={draft.scopeMode} onChange={(e) => setDraft({ ...draft, scopeMode: e.target.value as AlertScopeMode })}><option value="zone">{t("Zone")}</option><option value="citywide">{t("Citywide")}</option></select></label>
-              <label>{t("Severity")}<select value={draft.severity} onChange={(e) => setDraft({ ...draft, severity: e.target.value })}>{["Extreme","Severe","Moderate","Minor"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
-              <label>{t("Urgency")}<select value={draft.urgency} onChange={(e) => setDraft({ ...draft, urgency: e.target.value })}>{["Immediate","Expected","Future"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
-            </div>
-            <label>{t("Headline")}<input value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} placeholder={t("Severe dust storm - reduce speed")} /></label>
-            <div className="cap-bilingual">
-              <label>{t("Body (English)")}<textarea value={draft.bodyEn} onChange={(e) => setDraft({ ...draft, bodyEn: e.target.value })} /></label>
-              <label dir="rtl">{t("Body (Arabic)")}<textarea value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
-            </div>
-            <ActionRow>
-              <Button type="submit" icon={ShieldAlert}>{t("Ingest alert")}</Button>
-            </ActionRow>
-          </form>
-        </Panel>
-      </div>
-
-      <Panel icon={ShieldAlert} title={selected.title} action={<StatusPill label={selected.state} tone={alertTone(selected.state)} />}>
+        <LinkedDetail icon={ShieldAlert} title={t(selected.title)} action={<StatusPill label={selected.state} tone={alertTone(selected.state)} />}>
         <div className="selected-alert-summary">
           <div><span>{t("CAP ID")}</span><strong>{selected.capIdentifier ?? selected.identifier ?? "-"}</strong></div>
           <div><span>{t("Sender")}</span><strong>{t(selected.sender ?? selected.authority)}</strong></div>
@@ -4904,6 +4877,28 @@ function AlertsPage({
           {canBroadcast ? <Button icon={Megaphone} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now (preempt)")}</Button> : null}
           <Button variant="secondary" onClick={() => onResetAlert(selected.id)}>{t("Reset")}</Button>
         </ActionRow>
+        </LinkedDetail>
+      </Panel>
+
+      <Panel icon={Megaphone} title={t("Ingest CAP alert")}>
+        <form className="stack-form" onSubmit={ingestCap}>
+          <div className="cap-grid">
+            <label>{t("CAP identifier")}<input value={draft.identifier} onChange={(e) => setDraft({ ...draft, identifier: e.target.value })} placeholder="NCEMA-2026-..." /></label>
+            <label>{t("Sender")}<input value={draft.sender} onChange={(e) => setDraft({ ...draft, sender: e.target.value })} /></label>
+            <label>{t("Area")}<input value={draft.area} onChange={(e) => setDraft({ ...draft, area: e.target.value })} placeholder={t("Zone or Citywide")} /></label>
+            <label>{t("Scope")}<select value={draft.scopeMode} onChange={(e) => setDraft({ ...draft, scopeMode: e.target.value as AlertScopeMode })}><option value="zone">{t("Zone")}</option><option value="citywide">{t("Citywide")}</option></select></label>
+            <label>{t("Severity")}<select value={draft.severity} onChange={(e) => setDraft({ ...draft, severity: e.target.value })}>{["Extreme","Severe","Moderate","Minor"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+            <label>{t("Urgency")}<select value={draft.urgency} onChange={(e) => setDraft({ ...draft, urgency: e.target.value })}>{["Immediate","Expected","Future"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+          </div>
+          <label>{t("Headline")}<input value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} placeholder={t("Severe dust storm - reduce speed")} /></label>
+          <div className="cap-bilingual">
+            <label>{t("Body (English)")}<textarea value={draft.bodyEn} onChange={(e) => setDraft({ ...draft, bodyEn: e.target.value })} /></label>
+            <label dir="rtl">{t("Body (Arabic)")}<textarea value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
+          </div>
+          <ActionRow>
+            <Button type="submit" icon={ShieldAlert}>{t("Ingest alert")}</Button>
+          </ActionRow>
+        </form>
       </Panel>
 
       {mfaApprover ? (
@@ -6309,13 +6304,12 @@ function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
         </Panel>
       ) : null}
 
-      <div className="split-grid cms-grid knowledge-workspace">
-        <Panel icon={Database} title="Knowledge bases">
+      <Panel icon={Database} title="Knowledge bases">
           <div className="knowledge-search">
             <Search size={15} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Search sources, tags, owners")} />
           </div>
-          <div className="knowledge-list">
+          <div className="knowledge-list rules-catalogue">
             {knowledgeCollections.map((base) => (
               <button key={base.id} type="button" className={base.id === active ? "selected" : ""} onClick={() => setActive(base.id)}>
                 <strong>{localized(base.name, t)}</strong>
@@ -6324,8 +6318,7 @@ function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
               </button>
             ))}
           </div>
-        </Panel>
-        <Panel icon={FileText} title={localized(selected.name, t)}>
+        <LinkedDetail icon={FileText} title={localized(selected.name, t)}>
           <div className="source-summary-card">
             <p>{localized(selected.description, t)}</p>
             <div className="chip-row">
@@ -6334,7 +6327,7 @@ function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
               {selected.domains.map((domain) => <span key={domain}>{t(domain)}</span>)}
             </div>
           </div>
-          <div className="knowledge-list source-list">
+          <div className="knowledge-list source-list rules-catalogue">
             {visibleSources.map((source) => (
               <button key={source.id} type="button" className={source.id === selectedSource.id ? "selected" : ""} onClick={() => setSelectedSourceId(source.id)}>
                 <strong>{localized(source.title, t)}</strong>
@@ -6343,20 +6336,19 @@ function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
               </button>
             ))}
           </div>
-        </Panel>
-      </div>
+        </LinkedDetail>
 
       {selectedSource ? (
-        <Panel
+        <LinkedDetail
           icon={FileCheck2}
           title={localized(selectedSource.title, t)}
           action={
-            <div className="panel-action-row">
+            <>
               <StatusPill label={selectedSource.status} tone={selectedSource.status === "Indexed" ? "good" : "warn"} />
               <Button icon={sourceDetailsOpen ? X : Eye} variant="secondary" onClick={() => setSourceDetailsOpen((value) => !value)}>
                 {sourceDetailsOpen ? "Hide details" : "Show details"}
               </Button>
-            </div>
+            </>
           }
         >
           <div className="knowledge-detail-grid">
@@ -6404,8 +6396,9 @@ function KnowledgeBasePage({ t }: { t: (value: string) => string }) {
               </ActionRow>
             </section>
           </div>
-        </Panel>
+        </LinkedDetail>
       ) : null}
+      </Panel>
     </PageBody>
   );
 }
@@ -6851,9 +6844,8 @@ function SkillsCataloguePage({ t }: { t: (value: string) => string }) {
         <Metric label="Beta skills" value={String(doohSkillRows.filter((row) => row.status === "Beta").length)} helper="Admin-enabled only" tone="warn" />
         <Metric label="Rule-bound" value="100%" helper="Governed by DOOH rules" tone="good" />
       </MetricGrid>
-      <div className="split-grid cms-grid">
-        <Panel icon={Sparkles} title="Skills Catalogue">
-          <div className="knowledge-list">
+      <Panel icon={Sparkles} title="Skills Catalogue">
+          <div className="knowledge-list rules-catalogue">
             {doohSkillRows.map((row) => (
               <button key={row.id} type="button" className={selected.id === row.id ? "selected" : ""} onClick={() => setSelected(row)}>
                 <strong>{t(row.title)}</strong>
@@ -6862,8 +6854,7 @@ function SkillsCataloguePage({ t }: { t: (value: string) => string }) {
               </button>
             ))}
           </div>
-        </Panel>
-        <Panel icon={Workflow} title={selected.title} action={<StatusPill label={selected.status} tone={selected.tone} />}>
+        <LinkedDetail icon={Workflow} title={t(selected.title)} action={<StatusPill label={selected.status} tone={selected.tone} />}>
           <div className="rule-detail">
             <Detail label="Runtime" value={selected.status === "Beta" ? "Approval required" : "Available"} />
             <Detail label="Inputs" value="Knowledge, rules, workflow context" />
@@ -6877,8 +6868,8 @@ function SkillsCataloguePage({ t }: { t: (value: string) => string }) {
               ["Audit event creation", "Platform infrastructure", "Signed and exportable"],
             ]}
           />
-        </Panel>
-      </div>
+        </LinkedDetail>
+      </Panel>
     </PageBody>
   );
 }
@@ -8346,8 +8337,7 @@ function MarketplacePage({
         ) : null}
         </>
       ) : (
-        <div className="split-grid wide-left">
-          <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
+        <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
             <div className="package-grid">
               {marketplacePackages.map((item) => (
                 <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
@@ -8359,8 +8349,7 @@ function MarketplacePage({
                 </button>
               ))}
             </div>
-          </Panel>
-          <Panel icon={FileText} title={t("Submit campaign")}>
+          <LinkedDetail icon={FileText} title={t("Submit campaign")} action={<span className="head-meta">{t(selected.name)}</span>}>
             <form className="stack-form" onSubmit={submit}>
               <label>
                 {t("Campaign name")}
@@ -8380,8 +8369,8 @@ function MarketplacePage({
               </label>
               <Button type="submit">{t("Submit campaign")}</Button>
             </form>
-          </Panel>
-        </div>
+          </LinkedDetail>
+        </Panel>
       )}
     </PageBody>
   );
@@ -8822,6 +8811,31 @@ function Button({
 
 function ActionRow({ children }: { children: ReactNode }) {
   return <div className="action-row">{children}</div>;
+}
+
+// One-box pattern for dependent list->detail blocks: the detail renders inside
+// the same panel as its source list, below a divider, instead of a sibling box.
+function LinkedDetail({
+  icon: Icon,
+  title,
+  action,
+  children,
+}: {
+  icon: LucideIcon;
+  title: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="linked-detail">
+      <div className="linked-detail-head">
+        <span className="panel-icon"><Icon size={18} /></span>
+        <strong>{title}</strong>
+        {action ? <div className="panel-action-row">{action}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function StatusPill({ label, tone }: { label: string; tone: Tone }) {
