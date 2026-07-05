@@ -563,5 +563,10 @@ function summarize(value: unknown) {
 }
 
 function cleanText(value: string) {
-  return value.replace(/[–—]/g, "-").trim();
+  return value
+    .replace(/[–—]/g, "-")
+    // Repair UTF-8-as-Latin1 mojibake for the degree sign (57Â°C -> 57°C).
+    .replace(/Â°/g, "°")
+    .replace(/Â/g, "")
+    .trim();
 }

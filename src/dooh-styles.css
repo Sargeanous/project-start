@@ -1561,6 +1561,34 @@ select:focus {
   line-height: 1.45;
 }
 
+/* Structured rendering of the copilot's markdown answers */
+.chat-md { display: flex; flex-direction: column; gap: 8px; }
+.chat-md p { margin: 0; line-height: 1.5; }
+.chat-md-head {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary-dark, #14472b);
+}
+.chat-md-head:first-child { margin-top: 0; }
+.chat-md-list {
+  margin: 0;
+  padding-inline-start: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.chat-md-list li { line-height: 1.45; }
+.chat-md code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.92em;
+  background: var(--surface-2, #eef2f0);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
 .chat-log table {
   margin-top: 10px;
   font-size: 13px;

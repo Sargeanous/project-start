@@ -8584,7 +8584,7 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
             {message.role === "assistant" && message.source === "openai" ? (
               <small className="chat-source live">{t("Live AI")}</small>
             ) : null}
-            <p>{t(message.body)}</p>
+            {message.role === "assistant" ? <MarkdownLite text={t(message.body)} /> : <p>{t(message.body)}</p>}
             {message.table ? (
               <table>
                 <tbody>
@@ -8683,6 +8683,44 @@ function AgentActionCard({
 
 function shouldRequestRichAnswer(query: string) {
   return /chart|graph|barplot|plot|trend|month|monthly|table|dashboard|revenue|financial|compare|breakdown/i.test(query);
+}
+
+// Render the model's lightweight markdown (headings, bold, bullet/numbered
+// lists) as clean structured content instead of raw #, * and - characters.
+function renderInlineMarkdown(text: string): ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+  return parts.map((part, index) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (/^`[^`]+`$/.test(part)) return <code key={index}>{part.slice(1, -1)}</code>;
+    return <Fragment key={index}>{part}</Fragment>;
+  });
+}
+
+function MarkdownLite({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+  const blocks: ReactNode[] = [];
+  let list: string[] = [];
+  let para: string[] = [];
+  const flushPara = (key: string) => {
+    if (para.length) { blocks.push(<p key={key}>{renderInlineMarkdown(para.join(" "))}</p>); para = []; }
+  };
+  const flushList = (key: string) => {
+    if (list.length) {
+      blocks.push(<ul key={key} className="chat-md-list">{list.map((item, i) => <li key={i}>{renderInlineMarkdown(item)}</li>)}</ul>);
+      list = [];
+    }
+  };
+  lines.forEach((raw, index) => {
+    const line = raw.trim();
+    if (!line) { flushPara(`p${index}`); flushList(`l${index}`); return; }
+    const heading = line.match(/^#{1,6}\s+(.*)$/);
+    if (heading) { flushPara(`p${index}`); flushList(`l${index}`); blocks.push(<h4 key={`h${index}`} className="chat-md-head">{renderInlineMarkdown(heading[1])}</h4>); return; }
+    const item = line.match(/^(?:[-*]|\d+\.)\s+(.*)$/);
+    if (item) { flushPara(`p${index}`); list.push(item[1]); return; }
+    flushList(`l${index}`); para.push(line);
+  });
+  flushPara("pend"); flushList("lend");
+  return <div className="chat-md">{blocks}</div>;
 }
 
 function mergeActions(next: PendingAgentAction[], existing: PendingAgentAction[]) {
