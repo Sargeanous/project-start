@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { assets, campaigns, fieldTasks, historicalBids, historicalCampaigns, historicalRuns, proofRecords, tickets } from "../../../data";
 import { callOpenAI, generateImage, hasOpenAIKey } from "../../../backend/openai";
+import { INTER_600_WOFF2, INTER_700_WOFF2, NOTO_ARABIC_700_WOFF2 } from "../../../backend/creative-fonts";
 import { delimitUntrusted } from "../../../backend/agent-security";
 import {
   enqueueAgentJob,
@@ -621,7 +622,7 @@ async function handleAiEndpoint(endpoint: string | undefined, request: Request) 
       `Style: ${style}. Landscape composition with a clean, uncluttered lower third reserved for text.`,
       `Absolutely no text, no letters, no words, no numbers, no calligraphy, no logos and no watermarks anywhere in the image. Culturally appropriate for the UAE.`,
     ].filter(Boolean).join(" ");
-    const cacheKey = hashKey(`${prompt}|${JSON.stringify(overlay)}`);
+    const cacheKey = hashKey(`fontv1|${prompt}|${JSON.stringify(overlay)}`);
     const cached = await readVisualCache(cacheKey);
     if (cached) return Response.json({ image: cached, source: "cache" });
     const image = await generateImage({ prompt, quality: "medium" });
@@ -897,13 +898,22 @@ function composeCivicVisual(
     ? `<image href="${background}" xlink:href="${background}" x="0" y="0" width="1536" height="1024" preserveAspectRatio="xMidYMid slice"/>`
     : `<rect width="1536" height="1024" fill="url(#bg)"/>`;
   const dateLine = sub || subAr
-    ? `<text x='768' y='930' fill='#dff3ee' font-size='40' letter-spacing='2' text-anchor='middle'>${[sub, subAr].filter(Boolean).join("   ·   ")}</text>`
+    ? `<text x='768' y='930' fill='#dff3ee' font-size='40' letter-spacing='2' text-anchor='middle' font-family='Inter' font-weight='600'>${[sub, subAr].filter(Boolean).join("   ·   ")}</text>`
     : "";
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 1536 1024' font-family='Segoe UI, Tahoma, Arial, sans-serif'>
+  // Embed the platform fonts (Inter + Noto Sans Arabic) so the wording renders
+  // in the main app typeface. An SVG used as an image cannot reach the Google
+  // Fonts stylesheet, so the font has to travel inside the SVG.
+  const fontFace = `<style>
+    @font-face{font-family:'Inter';font-weight:600;font-style:normal;src:url(data:font/woff2;base64,${INTER_600_WOFF2}) format('woff2');}
+    @font-face{font-family:'Inter';font-weight:700;font-style:normal;src:url(data:font/woff2;base64,${INTER_700_WOFF2}) format('woff2');}
+    @font-face{font-family:'Noto Sans Arabic';font-weight:700;font-style:normal;src:url(data:font/woff2;base64,${NOTO_ARABIC_700_WOFF2}) format('woff2');}
+  </style>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 1536 1024' font-family='Inter, "Segoe UI", sans-serif'>
     <defs>
       <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0d1f19'/><stop offset='1' stop-color='#1f4a3d'/></linearGradient>
       <linearGradient id='scrim' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#04100b' stop-opacity='0'/><stop offset='1' stop-color='#04100b' stop-opacity='0.92'/></linearGradient>
     </defs>
+    ${fontFace}
     ${bg}
     <rect x='0' y='470' width='1536' height='554' fill='url(#scrim)'/>
     <g transform='translate(1360,96)'>
@@ -912,9 +922,9 @@ function composeCivicVisual(
       <rect x='0' y='48' width='120' height='24' fill='#000000'/>
       <rect x='0' y='0' width='34' height='72' fill='#ce1126'/>
     </g>
-    <text x='96' y='150' fill='#ffffff' font-size='30' letter-spacing='7' opacity='0.92'>${kicker}</text>
-    <text x='768' y='700' fill='#ffffff' font-size='82' font-weight='700' text-anchor='middle' direction='rtl'>${ar}</text>
-    <text x='768' y='808' fill='#ffffff' font-size='58' font-weight='600' text-anchor='middle' letter-spacing='1'>${en}</text>
+    <text x='96' y='150' fill='#ffffff' font-size='30' letter-spacing='7' opacity='0.92' font-family='Inter' font-weight='600'>${kicker}</text>
+    <text x='768' y='700' fill='#ffffff' font-size='82' font-weight='700' text-anchor='middle' direction='rtl' font-family='Noto Sans Arabic, "Segoe UI", sans-serif'>${ar}</text>
+    <text x='768' y='808' fill='#ffffff' font-size='58' font-weight='700' text-anchor='middle' letter-spacing='1' font-family='Inter'>${en}</text>
     ${dateLine}
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;

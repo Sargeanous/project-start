@@ -23,6 +23,7 @@ const CHECK_ONLY = process.argv.includes("--check");
 const OUT_NAME = "mediagpt-capability-reel.mp4";
 const FFMPEG = (await import("ffmpeg-static")).default;
 const BEAT_PAD_MS = 700;
+const ADVERTISER_CREATIVE = join(ROOT, "demo", "assets", "advertiser-creative.png");
 
 mkdirSync(OUT_DIR, { recursive: true });
 mkdirSync(AUDIO_DIR, { recursive: true });
@@ -78,6 +79,26 @@ const SCENES = [
     ],
   },
   {
+    id: "r1b",
+    title: "It turns questions into charts",
+    beats: [
+      {
+        say: "Ask it for the numbers, and it answers with a chart.",
+        async do(h) {
+          await h.askChat("Chart revenue by zone, month over month, as a bar chart.");
+          await h.page.locator(".chat-chart").first().waitFor({ timeout: 20000 }).catch(() => h.issues.push("reel: chat chart did not render"));
+        },
+      },
+      {
+        say: "The same question a strategist would ask, answered straight from the live ledger, with the trend and the figures behind it.",
+        async do(h) {
+          await h.page.locator(".chat-chart").first().scrollIntoViewIfNeeded().catch(() => {});
+          await h.pace(2600);
+        },
+      },
+    ],
+  },
+  {
     id: "r2",
     title: "It creates the message",
     beats: [
@@ -102,12 +123,48 @@ const SCENES = [
     ],
   },
   {
+    id: "r2b",
+    title: "It reviews what people make",
+    beats: [
+      {
+        say: "It does not only create. Hand it a finished visual, and it reviews it like a senior creative officer.",
+        async do(h) {
+          await h.switchProfile("ADMO Content Reviewer");
+          await h.nav("CMS");
+          await h.click(h.page.locator("button").filter({ hasText: "Create with AI" }).first(), { settle: 900 });
+          await h.click(h.page.locator("button").filter({ hasText: "Review my visual" }).first(), { settle: 700 });
+          // Match the studio brief to the uploaded advertiser artwork so the
+          // critique reads coherently (not against the National Day default).
+          const name = h.page.locator(".studio-controls label", { hasText: "Campaign name" }).locator("input").first();
+          if (await h.has(name, "reel: review campaign name")) await h.typeInto(name, "Corniche Summer Nights");
+          const brief = h.page.locator(".studio-controls label", { hasText: "Creative brief" }).locator("textarea").first();
+          if (await h.has(brief, "reel: review brief")) await h.typeInto(brief, "Azure Hotels summer hospitality campaign for roadside screens, bilingual.");
+          const file = h.page.locator(".studio-controls input[type=file]").first();
+          if (await h.has(file, "reel: review upload input")) await file.setInputFiles(ADVERTISER_CREATIVE);
+          await h.page.locator(".studio-visual .creative-frame.large").first().waitFor({ timeout: 8000 }).catch(() => h.issues.push("reel: uploaded visual did not render"));
+          await h.pace(1000);
+        },
+      },
+      {
+        say: "Brand safety, cultural fit, Arabic legibility and composition, each scored, with concrete fixes an officer can act on.",
+        async do(h) {
+          const review = h.page.locator(".studio-controls button", { hasText: "Review with MediaGPT" }).first();
+          if (await h.has(review, "reel: review button")) await h.click(review, { settle: 900 });
+          await h.page.locator(".studio-recos").first().waitFor({ timeout: 25000 }).catch(() => h.issues.push("reel: review result did not render"));
+          await h.page.locator(".studio-recos").first().scrollIntoViewIfNeeded().catch(() => {});
+          await h.pace(2600);
+        },
+      },
+    ],
+  },
+  {
     id: "r3",
     title: "One message, a whole area",
     beats: [
       {
         say: "Now the headline. A safety message needs every screen within reach of Downtown. The operator draws the area.",
         async do(h) {
+          await h.switchProfile("ADMO Control Room");
           await h.nav("Radius Broadcast");
           await h.page.locator(".radius-map").first().waitFor({ timeout: 15000 }).catch(() => {});
           await h.pace(1400);
@@ -171,12 +228,38 @@ const SCENES = [
     ],
   },
   {
+    id: "r4b",
+    title: "It watches the hardware",
+    beats: [
+      {
+        say: "It watches the hardware, too. When a screen runs hot, MediaGPT drafts the service order.",
+        async do(h) {
+          await h.nav("Network and Devices");
+          const asset = h.page.locator(".asset-registry button", { hasText: "WTC Souk Panel" }).first();
+          if (await h.has(asset, "reel: warning asset")) await h.click(asset, { settle: 900 });
+          const draft = h.page.locator(".asset-twin-pane button", { hasText: "Draft ticket" }).first();
+          if (await h.has(draft, "reel: draft ticket")) await h.click(draft, { settle: 900 });
+          await h.page.locator(".ai-mini-panel").first().waitFor({ timeout: 25000 }).catch(() => h.issues.push("reel: ticket draft did not render"));
+        },
+      },
+      {
+        say: "Likely cause, the parts to bring, and the response time. The team reviews the draft and commits the work order. The copilot prepares, the operator decides.",
+        async do(h) {
+          await h.page.locator(".ai-mini-panel").first().scrollIntoViewIfNeeded().catch(() => {});
+          await h.pace(2200);
+          const create = h.page.locator(".ai-mini-panel button", { hasText: "Create service order" }).first();
+          if (await h.has(create, "reel: create service order")) await h.click(create, { settle: 1200 });
+        },
+      },
+    ],
+  },
+  {
     id: "r5",
     title: "One copilot, always governed",
     beats: [
       {
-        say: "It reads. It creates. It targets. It advises. And every action still waits for a human. MediaGPT.",
-        async do(h) { await h.lowerThird(null); await h.card("MediaGPT", "reads · creates · targets · advises"); },
+        say: "It reads the estate and charts it. It creates, and it reviews. It targets a whole area, advises where to spend, and even drafts the repair. And every action still waits for a human. MediaGPT.",
+        async do(h) { await h.lowerThird(null); await h.card("MediaGPT", "reads · creates · reviews · targets · advises"); },
       },
     ],
   },
@@ -363,6 +446,11 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
   }
   async function lowerThird(text) { await page.evaluate((t) => window.__lowerThird(t), text); }
   async function card(title, subtitle) { await page.evaluate(([a, b]) => window.__card(a, b), [title, subtitle]); }
+  async function switchProfile(name) {
+    const sw = page.locator("button", { hasText: "Switch profile" }).first();
+    if (await sw.count()) await click(sw, { settle: 700 });
+    await click(page.locator("button", { hasText: name }).first(), { settle: 1200 });
+  }
   async function askChat(question, timeout = 50000) {
     const before = await page.locator(".chat-panel .chat-log article.assistant").count();
     await typeInto(page.locator(".chat-panel footer input"), question);
@@ -374,7 +462,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     if (!answered) issues.push(`chat did not answer: "${question.slice(0, 36)}..."`);
     await pace(700);
   }
-  return { pace, has, click, typeInto, nav, lowerThird, card, askChat, healIfCrashed, page, issues };
+  return { pace, has, click, typeInto, nav, lowerThird, card, switchProfile, askChat, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\

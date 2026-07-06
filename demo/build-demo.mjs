@@ -27,7 +27,7 @@ const CHECK_ONLY = process.argv.includes("--check");
 const FFMPEG = (await import("ffmpeg-static")).default;
 
 const BEAT_PAD_MS = 700; // silence held after a beat's narration ends
-const ADVERTISER_CREATIVE = join(ROOT, "demo", "assets", "advertiser-creative.svg");
+const ADVERTISER_CREATIVE = join(ROOT, "demo", "assets", "advertiser-creative.png");
 
 mkdirSync(OUT_DIR, { recursive: true });
 mkdirSync(AUDIO_DIR, { recursive: true });
