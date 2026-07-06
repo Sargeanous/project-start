@@ -33,6 +33,7 @@ import {
   computeRadiusScreens,
   queueRadiusBroadcast,
   approveRadiusBroadcast,
+  yieldRecommendation,
   decideFinanceApproval,
   getState,
   isRealSubmission,
@@ -241,6 +242,12 @@ export const Route = createFileRoute("/api/dooh/$")({
 
           if (segments[0] === "mediagpt" && segments[1] === "radius" && segments[3] === "approve") {
             return Response.json(await approveRadiusBroadcast(segments[2], actor));
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "yield") {
+            const budgetAed = typeof body.budgetAed === "number" ? body.budgetAed : 0;
+            if (!(budgetAed > 0)) return jsonError("A positive budget is required", 422);
+            return Response.json(yieldRecommendation(budgetAed, stringValue(body.goal, "awareness")));
           }
 
           if (segments[0] === "notifications" && segments[1] === "read-all") {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { assets as dataAssets } from "../data";
+import { assets as dataAssets, assetAllocations } from "../data";
 import { distanceM, evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
 
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
@@ -2394,6 +2394,85 @@ export async function approveRadiusBroadcast(id: string, approver: string): Prom
     addActivity(draft, approver, `Approved radius broadcast to ${broadcast.clearCount} screens`, broadcast.campaign);
   });
   return { state, broadcast: updated! };
+}
+
+// Yield / where-to-spend advisor. Deterministic ranking from audience,
+// rate card and goal fit, so the recommendation is explainable and stable.
+export interface YieldRecommendation {
+  assetId: string;
+  name: string;
+  zone: string;
+  audienceWeekly: number;
+  rateCardWeekAed: number;
+  weeksAffordable: number;
+  projectedImpressions: number;
+  costPerThousand: number;
+  rationale: string;
+}
+
+export interface YieldAdvice {
+  budgetAed: number;
+  goal: string;
+  recommendations: YieldRecommendation[];
+  dayparts: string[];
+  summary: string;
+}
+
+const GOAL_ZONE_FIT: Record<string, Record<string, number>> = {
+  retail: { Downtown: 1.35, "Abu Dhabi City": 1.15, "Yas Island": 1.2, "Industrial Zone": 0.7, "Al Ain": 1.0 },
+  tourism: { "Yas Island": 1.4, "Abu Dhabi City": 1.2, Downtown: 1.1, "Al Ain": 1.05, "Industrial Zone": 0.6 },
+  awareness: { "Abu Dhabi City": 1.3, "Al Ain": 1.15, Downtown: 1.1, "Yas Island": 1.1, "Industrial Zone": 1.0 },
+  safety: { "Abu Dhabi City": 1.35, "Al Ain": 1.25, "Industrial Zone": 1.2, Downtown: 1.0, "Yas Island": 0.9 },
+};
+const GOAL_DAYPARTS: Record<string, string[]> = {
+  retail: ["Evening peak (18:00-22:00)", "Weekend midday"],
+  tourism: ["Evening peak (18:00-22:00)", "Late morning"],
+  awareness: ["Morning peak (07:00-10:00)", "Evening peak (18:00-22:00)"],
+  safety: ["Morning peak (07:00-10:00)", "Evening peak (18:00-22:00)"],
+};
+
+function parseAudienceWeekly(value: string): number {
+  const m = value.match(/([\d.]+)\s*([km])?/i);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  const unit = (m[2] || "").toLowerCase();
+  return Math.round(n * (unit === "m" ? 1_000_000 : unit === "k" ? 1_000 : 1));
+}
+
+export function yieldRecommendation(budgetAed: number, goalRaw: string): YieldAdvice {
+  const goal = (goalRaw || "awareness").toLowerCase();
+  const fit = GOAL_ZONE_FIT[goal] ?? GOAL_ZONE_FIT.awareness;
+  const rows: YieldRecommendation[] = dataAssets
+    .filter((asset) => asset.status !== "Offline")
+    .map((asset) => {
+      const audienceWeekly = parseAudienceWeekly(asset.audience);
+      const alloc = assetAllocations.find((a) => a.assetId === asset.id);
+      const rateCardWeekAed = alloc?.rateCardWeekAed ?? 12000;
+      const zoneFit = fit[asset.zone] ?? 1;
+      const weeksAffordable = Math.max(1, Math.floor(budgetAed / rateCardWeekAed));
+      const projectedImpressions = Math.round(audienceWeekly * weeksAffordable * zoneFit);
+      const spend = Math.min(budgetAed, rateCardWeekAed * weeksAffordable);
+      const costPerThousand = spend > 0 ? Math.round((spend / projectedImpressions) * 1000 * 100) / 100 : 0;
+      return {
+        assetId: asset.id,
+        name: asset.name,
+        zone: asset.zone,
+        audienceWeekly,
+        rateCardWeekAed,
+        weeksAffordable,
+        projectedImpressions,
+        costPerThousand,
+        rationale: `${asset.zone} fit x${zoneFit.toFixed(2)}, ${(audienceWeekly / 1000).toFixed(0)}k weekly reach, ${weeksAffordable} week(s) within budget at AED ${rateCardWeekAed.toLocaleString("en-US")}/week.`,
+      };
+    })
+    .sort((a, b) => b.projectedImpressions - a.projectedImpressions)
+    .slice(0, 5);
+
+  const totalImpr = rows.reduce((s, r) => s + r.projectedImpressions, 0);
+  const summary = rows.length
+    ? `For a ${goal} goal on AED ${budgetAed.toLocaleString("en-US")}, MediaGPT ranks ${rows.length} screens led by ${rows[0].name} (${rows[0].zone}). Projected reach across the top set is ${(totalImpr / 1_000_000).toFixed(1)}M impressions.`
+    : "No eligible screens for this budget.";
+  return { budgetAed, goal, recommendations: rows, dayparts: GOAL_DAYPARTS[goal] ?? GOAL_DAYPARTS.awareness, summary };
 }
 
 export async function acknowledgeAlert(id: string, actor: string): Promise<DoohState> {

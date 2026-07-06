@@ -7395,6 +7395,22 @@ html[dir="rtl"] .network-tabs button.active {
 .radius-result strong { display: block; font-size: 13.5px; }
 .radius-result small { font-size: 12px; opacity: 0.9; }
 
+/* Yield advisor */
+.yield-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.yield-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+.yield-form label input, .yield-form label select { padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 9px; font: inherit; font-size: 13px; min-width: 170px; }
+.yield-list { display: grid; gap: 10px; }
+.yield-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.yield-rank { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+.yield-main { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.yield-main strong { font-size: 13.5px; }
+.yield-main small { font-size: 11.5px; color: var(--muted); }
+.yield-bar { display: block; height: 6px; border-radius: 999px; background: var(--surface-2, #eef2f0); overflow: hidden; margin-top: 3px; }
+.yield-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #2f8f6b); border-radius: 999px; }
+.yield-metric { text-align: end; display: grid; gap: 2px; }
+.yield-metric strong { font-size: 15px; }
+.yield-metric small { font-size: 11px; color: var(--muted); }
+
 /* Rules catalogue at full panel width: multi-column grid instead of one long list */
 .rules-catalogue { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
 .rules-catalogue button + button { margin-top: 0; }

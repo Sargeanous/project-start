@@ -134,6 +134,7 @@ type Page =
   | "network"
   | "mediagpt"
   | "radiusBroadcast"
+  | "yieldAdvisor"
   | "knowledge"
   | "rules"
   | "skillsCatalogue"
@@ -496,7 +497,7 @@ const profiles: Profile[] = [
     name: "ADMO Control Room",
     role: "Operations operator",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "alerts", "network", "mediagpt", "radiusBroadcast"],
+    pages: ["control", "alerts", "network", "mediagpt", "radiusBroadcast", "yieldAdvisor"],
   },
   {
     id: "reviewer",
@@ -510,14 +511,14 @@ const profiles: Profile[] = [
     name: "ADMO Finance",
     role: "Commercial finance",
     organization: "Abu Dhabi Media Office",
-    pages: ["financials", "allocations", "reports", "control"],
+    pages: ["financials", "allocations", "reports", "control", "yieldAdvisor"],
   },
   {
     id: "admin",
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
@@ -545,6 +546,7 @@ const navItems: Record<Page, NavItem> = {
   reports: { id: "reports", label: "Reports & BI", icon: BarChart3 },
   mediagpt: { id: "mediagpt", label: "MediaGPT", icon: Bot },
   radiusBroadcast: { id: "radiusBroadcast", label: "Radius Broadcast", icon: Target },
+  yieldAdvisor: { id: "yieldAdvisor", label: "Yield Advisor", icon: Gauge },
   knowledge: { id: "knowledge", label: "Knowledge", icon: Database },
   rules: { id: "rules", label: "Rules", icon: ShieldCheck },
   skillsCatalogue: { id: "skillsCatalogue", label: "Skills Catalogue", icon: Sparkles },
@@ -570,6 +572,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "reports", label: "Reports & BI", helper: "Executive dashboards, exports, and regulatory reports" },
   { key: "mediagpt", label: "MediaGPT", helper: "Agent outputs and approved AI actions" },
   { key: "radiusBroadcast", label: "Radius Broadcast", helper: "Radius targeting and bulk broadcast approvals" },
+  { key: "yieldAdvisor", label: "Yield Advisor", helper: "Budget placement recommendations" },
   { key: "knowledge", label: "Knowledge", helper: "Source ingestion and knowledge-base changes" },
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
   { key: "campaigns", label: "Campaigns", helper: "Bidder campaign status and ADMO messages" },
@@ -591,7 +594,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 
 const navGroups: NavGroup[] = [
   { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports"] },
-  { label: "Intelligence / Agentic", pages: ["mediagpt", "radiusBroadcast", "knowledge"] },
+  { label: "Intelligence / Agentic", pages: ["mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
   { label: "Infrastructure", pages: ["integrations", "accessRoles", "auditLog", "edgeCompute"] },
@@ -3096,6 +3099,7 @@ function App() {
           )}
           {page === "mediagpt" && <MediaGptSuite aiAvailable={aiAvailable} t={t} />}
           {page === "radiusBroadcast" && <RadiusBroadcastPage profile={profile} aiAvailable={aiAvailable} notify={notify} t={t} />}
+          {page === "yieldAdvisor" && <YieldAdvisorPage notify={notify} t={t} />}
           {page === "knowledge" && <KnowledgeBasePage t={t} />}
           {page === "rules" && <RulesPage enforcementEvents={enforcementEvents} t={t} />}
           {page === "skillsCatalogue" && <SkillsCataloguePage t={t} />}
@@ -6760,6 +6764,89 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
             </ActionRow>
           )}
         </div>
+      </Panel>
+    </PageBody>
+  );
+}
+
+type YieldRec = { assetId: string; name: string; zone: string; audienceWeekly: number; rateCardWeekAed: number; weeksAffordable: number; projectedImpressions: number; costPerThousand: number; rationale: string };
+type YieldAdvice = { budgetAed: number; goal: string; recommendations: YieldRec[]; dayparts: string[]; summary: string };
+const YIELD_GOALS = [
+  { value: "retail", label: "Retail sales" },
+  { value: "tourism", label: "Tourism and leisure" },
+  { value: "awareness", label: "Brand awareness" },
+  { value: "safety", label: "Civic and safety" },
+];
+
+function YieldAdvisorPage({ notify, t }: { notify: (message: string) => void; t: (value: string) => string }) {
+  const [budget, setBudget] = useState("200000");
+  const [goal, setGoal] = useState("retail");
+  const [advice, setAdvice] = useState<YieldAdvice | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function recommend() {
+    const budgetAed = Number(budget.replace(/[^\d]/g, ""));
+    if (!budgetAed) { notify(t("Enter a budget first")); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/dooh/mediagpt/yield", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budgetAed, goal, actor: "Operator", role: "control-room" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setAdvice(data);
+      else notify(data?.error ?? t("Could not compute recommendation"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const maxImpr = advice ? Math.max(...advice.recommendations.map((r) => r.projectedImpressions), 1) : 1;
+
+  return (
+    <PageBody>
+      <Panel icon={Gauge} title={t("Yield advisor")} action={<StatusPill label={t("Where the budget works hardest")} tone="info" />}>
+        <div className="yield-form">
+          <label><span>{t("Budget")} (AED)</span><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="numeric" /></label>
+          <label><span>{t("Goal")}</span><select value={goal} onChange={(event) => setGoal(event.target.value)}>{YIELD_GOALS.map((g) => <option key={g.value} value={g.value}>{t(g.label)}</option>)}</select></label>
+          <Button icon={Sparkles} disabled={loading} onClick={recommend}>{loading ? t("Analyzing") : t("Ask MediaGPT where to spend")}</Button>
+        </div>
+
+        {advice ? (
+          <div className="linked-detail">
+            <div className="linked-detail-head">
+              <span className="panel-icon"><Sparkles size={18} /></span>
+              <strong>{t("MediaGPT recommendation")}</strong>
+            </div>
+            <section className="ai-mini-panel">
+              <div>
+                <span>{t("Summary")}</span>
+                <strong>{advice.summary}</strong>
+                <small>{t("Recommended dayparts")}: {advice.dayparts.map((d) => t(d)).join(" · ")}</small>
+              </div>
+              <StatusPill label="MediaGPT" tone="good" />
+            </section>
+            <div className="yield-list">
+              {advice.recommendations.map((rec, index) => (
+                <div key={rec.assetId} className="yield-row">
+                  <span className="yield-rank">{index + 1}</span>
+                  <span className="yield-main">
+                    <strong>{rec.assetId} · {t(rec.name)}</strong>
+                    <small>{t(rec.zone)} · {t(rec.rationale)}</small>
+                    <span className="yield-bar"><span className="yield-fill" style={{ width: `${Math.round((rec.projectedImpressions / maxImpr) * 100)}%` }} /></span>
+                  </span>
+                  <span className="yield-metric">
+                    <strong>{(rec.projectedImpressions / 1_000_000).toFixed(2)}M</strong>
+                    <small>{t("impressions")} · AED {rec.costPerThousand} {t("CPM")}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="cell-note">{t("Set a budget and goal, and MediaGPT ranks the screens where it will perform best, with the reasoning.")}</p>
+        )}
       </Panel>
     </PageBody>
   );
