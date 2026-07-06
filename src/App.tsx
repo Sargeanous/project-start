@@ -2815,12 +2815,13 @@ function App() {
     return result.submission;
   }
 
-  async function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
+  async function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string; creativeUrl?: string }) {
     await submitBrief({
       campaign: payload.campaign,
       packageName: payload.packageName,
       budget: payload.budget,
       creativeId: payload.creativeId,
+      creativeUrl: payload.creativeUrl,
       priority: "Standard",
       brand: profile?.name ?? "Bidder",
       vertical: "Retail",
@@ -8711,7 +8712,7 @@ function MarketplacePage({
   onNewBrief,
   t,
 }: {
-  onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string }) => void;
+  onSubmit: (payload: { campaign: string; packageName: string; budget: string; creativeId: string; creativeUrl?: string }) => void;
   onBid: (payload: { lotId: string; amount: number; campaign: string }) => void;
   auctions: AuctionLot[];
   bookings: BookingRecord[];
@@ -8723,10 +8724,23 @@ function MarketplacePage({
   const [campaign, setCampaign] = useState("Airport retail launch");
   const [budget, setBudget] = useState("AED 420,000");
   const [mode, setMode] = useState<"auction" | "fixed">("auction");
+  const [creativeUrl, setCreativeUrl] = useState("");
+  const [creativeName, setCreativeName] = useState("");
+  const creativeRef = useRef<HTMLInputElement | null>(null);
+
+  function onCreativeFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    setCreativeName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => setCreativeUrl(String(reader.result));
+    reader.readAsDataURL(file);
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    onSubmit({ campaign, packageName: selected.name, budget, creativeId: selected.creativeId });
+    if (!creativeUrl) return;
+    onSubmit({ campaign, packageName: selected.name, budget, creativeId: selected.creativeId, creativeUrl });
   }
 
   return (
@@ -8841,10 +8855,19 @@ function MarketplacePage({
                 <input value={t(budget)} onChange={(event) => setBudget(event.target.value)} />
               </label>
               <label>
-                {t("Creative pack")}
-                <input value={t("Arabic and English creative uploaded")} readOnly />
+                {t("Your creative")}
+                <input ref={creativeRef} type="file" accept="image/*,video/*" hidden onChange={(event) => onCreativeFile(event.target.files)} />
+                <button type="button" className="creative-upload-btn" onClick={() => creativeRef.current?.click()}>
+                  <Upload size={15} /> {creativeName ? creativeName : t("Upload your creative (Arabic + English)")}
+                </button>
               </label>
-              <Button type="submit">{t("Submit campaign")}</Button>
+              {creativeUrl ? (
+                <div className="marketplace-creative-preview">
+                  <div className="creative-frame" style={{ backgroundImage: `url("${creativeUrl}")` }} />
+                  <small className="cell-note">{t("Your creative will be reviewed by MediaGPT and ADMO before it can run.")}</small>
+                </div>
+              ) : null}
+              <Button type="submit" disabled={!creativeUrl}>{t("Submit campaign")}</Button>
             </form>
           </LinkedDetail>
         </Panel>
