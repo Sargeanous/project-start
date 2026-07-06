@@ -2317,7 +2317,6 @@ const translations: Record<string, string> = {
   "Fallback": "البديل",
   "OpenAI vision": "رؤية OpenAI",
   "Local OCR": "تعرف نصي محلي",
-  "Claude / Arabic evaluator": "Claude / مقيم عربي",
   "Rules engine": "محرك القواعد",
   "Forecast model": "نموذج التنبؤ",
   "Static rate card": "بطاقة أسعار ثابتة",
