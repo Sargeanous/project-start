@@ -30,6 +30,9 @@ import {
   createPurchaseOrder,
   createServiceOrder,
   createSubmission,
+  computeRadiusScreens,
+  queueRadiusBroadcast,
+  approveRadiusBroadcast,
   decideFinanceApproval,
   getState,
   isRealSubmission,
@@ -206,6 +209,38 @@ export const Route = createFileRoute("/api/dooh/$")({
 
           if (segments[0] === "reset") {
             return Response.json({ state: await resetState() });
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "radius" && segments[2] === "preview") {
+            const center = body.center as { lat: number; lng: number } | undefined;
+            const radiusM = typeof body.radiusM === "number" ? body.radiusM : 0;
+            if (!center || !(radiusM > 0)) return jsonError("center and radiusM are required", 422);
+            return Response.json({
+              screens: computeRadiusScreens(center, radiusM, {
+                category: typeof body.category === "string" ? body.category : undefined,
+                daypart: typeof body.daypart === "string" ? body.daypart : undefined,
+              }),
+            });
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "radius" && segments[2] === "queue") {
+            const center = body.center as { lat: number; lng: number } | undefined;
+            const radiusM = typeof body.radiusM === "number" ? body.radiusM : 0;
+            if (!center || !(radiusM > 0)) return jsonError("center and radiusM are required", 422);
+            return Response.json(await queueRadiusBroadcast({
+              center,
+              centerLabel: stringValue(body.centerLabel, ""),
+              radiusM,
+              campaign: stringValue(body.campaign, ""),
+              messageEn: stringValue(body.messageEn, ""),
+              messageAr: stringValue(body.messageAr, ""),
+              category: typeof body.category === "string" ? body.category : undefined,
+              daypart: typeof body.daypart === "string" ? body.daypart : undefined,
+            }, actor));
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "radius" && segments[3] === "approve") {
+            return Response.json(await approveRadiusBroadcast(segments[2], actor));
           }
 
           if (segments[0] === "notifications" && segments[1] === "read-all") {

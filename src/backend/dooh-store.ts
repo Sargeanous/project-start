@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { assets as dataAssets } from "../data";
-import { evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
+import { distanceM, evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
 
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Approved" | "Broadcast queued" | "Broadcasting" | "Live on network";
@@ -324,6 +324,7 @@ export interface DoohState {
   popLedger: PopRecord[];
   enforcementEvents: EnforcementEvent[];
   killedAssetIds: string[];
+  radiusBroadcasts: RadiusBroadcast[];
   alerts: EmergencyAlert[];
   verificationSteps: VerificationStep[];
   financeApprovals: FinanceApproval[];
@@ -331,6 +332,33 @@ export interface DoohState {
   purchaseOrders: PurchaseOrder[];
   activity: ActivityItem[];
   notifications: PlatformNotification[];
+}
+
+export interface RadiusBroadcastScreen {
+  assetId: string;
+  name: string;
+  zone: string;
+  distanceM: number;
+  status: "clear" | "flagged";
+  flagLabel?: string;
+  flagDetail?: string;
+}
+
+export interface RadiusBroadcast {
+  id: string;
+  center: { lat: number; lng: number };
+  centerLabel: string;
+  radiusM: number;
+  campaign: string;
+  messageEn: string;
+  messageAr: string;
+  screens: RadiusBroadcastScreen[];
+  clearCount: number;
+  flaggedCount: number;
+  status: "Pending approval" | "Approved and queued";
+  createdBy: string;
+  createdAt: string;
+  approvedBy?: string;
 }
 
 export interface BriefPayload {
@@ -626,6 +654,7 @@ const initialState: DoohState = {
   invoices: [],
   enforcementEvents: [],
   killedAssetIds: [],
+  radiusBroadcasts: [],
   popLedger: [],
   alerts: [
     {
@@ -817,6 +846,7 @@ function normalizeState(state: DoohState, opts?: { sweepTestData?: boolean }): D
     popLedger: state.popLedger ?? [],
     enforcementEvents: state.enforcementEvents ?? [],
     killedAssetIds: state.killedAssetIds ?? [],
+    radiusBroadcasts: state.radiusBroadcasts ?? [],
     auctions: (state.auctions ?? []).map((lot) => ({ ...lot, status: lot.status ?? "Open" })),
     submissions: normalizeSubmissions(state.submissions ?? [], opts?.sweepTestData ?? false),
     serviceOrders: state.serviceOrders ?? cloneState(initialState).serviceOrders,
@@ -2270,6 +2300,100 @@ export async function restoreDisplays(payload: { scope: "asset" | "zone" | "emir
     draft.killedAssetIds = draft.killedAssetIds.filter((id) => !remove.has(id));
     addActivity(draft, actor, "Re-enabled displays", payload.target ?? "All");
   });
+}
+
+// Pure: the screens inside a radius, each with its per-screen rules verdict.
+// Same distanceM + evaluateRules the rest of the platform uses, so the
+// preview and the governed queue always agree.
+export function computeRadiusScreens(
+  center: { lat: number; lng: number },
+  radiusM: number,
+  opts: { category?: string; daypart?: string } = {},
+): RadiusBroadcastScreen[] {
+  return dataAssets
+    .map((asset) => ({ asset, d: distanceM(center, { lat: asset.lat, lng: asset.lng }) }))
+    .filter((row) => row.d <= radiusM)
+    .sort((a, b) => a.d - b.d)
+    .map(({ asset, d }) => {
+      // Per-screen check: only this screen's own coordinates. Passing its
+      // zone would expand evaluateRules to every asset in the zone and
+      // attribute a neighbour's proximity flag to this screen.
+      const verdict = evaluateRules({
+        kind: "scheduling",
+        assetIds: [asset.id],
+        category: opts.category,
+        daypart: opts.daypart,
+      });
+      const flag = verdict.hits[0] ?? verdict.warnings[0];
+      return {
+        assetId: asset.id,
+        name: asset.name,
+        zone: asset.zone,
+        distanceM: d,
+        status: flag ? "flagged" : "clear",
+        flagLabel: flag?.label,
+        flagDetail: flag?.detail,
+      } as RadiusBroadcastScreen;
+    });
+}
+
+export async function queueRadiusBroadcast(
+  payload: { center: { lat: number; lng: number }; centerLabel?: string; radiusM: number; campaign: string; messageEn: string; messageAr?: string; category?: string; daypart?: string },
+  actor: string,
+): Promise<{ state: DoohState; broadcast: RadiusBroadcast }> {
+  if (!payload.campaign?.trim()) throw new Error("A campaign or message name is required");
+  if (!payload.messageEn?.trim()) throw new Error("A message is required");
+  if (!(payload.radiusM > 0)) throw new Error("A positive radius is required");
+  const screens = computeRadiusScreens(payload.center, payload.radiusM, { category: payload.category, daypart: payload.daypart });
+  if (!screens.length) throw new Error("No screens fall inside the selected area");
+  const flaggedCount = screens.filter((s) => s.status === "flagged").length;
+  const broadcast: RadiusBroadcast = {
+    id: `RB-${Date.now().toString().slice(-6)}`,
+    center: payload.center,
+    centerLabel: payload.centerLabel?.trim() || `${payload.center.lat.toFixed(4)}, ${payload.center.lng.toFixed(4)}`,
+    radiusM: payload.radiusM,
+    campaign: payload.campaign.trim(),
+    messageEn: payload.messageEn.trim(),
+    messageAr: (payload.messageAr ?? "").trim(),
+    screens,
+    clearCount: screens.length - flaggedCount,
+    flaggedCount,
+    status: "Pending approval",
+    createdBy: actor,
+    createdAt: formatNow(),
+  };
+  const state = await commit((draft) => {
+    draft.radiusBroadcasts = [broadcast, ...draft.radiusBroadcasts];
+    addNotification(draft, {
+      title: "Radius broadcast awaiting approval",
+      body: `${broadcast.campaign}: ${screens.length} screen(s) within ${(payload.radiusM / 1000).toFixed(1)} km of ${broadcast.centerLabel}${flaggedCount ? `, ${flaggedCount} flagged by rules` : ""}. Proposed by ${actor}.`,
+      subject: broadcast.id,
+      recipients: ["control-room", "admin"],
+      page: "radius",
+      tone: flaggedCount ? "warning" : "info",
+    });
+    addActivity(draft, actor, `Proposed radius broadcast (${screens.length} screens)`, broadcast.centerLabel);
+  });
+  return { state, broadcast };
+}
+
+export async function approveRadiusBroadcast(id: string, approver: string): Promise<{ state: DoohState; broadcast: RadiusBroadcast }> {
+  let updated: RadiusBroadcast | null = null;
+  const state = await commit((draft) => {
+    const broadcast = draft.radiusBroadcasts.find((b) => b.id === id);
+    if (!broadcast) throw new Error("Radius broadcast not found");
+    if (broadcast.createdBy === approver) throw new Error("Segregation of duties: the proposer cannot approve their own broadcast");
+    broadcast.status = "Approved and queued";
+    broadcast.approvedBy = approver;
+    updated = broadcast;
+    // Queue the message onto the clear screens (flagged ones are held out).
+    const queued = broadcast.screens.filter((s) => s.status === "clear").map((s) => s.assetId);
+    for (const item of draft.schedule) {
+      if (queued.includes(item.asset)) item.campaign = broadcast.campaign;
+    }
+    addActivity(draft, approver, `Approved radius broadcast to ${broadcast.clearCount} screens`, broadcast.campaign);
+  });
+  return { state, broadcast: updated! };
 }
 
 export async function acknowledgeAlert(id: string, actor: string): Promise<DoohState> {
