@@ -149,7 +149,8 @@ export function generateCreativeCopy(payload: { brief: string; tone: string; rat
 }
 
 export interface GeneratedVisual { image: string; source?: string }
-export function generateVisual(payload: { brief: string; headline?: string; style?: string }) {
+export interface VisualOverlay { kicker?: string; en?: string; ar?: string; sub?: string; subAr?: string }
+export function generateVisual(payload: { brief: string; headline?: string; style?: string; overlay?: VisualOverlay }) {
   return aiPost<GeneratedVisual>("generateVisual", payload);
 }
 

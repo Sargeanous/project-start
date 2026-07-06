@@ -27,6 +27,7 @@ const CHECK_ONLY = process.argv.includes("--check");
 const FFMPEG = (await import("ffmpeg-static")).default;
 
 const BEAT_PAD_MS = 700; // silence held after a beat's narration ends
+const ADVERTISER_CREATIVE = join(ROOT, "demo", "assets", "advertiser-creative.svg");
 
 mkdirSync(OUT_DIR, { recursive: true });
 mkdirSync(AUDIO_DIR, { recursive: true });
@@ -87,31 +88,35 @@ const SCENES = [
 
   {
     id: "s2",
-    title: "The request: an advertiser bids for airtime",
+    title: "The request: an advertiser brings a campaign",
     beats: [
       {
-        say: "Across town, an advertiser wants premium airtime.",
+        say: "Across town, an advertiser wants premium airtime for a summer campaign.",
         async do(h) {
           await h.switchProfile("Advertiser");
           await h.nav("Marketplace");
-          await h.click(h.page.locator("button", { hasText: "Open auctions" }).first(), { settle: 900 });
+          await h.click(h.page.locator(".marketplace-toolbar button", { hasText: "Fixed-rate packages" }).first(), { settle: 900 });
+          await h.click(h.page.locator(".package-grid button").first(), { settle: 800 });
         },
       },
       {
-        say: "In the marketplace he opens the live auctions, names his campaign, and raises his bid on the Corniche evening rotation moments before it closes.",
+        say: "The advertiser brings their own creative. The platform never invents an advertiser's artwork, so they upload the visual they designed themselves.",
         async do(h) {
-          const lot = h.page.locator(".auction-card").first();
-          if (await h.has(lot, "s2: auction lot")) {
-            await lot.scrollIntoViewIfNeeded().catch(() => {});
-            const bidName = lot.locator("label", { hasText: "Campaign name" }).locator("input").first();
-            if (await h.has(bidName, "s2: bid name input")) await h.typeInto(bidName, "Corniche Summer Nights");
-            const placeBid = lot.locator("button", { hasText: "Place bid" }).first();
-            if (await h.has(placeBid, "s2: place bid")) await h.click(placeBid, { settle: 1200 });
-          }
+          const name = h.page.locator(".stack-form label", { hasText: "Campaign name" }).locator("input").first();
+          if (await h.has(name, "s2: campaign name")) await h.typeInto(name, "Corniche Summer Nights");
+          const file = h.page.locator(".stack-form input[type=file]").first();
+          if (await h.has(file, "s2: creative file input")) await file.setInputFiles(ADVERTISER_CREATIVE);
+          // Bring the uploaded artwork on camera so the upload is actually seen.
+          await h.page.locator(".marketplace-creative-preview .creative-frame").first().waitFor({ timeout: 8000 }).catch(() => h.issues.push("s2: creative preview did not render"));
+          await h.panToElement(".marketplace-creative-preview", { headroom: 300, ms: 1500 });
+          await h.pace(1800);
         },
       },
       {
-        say: "The request now exists inside the platform, on the record and routed to review.",
+        say: "They submit, and it enters ADMO's governed review, exactly like every other creative.",
+        async do(h) {
+          await h.click(h.page.locator(".stack-form button", { hasText: "Submit campaign" }).first(), { settle: 1400 });
+        },
       },
     ],
   },
@@ -160,25 +165,20 @@ const SCENES = [
         async do(h) {
           await h.switchProfile("ADMO Content Reviewer");
           await h.click(h.page.locator("button").filter({ hasText: "Create with AI" }).first(), { settle: 1000 });
+          await h.pace(600);
         },
       },
       {
-        say: "From a single sentence, MediaGPT writes the campaign in natural Arabic and English.",
+        say: "The officer sets the official wording in Arabic and English, and MediaGPT paints a background to match. It works from the national brand book and the flag palette, and it locks the wording as its own layer, so the Arabic reads exactly right on every screen.",
         async do(h) {
           const gen = h.page.locator(".studio-controls button", { hasText: "Generate with MediaGPT" }).first();
           if (await h.has(gen, "s3b: generate")) {
             await h.click(gen, { settle: 600 });
-            // Copy resolves first; wait for it to appear on camera.
-            await h.page.locator(".studio-copy strong").first().waitFor({ timeout: 25000 }).catch(() => h.issues.push("s3b: copy did not render"));
+            // The thinking stages animate while the background renders; the
+            // visual reveals mid-narration so there is no dead air.
+            await h.page.locator(".studio-visual .creative-frame.large").first().waitFor({ timeout: 60000 }).catch(() => h.issues.push("s3b: generated visual did not render"));
+            await h.pace(1600);
           }
-        },
-      },
-      {
-        say: "And then it paints the visual to match, right on brand for a national moment.",
-        async do(h) {
-          // The image model finishes here; hold until the visual lands.
-          await h.page.locator(".studio-visual .creative-frame.large").first().waitFor({ timeout: 75000 }).catch(() => h.issues.push("s3b: generated visual did not render"));
-          await h.pace(1500);
         },
       },
       {
@@ -199,19 +199,19 @@ const SCENES = [
     title: "The gate: AI reviews, humans decide",
     beats: [
       {
-        say: "Now the gate. Before any human looks, MediaGPT reads the creative and scores it on brand safety, cultural fit, Arabic accuracy and legibility.",
+        say: "Now the gate. On the advertiser's own artwork, MediaGPT scores brand safety, cultural fit, Arabic accuracy and legibility at highway distance.",
         async do(h) {
           await h.click(h.page.locator("button").filter({ hasText: "Submissions" }).first(), { settle: 900 });
-          await h.click(h.page.locator(".submission-list button", { hasText: "National Day tribute" }).first(), { settle: 1000 });
+          await h.click(h.page.locator(".submission-list button", { hasText: "Corniche Summer Nights" }).first(), { settle: 1000 });
           const start = h.page.locator("button", { hasText: "Start review" }).first();
-          if (await h.has(start, "s4: start review")) await h.click(start, { settle: 1000 });
+          if (await h.has(start, "s4: start review (advertiser)")) await h.click(start, { settle: 1000 });
           await h.page.locator(".ai-review-card").first().scrollIntoViewIfNeeded().catch(() => {});
           const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
           if (await h.has(aiCheck, "s4: run MediaGPT check")) await h.click(aiCheck, { settle: 1200 });
         },
       },
       {
-        say: "It clears the campaign on brand safety and copyright, but flags the call to action as too small for highway screens, and cites the creative-standards clause behind that rule.",
+        say: "It clears brand safety and copyright, but flags the call to action as too small for highway screens, and cites the creative-standards rule behind it. AI only proposes, so the officer decides whether to accept it or send it back to the advertiser to fix.",
         async do(h) {
           const details = h.page.locator("button", { hasText: "Show AI details" }).first();
           if (await h.has(details, "s4: show AI details")) {
@@ -222,20 +222,25 @@ const SCENES = [
         },
       },
       {
-        say: "The reviewer reads the finding and decides. Because AI only proposes, high-impact content still needs two named approvers, each with a one-time code, and neither owner nor bidder may sign their own work.",
+        say: "The National Day campaign is different. Because it takes over the whole civic estate it is high impact, and high impact needs two named approvers, each with a one-time code, and neither owner nor bidder may sign their own work.",
         async do(h) {
+          await h.click(h.page.locator(".submission-list button", { hasText: "National Day tribute" }).first(), { settle: 1000 });
+          const start = h.page.locator("button", { hasText: "Start review" }).first();
+          if (await h.has(start, "s4: start review (civic)")) await h.click(start, { settle: 1000 });
           const panel = h.page.locator(".approvals-panel").first();
           await panel.scrollIntoViewIfNeeded().catch(() => {});
           const select = panel.locator("select").first();
-          await h.click(select, { settle: 250 });
-          await select.selectOption({ index: 1 });
-          await h.pace(500);
-          await h.click(panel.locator("button", { hasText: "Approve with MFA" }).first(), { settle: 800 });
-          await h.mfa();
+          if (await h.has(select, "s4: first approver select")) {
+            await h.click(select, { settle: 250 });
+            await select.selectOption({ index: 1 });
+            await h.pace(500);
+            await h.click(panel.locator("button", { hasText: "Approve with MFA" }).first(), { settle: 800 });
+            await h.mfa();
+          }
         },
       },
       {
-        say: "Two signatures later it is approved, and the whole decision sits in the journal, permanently.",
+        say: "Two signatures later it is approved, and the whole decision, AI findings and human sign off, sits in the journal, permanently.",
         async do(h) {
           const select = h.page.locator(".approvals-panel select").first();
           if (await h.has(select, "s4: second approver select")) {
@@ -258,11 +263,17 @@ const SCENES = [
     title: "The copilot: ask the platform anything",
     beats: [
       {
-        say: "Everyone on the platform has the same copilot. Ask it anything: it reads the live estate and answers with sources.",
+        say: "Everyone on the platform has the same copilot. Ask it anything about the live estate.",
         async do(h) {
           await h.switchProfile("ADMO Control Room");
           await h.click(h.page.locator(".chat-fab").first(), { settle: 800 });
-          await h.askChat("Which assets are offline or need attention right now?");
+          await h.sendChat("Which assets are offline or need attention right now?");
+        },
+      },
+      {
+        say: "It reads every screen, every controller and every telemetry feed, then answers grounded in the live data, and it shows the sources behind every claim.",
+        async do(h) {
+          await h.awaitChat("Which assets are offline or need attention right now?");
         },
       },
       {
@@ -724,6 +735,24 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     if (!answered) issues.push(`chat did not answer: "${question.slice(0, 36)}..."`);
     await pace(700);
   }
+  // Split the ask into fire and await, so a long model wait can be covered by a
+  // second beat's narration instead of leaving the screen silent (max-silence rule).
+  let chatBefore = 0;
+  async function sendChat(question) {
+    chatBefore = await page.locator(".chat-panel .chat-log article.assistant").count();
+    await typeInto(page.locator(".chat-panel footer input"), question);
+    await click(page.locator(".chat-panel footer button").first(), { settle: 400 });
+  }
+  async function awaitChat(label = "", timeout = 50000) {
+    const answered = await page.waitForFunction(
+      (n) => {
+        const a = document.querySelectorAll(".chat-panel .chat-log article.assistant");
+        return a.length > n && ![...a].some((x) => x.textContent.includes("MediaGPT is thinking"));
+      }, chatBefore, { timeout },
+    ).then(() => true).catch(() => false);
+    if (!answered) issues.push(`chat did not answer: "${label.slice(0, 36)}..."`);
+    await pace(700);
+  }
   // Drag across a 3D canvas to orbit the model (OrbitControls left-drag).
   async function dragRotate(selector) {
     const box = await boxOf(page.locator(selector).first());
@@ -759,7 +788,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     }
     await pace(500);
   }
-  return { pace, has, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, slowPan, panToElement, mfa, askChat, dragRotate, slide, healIfCrashed, page, issues };
+  return { pace, has, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, slowPan, panToElement, mfa, askChat, sendChat, awaitChat, dragRotate, slide, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\

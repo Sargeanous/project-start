@@ -603,15 +603,33 @@ async function handleAiEndpoint(endpoint: string | undefined, request: Request) 
     const brief = stringValue(body.brief, "Abu Dhabi civic campaign");
     const headline = stringValue(body.headline, "");
     const style = stringValue(body.style, "official, modern, high-contrast, suitable for large outdoor LED");
+    const overlayIn = (typeof body.overlay === "object" && body.overlay) ? body.overlay as Record<string, unknown> : {};
+    const overlay = {
+      kicker: stringValue(overlayIn.kicker, "ABU DHABI MEDIA OFFICE"),
+      en: stringValue(overlayIn.en, headline || brief),
+      ar: stringValue(overlayIn.ar, "حملة أبوظبي"),
+      sub: stringValue(overlayIn.sub, ""),
+      subAr: stringValue(overlayIn.subAr, ""),
+    };
+    // The image model renders (especially Arabic) text unreliably, so we ask it
+    // for a text-free background and burn the exact bilingual wording on top
+    // ourselves. That keeps the Arabic correct by construction.
     const prompt = [
-      `A digital out-of-home billboard creative for the Abu Dhabi Media Office.`,
-      `Campaign brief: ${brief}.`,
-      headline ? `Feature the concept: ${headline}.` : "",
-      `Style: ${style}. Landscape composition, bold focal point, generous safe margins, no text baked into the image (text is added by the CMS layer). Culturally appropriate for the UAE.`,
+      `A cinematic background artwork for an Abu Dhabi Media Office digital billboard.`,
+      `Theme: ${brief}.`,
+      headline ? `Mood and subject: ${headline}.` : "",
+      `Style: ${style}. Landscape composition with a clean, uncluttered lower third reserved for text.`,
+      `Absolutely no text, no letters, no words, no numbers, no calligraphy, no logos and no watermarks anywhere in the image. Culturally appropriate for the UAE.`,
     ].filter(Boolean).join(" ");
-    const image = await generateImage({ prompt });
-    if (image.ok) return Response.json({ image: image.dataUrl, source: "openai" });
-    return Response.json({ image: composeFallbackVisual(headline || brief), source: "offline", reason: image.reason });
+    const cacheKey = hashKey(`${prompt}|${JSON.stringify(overlay)}`);
+    const cached = await readVisualCache(cacheKey);
+    if (cached) return Response.json({ image: cached, source: "cache" });
+    const image = await generateImage({ prompt, quality: "medium" });
+    const composed = composeCivicVisual(image.ok ? image.dataUrl : null, overlay);
+    // Only persist a real generated background; never cache the offline template
+    // so a transient outage does not freeze the branded fallback in place.
+    if (image.ok) await writeVisualCache(cacheKey, composed);
+    return Response.json({ image: composed, source: image.ok ? "openai" : "offline", reason: image.ok ? undefined : image.reason });
   }
 
   if (endpoint === "reviewVisual") {
@@ -857,21 +875,81 @@ function fallbackCreative(brief: string, ratios: string[]) {
   };
 }
 
-// Branded civic template used when the image model is slow or unavailable,
-// so the creative studio always shows a usable visual (same offline-fallback
-// pattern as the rest of the platform). Returned as an SVG data URI.
-function composeFallbackVisual(text: string) {
-  const clean = (text || "Abu Dhabi civic campaign").replace(/[<>&]/g, "").slice(0, 60);
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' font-family='Georgia, serif'>
-    <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0d1f19'/><stop offset='1' stop-color='#1f4a3d'/></linearGradient></defs>
-    <rect width='1536' height='1024' fill='url(#g)'/>
-    <rect x='60' y='60' width='1416' height='904' fill='none' stroke='#a9d3cb' stroke-opacity='0.4' stroke-width='3' rx='18'/>
-    <text x='768' y='300' fill='#a9d3cb' font-size='34' letter-spacing='6' text-anchor='middle'>ABU DHABI MEDIA OFFICE</text>
-    <text x='768' y='520' fill='#ffffff' font-size='84' font-weight='700' text-anchor='middle'>${clean}</text>
-    <text x='768' y='640' fill='#ffffff' font-size='60' font-weight='700' text-anchor='middle' direction='rtl'>حملة أبوظبي</text>
-    <text x='768' y='900' fill='#a9d3cb' font-size='26' letter-spacing='3' text-anchor='middle'>MEDIAGPT CIVIC STUDIO · TEMPLATE FALLBACK</text>
+function escapeXml(value: string) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Compose a print-correct DOOH visual: an optional AI-generated background (with
+// no baked text) plus the exact bilingual wording burned on by the platform, so
+// the Arabic is always right regardless of what the image model draws. Returned
+// as an SVG data URI. When no background is supplied, a branded civic gradient
+// stands in (the same offline-fallback pattern used across the platform).
+function composeCivicVisual(
+  background: string | null,
+  overlay: { kicker?: string; en: string; ar: string; sub?: string; subAr?: string },
+) {
+  const kicker = escapeXml(overlay.kicker || "ABU DHABI MEDIA OFFICE").slice(0, 60);
+  const en = escapeXml(overlay.en || "Abu Dhabi civic campaign").slice(0, 60);
+  const ar = escapeXml(overlay.ar || "حملة أبوظبي").slice(0, 60);
+  const sub = escapeXml(overlay.sub || "").slice(0, 40);
+  const subAr = escapeXml(overlay.subAr || "").slice(0, 40);
+  const bg = background
+    ? `<image href="${background}" xlink:href="${background}" x="0" y="0" width="1536" height="1024" preserveAspectRatio="xMidYMid slice"/>`
+    : `<rect width="1536" height="1024" fill="url(#bg)"/>`;
+  const dateLine = sub || subAr
+    ? `<text x='768' y='930' fill='#dff3ee' font-size='40' letter-spacing='2' text-anchor='middle'>${[sub, subAr].filter(Boolean).join("   ·   ")}</text>`
+    : "";
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' viewBox='0 0 1536 1024' font-family='Segoe UI, Tahoma, Arial, sans-serif'>
+    <defs>
+      <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0d1f19'/><stop offset='1' stop-color='#1f4a3d'/></linearGradient>
+      <linearGradient id='scrim' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#04100b' stop-opacity='0'/><stop offset='1' stop-color='#04100b' stop-opacity='0.92'/></linearGradient>
+    </defs>
+    ${bg}
+    <rect x='0' y='470' width='1536' height='554' fill='url(#scrim)'/>
+    <g transform='translate(1360,96)'>
+      <rect x='0' y='0' width='120' height='24' fill='#00843d'/>
+      <rect x='0' y='24' width='120' height='24' fill='#ffffff'/>
+      <rect x='0' y='48' width='120' height='24' fill='#000000'/>
+      <rect x='0' y='0' width='34' height='72' fill='#ce1126'/>
+    </g>
+    <text x='96' y='150' fill='#ffffff' font-size='30' letter-spacing='7' opacity='0.92'>${kicker}</text>
+    <text x='768' y='700' fill='#ffffff' font-size='82' font-weight='700' text-anchor='middle' direction='rtl'>${ar}</text>
+    <text x='768' y='808' fill='#ffffff' font-size='58' font-weight='600' text-anchor='middle' letter-spacing='1'>${en}</text>
+    ${dateLine}
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// Stable, non-crypto cache key (djb2) so we can memoise composed visuals on disk
+// without pulling in a crypto import at module scope.
+function hashKey(input: string) {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i += 1) hash = (((hash << 5) + hash) + input.charCodeAt(i)) | 0;
+  return `v${(hash >>> 0).toString(16)}`;
+}
+
+async function readVisualCache(hash: string): Promise<string | null> {
+  try {
+    if (typeof process === "undefined" || !process.versions?.node) return null;
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    return await readFile(join(process.cwd(), ".dooh-data", "visual-cache", `${hash}.txt`), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function writeVisualCache(hash: string, dataUri: string) {
+  try {
+    if (typeof process === "undefined" || !process.versions?.node) return;
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const dir = join(process.cwd(), ".dooh-data", "visual-cache");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `${hash}.txt`), dataUri, "utf8");
+  } catch {
+    // Persistence is best-effort; a miss just regenerates next time.
+  }
 }
 
 function fallbackVisualReview() {

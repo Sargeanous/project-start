@@ -138,9 +138,10 @@ export async function moderateInput(text: string, feature = "moderation"): Promi
 export async function generateImage({
   prompt,
   size = "1536x1024",
-  timeoutMs = 60000,
+  quality = "medium",
+  timeoutMs = 90000,
   feature = "generateVisual",
-}: { prompt: string; size?: string; timeoutMs?: number; feature?: string }):
+}: { prompt: string; size?: string; quality?: string; timeoutMs?: number; feature?: string }):
   Promise<{ ok: true; dataUrl: string; model: string; source: "openai" } | { ok: false; source: "offline"; reason: string }> {
   const started = Date.now();
   const key = process.env.OPENAI_API_KEY?.trim();
@@ -150,7 +151,7 @@ export async function generateImage({
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, size, n: 1 }),
+      body: JSON.stringify({ model, prompt, size, quality, n: 1 }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {

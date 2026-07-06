@@ -3869,30 +3869,54 @@ function ControlCentre({
 // ADMO creative-officer studio: generate a civic visual + bilingual copy
 // from a brief, or upload a visual and get an AI creative review. Either
 // path sends a governed high-impact submission into the CMS pipeline.
+const CREATIVE_GEN_STAGES = [
+  "Reading the national brand book",
+  "Selecting the UAE flag palette",
+  "Composing a landscape layout",
+  "Reserving the lower third for wording",
+  "Rendering the visual",
+];
+
 function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative: (payload: BriefPayload) => Promise<Submission | null>; aiAvailable: boolean; t: (value: string) => string }) {
   const [mode, setMode] = useState<"generate" | "review">("generate");
   const [campaign, setCampaign] = useState("National Day tribute");
   const [brief, setBrief] = useState("UAE National Day, 2 December. Unity, pride and gratitude. Official and warm, bilingual.");
-  const [headlineEn, setHeadlineEn] = useState("");
-  const [headlineAr, setHeadlineAr] = useState("");
+  // The exact wording burned onto the visual. Kept as an editable field, and
+  // composited server-side, so the Arabic is always right by construction and
+  // never left to the image model to render.
+  const [titleAr, setTitleAr] = useState("اليوم الوطني لدولة الإمارات");
+  const [titleEn, setTitleEn] = useState("UAE National Day");
+  const [dateEn, setDateEn] = useState("2 December");
+  const [dateAr, setDateAr] = useState("٢ ديسمبر");
   const [visual, setVisual] = useState("");
   const [visualSource, setVisualSource] = useState("");
   const [busy, setBusy] = useState("");
+  const [stageIndex, setStageIndex] = useState(0);
   const [review, setReview] = useState<VisualReview | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   async function generate() {
-    setBusy("generate"); setSent(null);
-    // Resolve copy and image independently so the bilingual copy appears in
-    // seconds while the image model finishes, instead of waiting for both.
-    const copyP = aiGenerateCreativeCopy({ brief: `${campaign}. ${brief}`, tone: "official, civic, warm", ratios: ["landscape"] })
-      .then((copy) => { const c = copy.concepts?.[0]; if (c) { setHeadlineEn(c.headline_en); setHeadlineAr(c.headline_ar); } })
-      .catch(() => {});
-    const imageP = aiGenerateVisual({ brief: `${campaign}. ${brief}`, headline: campaign })
-      .then((image) => { if (image?.image) { setVisual(image.image); setVisualSource(image.source ?? ""); } })
-      .catch(() => {});
-    try { await Promise.allSettled([copyP, imageP]); } finally { setBusy(""); }
+    setBusy("generate"); setSent(null); setVisual(""); setStageIndex(0);
+    // Walk the "thinking" stages on a timer so the officer always sees progress,
+    // whether the background comes back instantly (cached) or after the model
+    // renders. Reveal is held to a short minimum so it never flashes.
+    const start = performance.now();
+    const timer = window.setInterval(() => setStageIndex((value) => Math.min(CREATIVE_GEN_STAGES.length - 1, value + 1)), 2600);
+    try {
+      const image = await aiGenerateVisual({
+        brief: `${campaign}. ${brief}`,
+        headline: campaign,
+        overlay: { kicker: "ABU DHABI MEDIA OFFICE", en: titleEn, ar: titleAr, sub: dateEn, subAr: dateAr },
+      }).catch(() => null);
+      const elapsed = performance.now() - start;
+      if (elapsed < 9000) await new Promise((resolve) => setTimeout(resolve, 9000 - elapsed));
+      if (image?.image) { setVisual(image.image); setVisualSource(image.source ?? ""); }
+    } finally {
+      window.clearInterval(timer);
+      setStageIndex(CREATIVE_GEN_STAGES.length - 1);
+      setBusy("");
+    }
   }
 
   function onFile(files: FileList | null) {
@@ -3923,7 +3947,7 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
         startDate: "Dec 02, 2026",
         endDate: "Dec 03, 2026",
         priority: "High",
-        objective: headlineEn ? `${headlineEn} | ${headlineAr}` : brief,
+        objective: `${titleEn} | ${titleAr}`,
         contactName: "ADMO Creative Officer",
         contactEmail: "creative@admo.gov.ae",
         brand: "Abu Dhabi Media Office",
@@ -3949,9 +3973,17 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
       <div className="studio-grid">
         <div className="studio-controls">
           <label><span>{t("Campaign name")}</span><input value={campaign} onChange={(event) => setCampaign(event.target.value)} /></label>
-          <label><span>{t("Creative brief")}</span><textarea value={brief} onChange={(event) => setBrief(event.target.value)} rows={4} /></label>
+          <label><span>{t("Creative brief")}</span><textarea value={brief} onChange={(event) => setBrief(event.target.value)} rows={3} /></label>
           {mode === "generate" ? (
-            <Button icon={Sparkles} disabled={!aiAvailable || busy === "generate"} onClick={generate}>{busy === "generate" ? t("Generating") : t("Generate with MediaGPT")}</Button>
+            <>
+              <div className="studio-wording">
+                <label dir="rtl"><span>{t("Headline (Arabic)")}</span><input dir="rtl" value={titleAr} onChange={(event) => setTitleAr(event.target.value)} /></label>
+                <label><span>{t("Headline (English)")}</span><input value={titleEn} onChange={(event) => setTitleEn(event.target.value)} /></label>
+                <label><span>{t("Date line")}</span><input value={`${dateEn} · ${dateAr}`} onChange={(event) => { const [en, ar] = event.target.value.split("·"); setDateEn((en || "").trim()); setDateAr((ar || "").trim()); }} /></label>
+              </div>
+              <small className="cell-note">{t("MediaGPT paints the background and locks this exact wording on top, so the Arabic is always correct.")}</small>
+              <Button icon={Sparkles} disabled={!aiAvailable || busy === "generate"} onClick={generate}>{busy === "generate" ? t("Generating") : t("Generate with MediaGPT")}</Button>
+            </>
           ) : (
             <ActionRow>
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => onFile(event.target.files)} />
@@ -3959,17 +3991,27 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
               <Button icon={Sparkles} disabled={!aiAvailable || !visual || busy === "review"} onClick={runReview}>{busy === "review" ? t("Reviewing") : t("Review with MediaGPT")}</Button>
             </ActionRow>
           )}
-          {headlineEn ? (
-            <div className="studio-copy">
-              <div><span>{t("English")}</span><strong>{headlineEn}</strong></div>
-              <div dir="rtl"><span>{t("Arabic")}</span><strong>{headlineAr}</strong></div>
-            </div>
-          ) : null}
         </div>
 
         <div className="studio-visual">
-          {visual ? <div className="creative-frame large" style={{ backgroundImage: `url("${visual}")` }} /> : <div className="studio-visual-empty"><ImageIcon size={26} /><span>{mode === "generate" ? t("Your generated visual will appear here.") : t("Upload a visual to review it.")}</span></div>}
-          {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template.")}</small> : null}
+          {visual ? (
+            <div className="creative-frame large" style={{ backgroundImage: `url("${visual}")` }} />
+          ) : busy === "generate" ? (
+            <div className="studio-thinking">
+              <div className="studio-thinking-head"><Sparkles size={16} /><strong>{t("MediaGPT is composing")}</strong></div>
+              <ul>
+                {CREATIVE_GEN_STAGES.map((stage, index) => (
+                  <li key={stage} className={index < stageIndex ? "done" : index === stageIndex ? "active" : ""}>
+                    {index < stageIndex ? <CheckCircle2 size={14} /> : <span className="studio-dot" />}
+                    <span>{t(stage)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="studio-visual-empty"><ImageIcon size={26} /><span>{mode === "generate" ? t("Your generated visual will appear here.") : t("Upload a visual to review it.")}</span></div>
+          )}
+          {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template with the correct wording.")}</small> : null}
         </div>
       </div>
 
