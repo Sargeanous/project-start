@@ -592,3 +592,112 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
 
   return <div className="live-map" ref={containerRef} role="application" aria-label={t("Live estate map")} />;
 }
+
+/* ------------------------------------------------------------------ *\
+   Radius targeting map: drop a centre, draw a radius ring, and colour
+   the screens inside it (clear vs rules-flagged). Click sets the centre.
+\* ------------------------------------------------------------------ */
+
+interface RadiusMapAsset { id: string; name: string; status: string; lat: number; lng: number; }
+interface RadiusMapProps {
+  assets: RadiusMapAsset[];
+  center: { lat: number; lng: number };
+  radiusM: number;
+  insideIds: string[];
+  flaggedIds: string[];
+  onPick: (lat: number, lng: number) => void;
+  t: (value: string) => string;
+}
+
+export function RadiusMap({ assets, center, radiusM, insideIds, flaggedIds, onPick, t }: RadiusMapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const circleRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const centerRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersRef = useRef<Record<string, any>>({});
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  const stateRef = useRef({ center, radiusM, insideIds, flaggedIds });
+  stateRef.current = { center, radiusM, insideIds, flaggedIds };
+  const [failed, setFailed] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function dotIcon(L: any, kind: "grey" | "clear" | "flag") {
+    const color = kind === "flag" ? "#c0392b" : kind === "clear" ? "#1f9d57" : "#8a94a6";
+    const size = kind === "grey" ? 13 : 18;
+    return L.divIcon({ className: "radius-dot-icon", html: `<span class="radius-dot ${kind}" style="--d:${color}"></span>`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function paint(L: any) {
+    const map = mapRef.current;
+    if (!map) return;
+    const s = stateRef.current;
+    if (circleRef.current) circleRef.current.setLatLng([s.center.lat, s.center.lng]).setRadius(s.radiusM);
+    else circleRef.current = L.circle([s.center.lat, s.center.lng], { radius: s.radiusM, color: "#1f4a3d", weight: 2, fillColor: "#1f6f52", fillOpacity: 0.12 }).addTo(map);
+    if (centerRef.current) centerRef.current.setLatLng([s.center.lat, s.center.lng]);
+    else centerRef.current = L.marker([s.center.lat, s.center.lng], { icon: L.divIcon({ className: "radius-center-icon", html: `<span class="radius-center"></span>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(map);
+    assets.forEach((a) => {
+      const m = markersRef.current[a.id];
+      if (!m) return;
+      const kind = s.flaggedIds.includes(a.id) ? "flag" : s.insideIds.includes(a.id) ? "clear" : "grey";
+      m.setIcon(dotIcon(L, kind));
+    });
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let map: any = null;
+    const init = () => {
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (window as any).L;
+      if (!L || !containerRef.current) {
+        if (tries++ < 25) setTimeout(init, 150); else setFailed(true);
+        return;
+      }
+      try {
+        map = L.map(containerRef.current, { zoomControl: true, scrollWheelZoom: false }).setView([center.lat, center.lng], 11);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { subdomains: ["a", "b", "c"], maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        map.on("click", (e: any) => pickRef.current(e.latlng.lat, e.latlng.lng));
+        mapRef.current = map;
+        markersRef.current = {};
+        assets.forEach((a) => {
+          const marker = L.marker([a.lat, a.lng], { icon: dotIcon(L, "grey"), title: a.name }).addTo(map);
+          markersRef.current[a.id] = marker;
+        });
+        setTimeout(() => map && map.invalidateSize(), 220);
+        paint(L);
+      } catch {
+        setFailed(true);
+      }
+    };
+    init();
+    return () => {
+      cancelled = true;
+      if (map) map.remove();
+      mapRef.current = null;
+      circleRef.current = null;
+      centerRef.current = null;
+      markersRef.current = {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets]);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    if (L) paint(L);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [center.lat, center.lng, radiusM, insideIds, flaggedIds]);
+
+  if (failed) return <div className="live-map-fallback"><p>{t("Live map tiles are unavailable offline.")}</p></div>;
+  return <div className="radius-map" ref={containerRef} role="application" aria-label={t("Radius targeting map")} />;
+}

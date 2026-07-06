@@ -73,9 +73,9 @@ import {
   type AssetAllocation,
   type MediaAsset,
 } from "./data";
-import { creativeBackground, feedBackground, LiveMap } from "./visuals";
+import { creativeBackground, feedBackground, LiveMap, RadiusMap } from "./visuals";
 import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
-import type { RuleVerdict } from "./rules-engine";
+import { distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
 import {
   demoScenarios,
   doohOntology,
@@ -133,6 +133,7 @@ type Page =
   | "alerts"
   | "network"
   | "mediagpt"
+  | "radiusBroadcast"
   | "knowledge"
   | "rules"
   | "skillsCatalogue"
@@ -495,7 +496,7 @@ const profiles: Profile[] = [
     name: "ADMO Control Room",
     role: "Operations operator",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "alerts", "network", "mediagpt"],
+    pages: ["control", "alerts", "network", "mediagpt", "radiusBroadcast"],
   },
   {
     id: "reviewer",
@@ -516,7 +517,7 @@ const profiles: Profile[] = [
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
@@ -543,6 +544,7 @@ const navItems: Record<Page, NavItem> = {
   allocations: { id: "allocations", label: "Commercial Map", icon: MapPinned },
   reports: { id: "reports", label: "Reports & BI", icon: BarChart3 },
   mediagpt: { id: "mediagpt", label: "MediaGPT", icon: Bot },
+  radiusBroadcast: { id: "radiusBroadcast", label: "Radius Broadcast", icon: Target },
   knowledge: { id: "knowledge", label: "Knowledge", icon: Database },
   rules: { id: "rules", label: "Rules", icon: ShieldCheck },
   skillsCatalogue: { id: "skillsCatalogue", label: "Skills Catalogue", icon: Sparkles },
@@ -567,6 +569,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "allocations", label: "Commercial Map", helper: "Asset allocations, availability, and commercial KPIs" },
   { key: "reports", label: "Reports & BI", helper: "Executive dashboards, exports, and regulatory reports" },
   { key: "mediagpt", label: "MediaGPT", helper: "Agent outputs and approved AI actions" },
+  { key: "radiusBroadcast", label: "Radius Broadcast", helper: "Radius targeting and bulk broadcast approvals" },
   { key: "knowledge", label: "Knowledge", helper: "Source ingestion and knowledge-base changes" },
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
   { key: "campaigns", label: "Campaigns", helper: "Bidder campaign status and ADMO messages" },
@@ -588,7 +591,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 
 const navGroups: NavGroup[] = [
   { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports"] },
-  { label: "Intelligence / Agentic", pages: ["mediagpt", "knowledge"] },
+  { label: "Intelligence / Agentic", pages: ["mediagpt", "radiusBroadcast", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
   { label: "Infrastructure", pages: ["integrations", "accessRoles", "auditLog", "edgeCompute"] },
@@ -3092,6 +3095,7 @@ function App() {
             />
           )}
           {page === "mediagpt" && <MediaGptSuite aiAvailable={aiAvailable} t={t} />}
+          {page === "radiusBroadcast" && <RadiusBroadcastPage profile={profile} aiAvailable={aiAvailable} notify={notify} t={t} />}
           {page === "knowledge" && <KnowledgeBasePage t={t} />}
           {page === "rules" && <RulesPage enforcementEvents={enforcementEvents} t={t} />}
           {page === "skillsCatalogue" && <SkillsCataloguePage t={t} />}
@@ -6559,6 +6563,205 @@ function RulesEnforcementPanel({ enforcementEvents, t }: { enforcementEvents: En
         </Panel>
       ) : null}
     </div>
+  );
+}
+
+const RADIUS_PRESETS = [
+  { label: "Corniche, Abu Dhabi", lat: 24.4664, lng: 54.3170 },
+  { label: "Downtown Abu Dhabi", lat: 24.485, lng: 54.360 },
+  { label: "Yas Island", lat: 24.4887, lng: 54.6030 },
+  { label: "Al Ain", lat: 24.2244, lng: 55.7628 },
+];
+
+type RadiusScreen = { id: string; name: string; zone: string; distanceM: number; status: "clear" | "flagged"; flagLabel?: string; flagDetail?: string };
+type QueuedBroadcast = { id: string; campaign: string; clearCount: number; flaggedCount: number; status: string; approvedBy?: string };
+
+function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Profile | null; aiAvailable: boolean; notify: (message: string) => void; t: (value: string) => string }) {
+  const [center, setCenter] = useState({ lat: 24.485, lng: 54.360 });
+  const [centerLabel, setCenterLabel] = useState("Downtown Abu Dhabi");
+  const [radiusKm, setRadiusKm] = useState(3.5);
+  const [campaign, setCampaign] = useState("Strong wind safety notice");
+  const [brief, setBrief] = useState("Reduce speed, strong winds this evening. Calm, official tone.");
+  const [messageEn, setMessageEn] = useState("");
+  const [messageAr, setMessageAr] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [pending, setPending] = useState<QueuedBroadcast | null>(null);
+  const [approved, setApproved] = useState<QueuedBroadcast | null>(null);
+  const [approver, setApprover] = useState("");
+  const radiusM = Math.round(radiusKm * 1000);
+
+  const screens = useMemo<RadiusScreen[]>(() => {
+    return estateAssets
+      .map((a) => ({ a, d: distanceM(center, { lat: a.lat, lng: a.lng }) }))
+      .filter((row) => row.d <= radiusM)
+      .sort((x, y) => x.d - y.d)
+      .map(({ a, d }) => {
+        const verdict = evaluateRules({ kind: "scheduling", assetIds: [a.id] });
+        const flag = verdict.hits[0] ?? verdict.warnings[0];
+        return { id: a.id, name: a.name, zone: a.zone, distanceM: d, status: flag ? "flagged" : "clear", flagLabel: flag?.label, flagDetail: flag?.detail };
+      });
+  }, [center.lat, center.lng, radiusM]);
+
+  const insideIds = screens.map((s) => s.id);
+  const flaggedIds = screens.filter((s) => s.status === "flagged").map((s) => s.id);
+  const clearCount = screens.length - flaggedIds.length;
+  const approverOptions = namedApprovers.filter((a) => a.name !== (profile?.name ?? ""));
+
+  function resetQueue() { setPending(null); setApproved(null); }
+  function pickPreset(preset: (typeof RADIUS_PRESETS)[number]) {
+    setCenter({ lat: preset.lat, lng: preset.lng });
+    setCenterLabel(preset.label);
+    resetQueue();
+  }
+  function onPick(lat: number, lng: number) {
+    setCenter({ lat, lng });
+    setCenterLabel(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    resetQueue();
+  }
+
+  async function generate() {
+    setGenerating(true);
+    try {
+      const copy = await aiGenerateCreativeCopy({ brief: `${campaign}. ${brief}`, tone: "official, calm, roadside", ratios: ["landscape"] });
+      const concept = copy.concepts?.[0];
+      if (concept) { setMessageEn(concept.headline_en); setMessageAr(concept.headline_ar); }
+      else notify(t("MediaGPT could not generate copy right now."));
+    } catch {
+      notify(t("MediaGPT could not generate copy right now."));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function queue() {
+    const res = await fetch("/api/dooh/mediagpt/radius/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ center, centerLabel, radiusM, campaign, messageEn, messageAr, actor: profile?.name ?? "Operator", role: profile?.id ?? "control-room" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.broadcast) { setPending(data.broadcast); notify(t("Radius broadcast queued for approval")); }
+    else notify(data.error ?? t("Could not queue the broadcast"));
+  }
+
+  async function approve() {
+    if (!pending || !approver) return;
+    const res = await fetch(`/api/dooh/mediagpt/radius/${pending.id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actor: approver, role: "admin" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.broadcast) { setApproved(data.broadcast); setPending(null); notify(t("Broadcast approved and queued")); }
+    else notify(data.error ?? t("Could not approve the broadcast"));
+  }
+
+  return (
+    <PageBody>
+      <MetricGrid>
+        <Metric label={t("Screens in range")} value={String(screens.length)} helper={`${(radiusKm).toFixed(1)} km of ${t(centerLabel)}`} tone="info" />
+        <Metric label={t("Clear to run")} value={String(clearCount)} helper="Pass all rules" tone="good" />
+        <Metric label={t("Flagged by rules")} value={String(flaggedIds.length)} helper="Held for review" tone={flaggedIds.length ? "warn" : "good"} />
+        <Metric label={t("Radius")} value={`${radiusKm.toFixed(1)} km`} helper="Adjustable" tone="neutral" />
+      </MetricGrid>
+
+      <Panel icon={Target} title={t("Radius broadcast")} action={<StatusPill label={t("AI proposes, humans approve")} tone="info" />}>
+        <RadiusMap assets={estateAssets} center={center} radiusM={radiusM} insideIds={insideIds} flaggedIds={flaggedIds} onPick={onPick} t={t} />
+        <div className="radius-presets">
+          <span className="radius-presets-label">{t("Centre on")}:</span>
+          {RADIUS_PRESETS.map((preset) => (
+            <button key={preset.label} type="button" className={centerLabel === preset.label ? "active" : ""} onClick={() => pickPreset(preset)}>{t(preset.label)}</button>
+          ))}
+          <label className="radius-slider">
+            {t("Radius")}: <strong>{radiusKm.toFixed(1)} km</strong>
+            <input type="range" min={1} max={8} step={0.5} value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); resetQueue(); }} />
+          </label>
+        </div>
+
+        <div className="linked-detail">
+          <div className="linked-detail-head">
+            <span className="panel-icon"><Sparkles size={18} /></span>
+            <strong>{t("Compose the message")}</strong>
+          </div>
+          <div className="radius-compose">
+            <label><span>{t("Campaign name")}</span><input value={campaign} onChange={(event) => { setCampaign(event.target.value); resetQueue(); }} /></label>
+            <label><span>{t("Brief")}</span><input value={brief} onChange={(event) => setBrief(event.target.value)} /></label>
+            <ActionRow>
+              <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || generating} onClick={generate}>{generating ? t("Generating") : t("Generate with MediaGPT")}</Button>
+            </ActionRow>
+            {messageEn ? (
+              <div className="radius-message">
+                <div><span>{t("English")}</span><strong>{messageEn}</strong></div>
+                <div dir="rtl"><span>{t("Arabic")}</span><strong>{messageAr}</strong></div>
+              </div>
+            ) : <p className="cell-note">{t("Generate a bilingual message, or type one, then queue it across the screens in range.")}</p>}
+          </div>
+        </div>
+
+        <div className="linked-detail">
+          <div className="linked-detail-head">
+            <span className="panel-icon"><ShieldCheck size={18} /></span>
+            <strong>{t("Screens in range")} ({screens.length})</strong>
+            <span className="head-meta">{clearCount} {t("clear")} · {flaggedIds.length} {t("flagged")}</span>
+          </div>
+          <div className="radius-screens">
+            {screens.map((screen) => (
+              <div key={screen.id} className={`radius-screen ${screen.status}`}>
+                <span className="radius-screen-dot" />
+                <span className="radius-screen-main">
+                  <strong>{screen.id} · {t(screen.name)}</strong>
+                  <small>{t(screen.zone)} · {(screen.distanceM / 1000).toFixed(1)} km{screen.flagDetail ? ` · ${t(screen.flagDetail)}` : ""}</small>
+                </span>
+                <StatusPill label={screen.status === "flagged" ? (screen.flagLabel ?? "Flagged") : "Clear"} tone={screen.status === "flagged" ? "warn" : "good"} />
+              </div>
+            ))}
+            {!screens.length ? <p className="cell-note">{t("No screens fall inside this area. Widen the radius or move the centre.")}</p> : null}
+          </div>
+        </div>
+
+        <div className="linked-detail">
+          <div className="linked-detail-head">
+            <span className="panel-icon"><Send size={18} /></span>
+            <strong>{t("Queue and approve")}</strong>
+          </div>
+          {approved ? (
+            <div className="radius-result good">
+              <ShieldCheck size={16} />
+              <div>
+                <strong>{t("Approved and queued")}</strong>
+                <small>{approved.campaign}: {approved.clearCount} {t("screens queued")}, {approved.flaggedCount} {t("held for review")}. {t("Approved by")} {t(approved.approvedBy ?? "")}.</small>
+              </div>
+            </div>
+          ) : pending ? (
+            <div className="radius-approve">
+              <div className="radius-result warn">
+                <AlertTriangle size={16} />
+                <div>
+                  <strong>{t("Pending approval")}</strong>
+                  <small>{pending.campaign}: {pending.clearCount} {t("clear screens")}, {pending.flaggedCount} {t("flagged")}. {t("One approval queues them all.")}</small>
+                </div>
+              </div>
+              <div className="approvals-action">
+                <label>{t("Approving as")}
+                  <select value={approver} onChange={(event) => setApprover(event.target.value)}>
+                    <option value="">{t("Select a named approver")}</option>
+                    {approverOptions.map((a) => <option key={a.name} value={a.name}>{a.name} ({t(a.role)})</option>)}
+                  </select>
+                </label>
+                <Button icon={ShieldCheck} disabled={!approver} onClick={approve}>{t("Approve and queue")}</Button>
+              </div>
+              <p className="approvals-sod">{t("Segregation of duties: the operator who proposed the broadcast cannot approve it.")}</p>
+            </div>
+          ) : (
+            <ActionRow>
+              <Button icon={Send} disabled={!messageEn.trim() || !clearCount} onClick={queue}>
+                {t("Queue")} {clearCount} {t("clear screens for approval")}
+              </Button>
+            </ActionRow>
+          )}
+        </div>
+      </Panel>
+    </PageBody>
   );
 }
 
