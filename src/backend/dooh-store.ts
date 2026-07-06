@@ -50,6 +50,7 @@ export interface Submission {
   priority: Priority;
   stage: SubmissionStage;
   creativeId: string;
+  creativeUrl?: string;
   language: string;
   notes: string;
   version: number;
@@ -366,6 +367,7 @@ export interface BriefPayload {
   packageName: string;
   budget: string;
   creativeId: string;
+  creativeUrl?: string;
   languages: string;
   startDate: string;
   endDate: string;
@@ -1013,6 +1015,7 @@ export async function createSubmission(payload: BriefPayload, actor: string): Pr
       priority: payload.priority === "High" ? "High" : "Medium",
       stage: "Submitted",
       creativeId: payload.creativeId,
+      creativeUrl: payload.creativeUrl,
       language: payload.languages,
       notes: payload.objective || "Submitted from the bidder workspace and waiting for ADMO CMS review.",
       version: 1,

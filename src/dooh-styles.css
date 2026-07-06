@@ -7395,6 +7395,23 @@ html[dir="rtl"] .network-tabs button.active {
 .radius-result strong { display: block; font-size: 13.5px; }
 .radius-result small { font-size: 12px; opacity: 0.9; }
 
+/* Creative studio */
+.studio-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; margin-top: 14px; }
+.studio-controls { display: grid; gap: 12px; align-content: start; }
+.studio-controls label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+.studio-controls input, .studio-controls textarea { padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 9px; font: inherit; font-size: 13px; }
+.studio-copy { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.studio-copy > div { background: var(--surface-2, #f5f7f6); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; }
+.studio-copy span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.studio-copy strong { font-size: 14px; }
+.studio-visual { display: grid; gap: 6px; align-content: start; }
+.studio-visual .creative-frame.large { width: 100%; aspect-ratio: 3 / 2; border-radius: 12px; background-size: cover; background-position: center; border: 1px solid var(--line); }
+.studio-visual-empty { width: 100%; aspect-ratio: 3 / 2; border: 1px dashed var(--line-strong); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.studio-recos { background: var(--surface-2, #f5f7f6); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.studio-recos strong { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary-dark, #14472b); }
+.studio-recos ul { margin: 8px 0 0; padding-inline-start: 16px; display: grid; gap: 5px; font-size: 12.5px; }
+@media (max-width: 900px) { .studio-grid { grid-template-columns: 1fr; } }
+
 /* Yield advisor */
 .yield-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .yield-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }

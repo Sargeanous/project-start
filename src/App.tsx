@@ -105,6 +105,8 @@ import {
   explainYield as aiExplainYield,
   generateBroadcast as aiGenerateBroadcast,
   generateCreativeCopy as aiGenerateCreativeCopy,
+  generateVisual as aiGenerateVisual,
+  reviewVisual as aiReviewVisual,
   listAgentActions as aiListAgentActions,
   opsDigest as aiOpsDigest,
   parseEstateQuery as aiParseEstateQuery,
@@ -114,6 +116,7 @@ import {
   tagSubmission as aiTagSubmission,
   triageSubmission as aiTriageSubmission,
   type CreativeCopy,
+  type VisualReview,
   type ChatAnswer,
   type EstateFilter,
   type AgentToolTrace,
@@ -156,7 +159,7 @@ type Lang = "en" | "ar";
 type Tone = "neutral" | "good" | "warn" | "danger" | "info";
 type NotificationPreferenceKey = Page | "critical";
 type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
-type CmsTab = "submissions" | "library" | "scheduling";
+type CmsTab = "submissions" | "create" | "library" | "scheduling";
 type NetworkTab = "assetOperations" | "maintenanceWorkbench" | "supplyChain";
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Approved" | "Broadcast queued" | "Broadcasting" | "Live on network";
@@ -230,6 +233,7 @@ interface Submission {
   priority: "Low" | "Medium" | "High";
   stage: SubmissionStage;
   creativeId: string;
+  creativeUrl?: string;
   language: string;
   notes: string;
   version: number;
@@ -2801,6 +2805,16 @@ function App() {
     if (profile?.pages.includes("campaigns")) setPage("campaigns");
   }
 
+  async function submitCivicCreative(payload: BriefPayload) {
+    const result = await syncMutation<{ state: DoohStatePayload; submission: Submission }>("submissions", {
+      actor: profile?.name ?? "ADMO Creative Officer",
+      payload,
+    });
+    if (!result) return null;
+    notify(t("Creative sent to CMS review"));
+    return result.submission;
+  }
+
   async function submitMarketplaceCampaign(payload: { campaign: string; packageName: string; budget: string; creativeId: string }) {
     await submitBrief({
       campaign: payload.campaign,
@@ -3068,6 +3082,7 @@ function App() {
               onRequestChanges={requestBidderChanges}
               onApprove={approveSubmissionAction}
               onPlaySchedule={playSchedule}
+              onCreateCreative={submitCivicCreative}
               aiAvailable={aiAvailable}
               t={t}
             />
@@ -3850,6 +3865,148 @@ function ControlCentre({
   );
 }
 
+// ADMO creative-officer studio: generate a civic visual + bilingual copy
+// from a brief, or upload a visual and get an AI creative review. Either
+// path sends a governed high-impact submission into the CMS pipeline.
+function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative: (payload: BriefPayload) => Promise<Submission | null>; aiAvailable: boolean; t: (value: string) => string }) {
+  const [mode, setMode] = useState<"generate" | "review">("generate");
+  const [campaign, setCampaign] = useState("National Day tribute");
+  const [brief, setBrief] = useState("UAE National Day, 2 December. Unity, pride and gratitude. Official and warm, bilingual.");
+  const [headlineEn, setHeadlineEn] = useState("");
+  const [headlineAr, setHeadlineAr] = useState("");
+  const [visual, setVisual] = useState("");
+  const [visualSource, setVisualSource] = useState("");
+  const [busy, setBusy] = useState("");
+  const [review, setReview] = useState<VisualReview | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  async function generate() {
+    setBusy("generate"); setSent(null);
+    try {
+      const [copy, image] = await Promise.all([
+        aiGenerateCreativeCopy({ brief: `${campaign}. ${brief}`, tone: "official, civic, warm", ratios: ["landscape"] }),
+        aiGenerateVisual({ brief: `${campaign}. ${brief}`, headline: campaign }),
+      ]);
+      const concept = copy.concepts?.[0];
+      if (concept) { setHeadlineEn(concept.headline_en); setHeadlineAr(concept.headline_ar); }
+      if (image?.image) { setVisual(image.image); setVisualSource(image.source ?? ""); }
+    } finally { setBusy(""); }
+  }
+
+  function onFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { setVisual(String(reader.result)); setVisualSource("upload"); setReview(null); setSent(null); };
+    reader.readAsDataURL(file);
+  }
+
+  async function runReview() {
+    if (!visual) return;
+    setBusy("review");
+    try { setReview(await aiReviewVisual({ image: visual, brief: `${campaign}. ${brief}` })); }
+    finally { setBusy(""); }
+  }
+
+  async function sendToCms() {
+    setBusy("send");
+    try {
+      const submission = await onCreateCreative({
+        campaign: campaign.trim() || "Civic creative",
+        packageName: "Full estate civic takeover",
+        budget: "Non-billed",
+        creativeId: "civic-studio",
+        creativeUrl: visual || undefined,
+        languages: "Arabic and English",
+        startDate: "Dec 02, 2026",
+        endDate: "Dec 03, 2026",
+        priority: "High",
+        objective: headlineEn ? `${headlineEn} | ${headlineAr}` : brief,
+        contactName: "ADMO Creative Officer",
+        contactEmail: "creative@admo.gov.ae",
+        brand: "Abu Dhabi Media Office",
+        vertical: "Civic",
+        audience: "Residents and visitors",
+        targetZones: ["Abu Dhabi City"],
+        daypart: "Evening peak",
+        reach: "Estate-wide",
+        compliance: { uaeMedia: true, arabicProof: true, rightsCleared: true, noPolitical: true },
+        assets: [],
+      });
+      if (submission) setSent(submission.id);
+    } finally { setBusy(""); }
+  }
+
+  return (
+    <Panel icon={PenTool} title={t("Creative studio")} action={<StatusPill label={t("ADMO civic creative")} tone="info" />}>
+      <Segmented value={mode} onChange={(m) => { setMode(m); setReview(null); setSent(null); }} items={[
+        { id: "generate", label: t("Generate a visual") },
+        { id: "review", label: t("Review my visual") },
+      ]} />
+
+      <div className="studio-grid">
+        <div className="studio-controls">
+          <label><span>{t("Campaign name")}</span><input value={campaign} onChange={(event) => setCampaign(event.target.value)} /></label>
+          <label><span>{t("Creative brief")}</span><textarea value={brief} onChange={(event) => setBrief(event.target.value)} rows={4} /></label>
+          {mode === "generate" ? (
+            <Button icon={Sparkles} disabled={!aiAvailable || busy === "generate"} onClick={generate}>{busy === "generate" ? t("Generating") : t("Generate with MediaGPT")}</Button>
+          ) : (
+            <ActionRow>
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => onFile(event.target.files)} />
+              <Button icon={Upload} variant="secondary" onClick={() => fileRef.current?.click()}>{t("Upload a visual")}</Button>
+              <Button icon={Sparkles} disabled={!aiAvailable || !visual || busy === "review"} onClick={runReview}>{busy === "review" ? t("Reviewing") : t("Review with MediaGPT")}</Button>
+            </ActionRow>
+          )}
+          {headlineEn ? (
+            <div className="studio-copy">
+              <div><span>{t("English")}</span><strong>{headlineEn}</strong></div>
+              <div dir="rtl"><span>{t("Arabic")}</span><strong>{headlineAr}</strong></div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="studio-visual">
+          {visual ? <div className="creative-frame large" style={{ backgroundImage: `url("${visual}")` }} /> : <div className="studio-visual-empty"><ImageIcon size={26} /><span>{mode === "generate" ? t("Your generated visual will appear here.") : t("Upload a visual to review it.")}</span></div>}
+          {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template.")}</small> : null}
+        </div>
+      </div>
+
+      {review ? (
+        <div className="linked-detail">
+          <div className="linked-detail-head">
+            <span className="panel-icon"><Sparkles size={18} /></span>
+            <strong>{t("MediaGPT creative review")}</strong>
+            <StatusPill label={review.verdict === "clear" ? t("Clear") : t("Recommendations")} tone={review.verdict === "clear" ? "good" : "warn"} />
+          </div>
+          <div className="deepscan-grid">
+            <div className="deepscan-scores">
+              {review.scores.map((score) => (
+                <div key={score.label} className="deepscan-bar">
+                  <div className="deepscan-bar-head"><span>{t(score.label)}</span><strong>{score.value}%</strong></div>
+                  <div className="deepscan-track"><div className={`deepscan-fill tone-${score.tone === "danger" ? "danger" : score.tone === "warn" ? "warn" : "good"}`} style={{ width: `${score.value}%` }} /></div>
+                </div>
+              ))}
+            </div>
+            <div className="studio-recos">
+              <strong>{t("Recommendations")}</strong>
+              <ul>{review.recommendations.map((r) => <li key={r}>{t(r)}</li>)}</ul>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {sent ? (
+        <div className="radius-result good"><ShieldCheck size={16} /><div><strong>{t("Sent to CMS review")}</strong><small>{sent}: {t("routed to governed approval as a high-impact civic creative.")}</small></div></div>
+      ) : (
+        <ActionRow>
+          <Button icon={Send} disabled={!visual || busy === "send"} onClick={sendToCms}>{busy === "send" ? t("Sending") : t("Send to CMS review")}</Button>
+        </ActionRow>
+      )}
+    </Panel>
+  );
+}
+
 function CmsPage({
   submissions,
   schedule,
@@ -3859,6 +4016,7 @@ function CmsPage({
   onRequestChanges,
   onApprove,
   onPlaySchedule,
+  onCreateCreative,
   aiAvailable,
   t,
 }: {
@@ -3870,6 +4028,7 @@ function CmsPage({
   onRequestChanges: (id: string, message: string) => void;
   onApprove: (id: string, approverName: string, reason: string, mfaCode: string) => void;
   onPlaySchedule: (id: string) => void;
+  onCreateCreative: (payload: BriefPayload) => Promise<Submission | null>;
   aiAvailable: boolean;
   t: (value: string) => string;
 }) {
@@ -3891,9 +4050,12 @@ function CmsPage({
 
       <Segmented value={tab} onChange={setTab} items={[
         { id: "submissions", label: t("Submissions") },
+        { id: "create", label: t("Create with AI") },
         { id: "library", label: t("Media Library") },
         { id: "scheduling", label: t("Scheduling") },
       ]} />
+
+      {tab === "create" ? <CreativeStudio onCreateCreative={onCreateCreative} aiAvailable={aiAvailable} t={t} /> : null}
 
       {tab === "submissions" && selected ? (
         <Panel icon={FileCheck2} title={t("Submissions")} action={itemCountLabel(submissions.length, t)}>
@@ -4033,7 +4195,7 @@ function SubmissionDetail({
         onStage={(stage) => onStage(submission.id, stage)}
       />
       <div className="submission-hero">
-        <div className="creative-frame large" style={{ backgroundImage: `url("${creativeBackground(submission.creativeId)}")` }} />
+        <div className="creative-frame large" style={{ backgroundImage: `url("${submission.creativeUrl || creativeBackground(submission.creativeId)}")` }} />
         <div className="detail-cards compact">
           <Detail label="Owner" value={submission.owner} />
           <Detail label="Package" value={submission.packageName} />
@@ -9517,6 +9679,7 @@ interface BriefPayload {
   packageName: string;
   budget: string;
   creativeId: string;
+  creativeUrl?: string;
   languages: string;
   startDate: string;
   endDate: string;
