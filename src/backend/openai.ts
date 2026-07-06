@@ -133,6 +133,43 @@ export async function moderateInput(text: string, feature = "moderation"): Promi
   }
 }
 
+// Generative visual (gpt-image-1). Returns a data URL on success, or an
+// offline result so the caller can fall back to a composed template.
+export async function generateImage({
+  prompt,
+  size = "1536x1024",
+  timeoutMs = 60000,
+  feature = "generateVisual",
+}: { prompt: string; size?: string; timeoutMs?: number; feature?: string }):
+  Promise<{ ok: true; dataUrl: string; model: string; source: "openai" } | { ok: false; source: "offline"; reason: string }> {
+  const started = Date.now();
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) return { ok: false, source: "offline", reason: "missing_key" };
+  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, size, n: 1 }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      void appendAgentTrace({ feature, model, latencyMs: Date.now() - started, success: false, reason: `openai_${response.status}`, outcomeSummary: "Image generation failed" });
+      return { ok: false, source: "offline", reason: `openai_${response.status}` };
+    }
+    const payload = await response.json() as { data?: Array<{ b64_json?: string; url?: string }> };
+    const b64 = payload.data?.[0]?.b64_json;
+    const url = payload.data?.[0]?.url;
+    const dataUrl = b64 ? `data:image/png;base64,${b64}` : url;
+    if (!dataUrl) return { ok: false, source: "offline", reason: "no_image" };
+    void appendAgentTrace({ feature, model, latencyMs: Date.now() - started, success: true, outcomeSummary: "Image generated" });
+    return { ok: true, dataUrl, model, source: "openai" };
+  } catch (error) {
+    const reason = error instanceof Error && error.name === "TimeoutError" ? "timeout" : "image_error";
+    return { ok: false, source: "offline", reason };
+  }
+}
+
 export async function callOpenAI({
   system,
   user,

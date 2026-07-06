@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { assets, campaigns, fieldTasks, historicalBids, historicalCampaigns, historicalRuns, proofRecords, tickets } from "../../../data";
-import { callOpenAI, hasOpenAIKey } from "../../../backend/openai";
+import { callOpenAI, generateImage, hasOpenAIKey } from "../../../backend/openai";
 import { delimitUntrusted } from "../../../backend/agent-security";
 import {
   enqueueAgentJob,
@@ -599,6 +599,42 @@ async function handleAiEndpoint(endpoint: string | undefined, request: Request) 
     return jsonData(result, fallbackCreative(brief, ratios));
   }
 
+  if (endpoint === "generateVisual") {
+    const brief = stringValue(body.brief, "Abu Dhabi civic campaign");
+    const headline = stringValue(body.headline, "");
+    const style = stringValue(body.style, "official, modern, high-contrast, suitable for large outdoor LED");
+    const prompt = [
+      `A digital out-of-home billboard creative for the Abu Dhabi Media Office.`,
+      `Campaign brief: ${brief}.`,
+      headline ? `Feature the concept: ${headline}.` : "",
+      `Style: ${style}. Landscape composition, bold focal point, generous safe margins, no text baked into the image (text is added by the CMS layer). Culturally appropriate for the UAE.`,
+    ].filter(Boolean).join(" ");
+    const image = await generateImage({ prompt });
+    if (image.ok) return Response.json({ image: image.dataUrl, source: "openai" });
+    return Response.json({ image: composeFallbackVisual(headline || brief), source: "offline", reason: image.reason });
+  }
+
+  if (endpoint === "reviewVisual") {
+    const image = stringValue(body.image, "");
+    const brief = stringValue(body.brief, "Civic DOOH creative for Abu Dhabi.");
+    if (!image) return Response.json({ ...fallbackVisualReview(), ok: false, source: "offline", reason: "no_image" });
+    const result = await callOpenAI({
+      system: aiSystem("You are ADMO's senior creative reviewer for outdoor DOOH. Judge the supplied image on brand safety, cultural sensitivity for the UAE, Arabic and English legibility at 40 metres, composition and rights risk. Return strict JSON only: {\"verdict\":\"clear|issues\",\"scores\":[{\"label\":\"...\",\"value\":0,\"tone\":\"good|warn|danger\"}],\"findings\":[{\"label\":\"...\",\"ok\":true}],\"recommendations\":[\"...\"]}. Do not use em or en dashes."),
+      user: [
+        `Review this DOOH creative for approval.`,
+        `Brief and intent: ${brief}`,
+        `Score brand safety, cultural sensitivity, Arabic accuracy, legibility at 40m and composition from 0 to 100.`,
+        `Give two to four concrete creative recommendations an officer can act on.`,
+      ].join("\n"),
+      image,
+      json: true,
+      model: "gpt-4o",
+      maxTokens: 700,
+      feature: "reviewVisual",
+    });
+    return jsonData(result, fallbackVisualReview());
+  }
+
   if (endpoint === "summarizeReport") {
     const scope = stringValue(body.scope, "quarterly financial and proof-of-play status");
     const result = await callOpenAI({
@@ -818,6 +854,47 @@ function fallbackCreative(brief: string, ratios: string[]) {
       body_ar: "رسالة موجزة مناسبة لشاشات الطرق والأماكن العامة.",
       ratio,
     })),
+  };
+}
+
+// Branded civic template used when the image model is slow or unavailable,
+// so the creative studio always shows a usable visual (same offline-fallback
+// pattern as the rest of the platform). Returned as an SVG data URI.
+function composeFallbackVisual(text: string) {
+  const clean = (text || "Abu Dhabi civic campaign").replace(/[<>&]/g, "").slice(0, 60);
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' font-family='Georgia, serif'>
+    <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0d1f19'/><stop offset='1' stop-color='#1f4a3d'/></linearGradient></defs>
+    <rect width='1536' height='1024' fill='url(#g)'/>
+    <rect x='60' y='60' width='1416' height='904' fill='none' stroke='#a9d3cb' stroke-opacity='0.4' stroke-width='3' rx='18'/>
+    <text x='768' y='300' fill='#a9d3cb' font-size='34' letter-spacing='6' text-anchor='middle'>ABU DHABI MEDIA OFFICE</text>
+    <text x='768' y='520' fill='#ffffff' font-size='84' font-weight='700' text-anchor='middle'>${clean}</text>
+    <text x='768' y='640' fill='#ffffff' font-size='60' font-weight='700' text-anchor='middle' direction='rtl'>حملة أبوظبي</text>
+    <text x='768' y='900' fill='#a9d3cb' font-size='26' letter-spacing='3' text-anchor='middle'>MEDIAGPT CIVIC STUDIO · TEMPLATE FALLBACK</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function fallbackVisualReview() {
+  return {
+    verdict: "issues",
+    scores: [
+      { label: "Brand safety", value: 94, tone: "good" },
+      { label: "Cultural sensitivity", value: 96, tone: "good" },
+      { label: "Arabic accuracy", value: 82, tone: "warn" },
+      { label: "Legibility at 40m", value: 74, tone: "warn" },
+      { label: "Composition", value: 88, tone: "good" },
+    ],
+    findings: [
+      { label: "No prohibited symbols detected", ok: true },
+      { label: "Arabic and English present", ok: true },
+      { label: "Arabic weight lighter than English headline", ok: false },
+      { label: "Primary message may be small for highway viewing", ok: false },
+    ],
+    recommendations: [
+      "Increase the Arabic headline weight to match the English.",
+      "Enlarge the key message by about 15 percent for highway assets.",
+      "Add more clear space around the logo lockup.",
+    ],
   };
 }
 

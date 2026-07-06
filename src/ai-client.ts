@@ -148,6 +148,21 @@ export function generateCreativeCopy(payload: { brief: string; tone: string; rat
   return aiPost<CreativeCopy>("generateCreativeCopy", payload);
 }
 
+export interface GeneratedVisual { image: string; source?: string }
+export function generateVisual(payload: { brief: string; headline?: string; style?: string }) {
+  return aiPost<GeneratedVisual>("generateVisual", payload);
+}
+
+export interface VisualReview {
+  verdict: string;
+  scores: Array<{ label: string; value: number; tone: string }>;
+  findings: Array<{ label: string; ok: boolean }>;
+  recommendations: string[];
+}
+export function reviewVisual(payload: { image: string; brief?: string }) {
+  return aiPost<VisualReview>("reviewVisual", payload);
+}
+
 export function summarizeReport(payload: { scope: string }) {
   return aiPost<ReportSummary>("summarizeReport", payload);
 }
