@@ -152,14 +152,57 @@ const SCENES = [
   },
 
   {
+    id: "s3b",
+    title: "The creative desk: ADMO makes its own campaign with AI",
+    beats: [
+      {
+        say: "Not every campaign comes from an advertiser. For National Day, Abu Dhabi's own creative officer briefs MediaGPT.",
+        async do(h) {
+          await h.switchProfile("ADMO Content Reviewer");
+          await h.click(h.page.locator("button").filter({ hasText: "Create with AI" }).first(), { settle: 1000 });
+        },
+      },
+      {
+        say: "From a single sentence, MediaGPT writes the campaign in natural Arabic and English.",
+        async do(h) {
+          const gen = h.page.locator(".studio-controls button", { hasText: "Generate with MediaGPT" }).first();
+          if (await h.has(gen, "s3b: generate")) {
+            await h.click(gen, { settle: 600 });
+            // Copy resolves first; wait for it to appear on camera.
+            await h.page.locator(".studio-copy strong").first().waitFor({ timeout: 25000 }).catch(() => h.issues.push("s3b: copy did not render"));
+          }
+        },
+      },
+      {
+        say: "And then it paints the visual to match, right on brand for a national moment.",
+        async do(h) {
+          // The image model finishes here; hold until the visual lands.
+          await h.page.locator(".studio-visual .creative-frame.large").first().waitFor({ timeout: 75000 }).catch(() => h.issues.push("s3b: generated visual did not render"));
+          await h.pace(1500);
+        },
+      },
+      {
+        say: "The officer sends it straight into the same governed review as every other creative.",
+        async do(h) {
+          const send = h.page.locator("button", { hasText: "Send to CMS review" }).first();
+          if (await h.has(send, "s3b: send to CMS")) {
+            await h.click(send, { settle: 1200 });
+            await h.page.locator(".radius-result.good").first().waitFor({ timeout: 12000 }).catch(() => {});
+          }
+        },
+      },
+    ],
+  },
+
+  {
     id: "s4",
     title: "The gate: AI reviews, humans decide",
     beats: [
       {
         say: "Now the gate. Before any human looks, MediaGPT reads the creative and scores it on brand safety, cultural fit, Arabic accuracy and legibility.",
         async do(h) {
-          await h.switchProfile("ADMO Content Reviewer");
-          await h.click(h.page.locator(".submission-list button", { hasText: "National observance takeover" }).first(), { settle: 1000 });
+          await h.click(h.page.locator("button").filter({ hasText: "Submissions" }).first(), { settle: 900 });
+          await h.click(h.page.locator(".submission-list button", { hasText: "National Day tribute" }).first(), { settle: 1000 });
           const start = h.page.locator("button", { hasText: "Start review" }).first();
           if (await h.has(start, "s4: start review")) await h.click(start, { settle: 1000 });
           await h.page.locator(".ai-review-card").first().scrollIntoViewIfNeeded().catch(() => {});
@@ -354,7 +397,10 @@ const SCENES = [
             await h.click(h.page.locator("button", { hasText: "Approve with MFA" }).first(), { settle: 800 });
             await h.mfa("774201");
           }
+          // The broadcast button only renders once the alert re-renders to
+          // Approved after the second signature; wait for it before acting.
           const broadcast = h.page.locator("button", { hasText: "Broadcast now (preempt)" }).first();
+          await broadcast.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
           if (await h.has(broadcast, "s7: broadcast now")) await h.click(broadcast, { settle: 1600 });
         },
       },

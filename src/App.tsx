@@ -3884,15 +3884,15 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
 
   async function generate() {
     setBusy("generate"); setSent(null);
-    try {
-      const [copy, image] = await Promise.all([
-        aiGenerateCreativeCopy({ brief: `${campaign}. ${brief}`, tone: "official, civic, warm", ratios: ["landscape"] }),
-        aiGenerateVisual({ brief: `${campaign}. ${brief}`, headline: campaign }),
-      ]);
-      const concept = copy.concepts?.[0];
-      if (concept) { setHeadlineEn(concept.headline_en); setHeadlineAr(concept.headline_ar); }
-      if (image?.image) { setVisual(image.image); setVisualSource(image.source ?? ""); }
-    } finally { setBusy(""); }
+    // Resolve copy and image independently so the bilingual copy appears in
+    // seconds while the image model finishes, instead of waiting for both.
+    const copyP = aiGenerateCreativeCopy({ brief: `${campaign}. ${brief}`, tone: "official, civic, warm", ratios: ["landscape"] })
+      .then((copy) => { const c = copy.concepts?.[0]; if (c) { setHeadlineEn(c.headline_en); setHeadlineAr(c.headline_ar); } })
+      .catch(() => {});
+    const imageP = aiGenerateVisual({ brief: `${campaign}. ${brief}`, headline: campaign })
+      .then((image) => { if (image?.image) { setVisual(image.image); setVisualSource(image.source ?? ""); } })
+      .catch(() => {});
+    try { await Promise.allSettled([copyP, imageP]); } finally { setBusy(""); }
   }
 
   function onFile(files: FileList | null) {
