@@ -460,6 +460,22 @@ export function EstateMap({ assets, selectedAssetId, onSelect, mode, openAlarmAs
  * or the tile server is unavailable (e.g. offline).
 \* ------------------------------------------------------------------ */
 
+// Theme-aware basemap: the Origen design uses a near-black canvas map, so the
+// dark theme gets CARTO dark_all and light gets light_all. The layer swaps in
+// place when the user toggles the theme (data-theme on <html>).
+const TILE_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const TILE_LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const TILE_ATTR = "&copy; OpenStreetMap contributors &copy; CARTO";
+const tileUrlForTheme = () =>
+  typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? TILE_LIGHT : TILE_DARK;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function addThemedTiles(L: any, map: any): () => void {
+  const layer = L.tileLayer(tileUrlForTheme(), { subdomains: "abcd", maxZoom: 19, attribution: TILE_ATTR }).addTo(map);
+  const observer = new MutationObserver(() => layer.setUrl(tileUrlForTheme()));
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
+
 const statusColor: Record<string, string> = {
   Live: "#1f9d57",
   Attention: "#d08400",
@@ -508,6 +524,7 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
   const markersRef = useRef<Record<string, unknown>>({});
   const clickRef = useRef(onMarkerClick);
   clickRef.current = onMarkerClick;
+  const disposeTilesRef = useRef<(() => void) | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -529,11 +546,7 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
       }
       try {
         map = L.map(containerRef.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([24.45, 54.42], 10);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          subdomains: ["a", "b", "c"],
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap contributors",
-        }).addTo(map);
+        disposeTilesRef.current = addThemedTiles(L, map);
         mapRef.current = map;
         markersRef.current = {};
         assets.forEach((asset) => {
@@ -552,6 +565,8 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
     init();
     return () => {
       cancelled = true;
+      disposeTilesRef.current?.();
+      disposeTilesRef.current = null;
       if (map) map.remove();
       mapRef.current = null;
       markersRef.current = {};
@@ -623,6 +638,7 @@ export function RadiusMap({ assets, center, radiusM, insideIds, flaggedIds, onPi
   pickRef.current = onPick;
   const stateRef = useRef({ center, radiusM, insideIds, flaggedIds });
   stateRef.current = { center, radiusM, insideIds, flaggedIds };
+  const disposeTilesRef = useRef<(() => void) | null>(null);
   const [failed, setFailed] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -664,7 +680,7 @@ export function RadiusMap({ assets, center, radiusM, insideIds, flaggedIds, onPi
       }
       try {
         map = L.map(containerRef.current, { zoomControl: true, scrollWheelZoom: false }).setView([center.lat, center.lng], 11);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { subdomains: ["a", "b", "c"], maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+        disposeTilesRef.current = addThemedTiles(L, map);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         map.on("click", (e: any) => pickRef.current(e.latlng.lat, e.latlng.lng));
         mapRef.current = map;
@@ -682,6 +698,8 @@ export function RadiusMap({ assets, center, radiusM, insideIds, flaggedIds, onPi
     init();
     return () => {
       cancelled = true;
+      disposeTilesRef.current?.();
+      disposeTilesRef.current = null;
       if (map) map.remove();
       mapRef.current = null;
       circleRef.current = null;
