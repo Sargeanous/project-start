@@ -7909,3 +7909,14 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
 .cc-tag.warn { background: rgba(247, 126, 21, 0.6); border-color: #f77e15; color: rgba(253, 255, 254, 0.98); }
 .cc-tag.danger { background: rgba(229, 77, 46, 0.6); border-color: #e54d2e; color: rgba(253, 255, 254, 0.98); }
 .cc-tag.idle { background: rgba(96, 96, 96, 0.6); border-color: #8b9490; color: rgba(253, 255, 254, 0.98); }
+
+/* On the map page the MediaGPT launcher joins the right control stack
+   (above zoom, kill below) instead of floating over the filmstrip. */
+.app:has(.workspace.map-canvas) .chat-fab {
+  right: 16px; left: auto; bottom: auto; top: calc(50dvh - 122px);
+  width: 40px; min-height: 40px; height: 40px; padding: 0;
+  border-radius: 10px; font-size: 0; gap: 0;
+  display: grid; place-items: center;
+  box-shadow: var(--shadow-lg);
+}
+[dir="rtl"] .app:has(.workspace.map-canvas) .chat-fab { right: auto; left: 16px; }
