@@ -7900,3 +7900,12 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
 /* Node-tree exact: status tag top-RIGHT 12/12; card footer 12px insets */
 .cc-tag { top: 12px; inset-inline-end: 12px; inset-inline-start: auto; }
 .cc-card-foot { inset-inline: 12px; bottom: 12px; }
+
+/* Node-exact Live chip: 60% toned fill + 1px toned stroke, white 12/16 text,
+   4px white dot, r4, pad 2/6, gap 4 */
+.cc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px; color: rgba(253, 255, 254, 0.98); backdrop-filter: none; }
+.cc-tag::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: rgba(253, 255, 254, 0.98); }
+.cc-tag.live { background: rgba(70, 167, 88, 0.6); border-color: #46a758; color: rgba(253, 255, 254, 0.98); }
+.cc-tag.warn { background: rgba(247, 126, 21, 0.6); border-color: #f77e15; color: rgba(253, 255, 254, 0.98); }
+.cc-tag.danger { background: rgba(229, 77, 46, 0.6); border-color: #e54d2e; color: rgba(253, 255, 254, 0.98); }
+.cc-tag.idle { background: rgba(96, 96, 96, 0.6); border-color: #8b9490; color: rgba(253, 255, 254, 0.98); }
