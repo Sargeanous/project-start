@@ -7936,3 +7936,44 @@ html[data-theme="light"] .cc-toast { background: color-mix(in srgb, #ffffff 86%,
 .cc-toast { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
 .cc-toast strong { letter-spacing: 0.02px; }
 .cc-toast small { letter-spacing: 0.02px; }
+
+/* ---- Sidebar node-exact (Figma Sidebar 240w, bg #2f3030-dark) ---- */
+:root { --sidebar: 240px; }
+.sidebar { background: var(--surface-elevated); padding: 0 0 8px; display: flex; flex-direction: column; }
+.sidebar-brand { padding: 14px 24px; min-height: 64px; align-items: center; }
+.nav-groups { flex: 1; padding: 24px 8px; display: grid; gap: 24px; align-content: start; overflow-y: auto; }
+.nav-group { display: grid; gap: 16px; }
+.nav-group p {
+  padding: 0 0 0 16px; margin: 0;
+  font-size: 12px; line-height: 16px; font-weight: 600;
+  color: var(--muted); text-transform: none; letter-spacing: 0.01em;
+}
+.nav-group button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 8px; min-height: 40px;
+  font-size: 14px; line-height: 20px; font-weight: 400;
+  color: var(--ink); background: transparent;
+}
+.nav-group button + button { margin-top: -4px; }
+.nav-group button:hover { background: color-mix(in srgb, var(--bg) 55%, transparent); color: var(--ink); }
+.nav-group button.active { background: var(--bg); color: var(--primary); font-weight: 600; box-shadow: none; }
+.nav-group button.active svg { color: var(--primary); }
+.sidebar-profile {
+  display: flex; align-items: center; gap: 8px; margin: 0 8px 6px;
+  padding: 10px 8px 10px 10px; border-radius: 8px; border: 0;
+  background: var(--bg); color: var(--ink); text-align: start;
+}
+.sidebar-profile:hover { background: color-mix(in srgb, var(--bg) 80%, var(--surface-elevated)); }
+.sidebar-avatar {
+  width: 40px; height: 40px; min-width: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--primary-soft); color: var(--primary);
+  font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+}
+.sidebar-profile-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.sidebar-profile-text strong { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-profile-text small { font-size: 12px; line-height: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-profile-arrows { color: var(--muted); flex: none; }
+html[data-theme="light"] .sidebar { background: #ffffff; border-inline-end: 1px solid var(--line); }
+html[data-theme="light"] .nav-group button.active { background: var(--primary-soft); }
+html[data-theme="light"] .sidebar-profile { background: var(--surface-2); }

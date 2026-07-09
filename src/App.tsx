@@ -52,6 +52,7 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  ChevronsUpDown,
   CalendarClock,
   CornerDownRight,
   Upload,
@@ -3251,11 +3252,6 @@ function Sidebar({
           {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       </div>
-      <div className="current-profile">
-        <small>{t("Access profile")}</small>
-        <strong>{t(profile.name)}</strong>
-        <span>{t(profile.role)}</span>
-      </div>
       <nav className="nav-groups" aria-label={t("Primary")}>
         {navGroups.map((group) => {
           const items = group.pages.filter((id) => allowed.has(id));
@@ -3268,7 +3264,7 @@ function Sidebar({
                 const Icon = item.icon;
                 return (
                   <button key={id} className={page === id ? "active" : ""} type="button" onClick={() => goTo(id)}>
-                    <Icon size={18} />
+                    <Icon size={20} />
                     <span>{t(item.label)}</span>
                   </button>
                 );
@@ -3277,9 +3273,15 @@ function Sidebar({
           );
         })}
       </nav>
-      <button className="switch-profile" type="button" onClick={onSwitch}>
-        <LogOut size={17} />
-        {t("Switch profile")}
+      {/* Figma footer card (224x60, r8, darker well): avatar + name/role +
+          up/down arrows; the whole card is the profile switcher. */}
+      <button className="sidebar-profile" type="button" onClick={onSwitch} title={t("Switch profile")} aria-label={t("Switch profile")}>
+        <span className="sidebar-avatar" aria-hidden="true">{t(profile.name).split(" ").map((word) => word[0]).slice(0, 2).join("")}</span>
+        <span className="sidebar-profile-text">
+          <strong>{t(profile.name)}</strong>
+          <small>{t(profile.role)}</small>
+        </span>
+        <ChevronsUpDown size={16} className="sidebar-profile-arrows" />
       </button>
       <div className="powered-by powered-by--sidebar">
         <span>{t("Powered by")}</span>
