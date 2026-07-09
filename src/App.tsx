@@ -3897,10 +3897,12 @@ function ControlCentre({
       <div className="cc-right">
         {headlineTicket && !toastDismissed ? (
           <div className="cc-toast" role="status">
-            <span className="cc-toast-icon"><Bell size={18} /></span>
+            {/* The alert glyph is the design's own exported asset (node 127:3743),
+                not a rebuilt approximation. */}
+            <img className="cc-toast-glyph" src="/icons/alert-bell.png" alt="" width={40} height={40} />
             <div>
               <strong>{t(headlineTicket.title)}</strong>
-              <small>{headlineTicket.asset} · {t(estateAssets.find((asset) => asset.id === headlineTicket.asset)?.name ?? headlineTicket.team)}</small>
+              <small>{headlineTicket.asset} • {t(estateAssets.find((asset) => asset.id === headlineTicket.asset)?.name ?? headlineTicket.team)}</small>
               <small className="cc-toast-time">12 {t("min ago")}</small>
             </div>
             <button type="button" className="cc-handle" onClick={goToAlerts}>{t("Handle")}</button>

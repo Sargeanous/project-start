@@ -7920,3 +7920,6 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
   box-shadow: var(--shadow-lg);
 }
 [dir="rtl"] .app:has(.workspace.map-canvas) .chat-fab { right: auto; left: 16px; }
+
+/* Toast glyph: the exported Figma asset, untouched */
+.cc-toast-glyph { width: 40px; height: 40px; flex: none; object-fit: contain; }
