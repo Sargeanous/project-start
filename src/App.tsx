@@ -51,6 +51,8 @@ import {
   Sparkles,
   Sun,
   Moon,
+  ChevronDown,
+  CalendarClock,
   Upload,
   UserRound,
   UserPlus,
@@ -3068,7 +3070,7 @@ function App() {
     <I18nContext.Provider value={t}>
       <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} dir={lang === "ar" ? "rtl" : "ltr"}>
         <Sidebar profile={profile} page={page} goTo={goTo} onSwitch={() => setProfile(null)} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((v) => !v)} t={t} />
-        <main className="workspace">
+        <main className={`workspace ${page === "control" ? "map-canvas" : ""}`}>
           <Topbar
             profile={profile}
             page={page}
@@ -3085,7 +3087,7 @@ function App() {
             t={t}
           />
           {page === "control" && (
-            <ControlCentre submissions={submissions} published={published} killedAssetIds={killedAssetIds} aiAvailable={aiAvailable} notify={notify} onKill={remoteKill} onRestore={restoreDisplays} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} t={t} />
+            <ControlCentre submissions={submissions} published={published} killedAssetIds={killedAssetIds} aiAvailable={aiAvailable} notify={notify} onKill={remoteKill} onRestore={restoreDisplays} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} goToNetwork={() => profile?.pages.includes("network") && setPage("network")} t={t} />
           )}
           {page === "cms" && (
             <CmsPage
@@ -3327,6 +3329,11 @@ function Topbar({
         <h1>{t(meta.label)}</h1>
       </div>
       <div className="topbar-actions">
+        {page === "control" ? (
+          <span className="weather-chip">
+            <Sun size={14} /> {Math.round(estateAssets.reduce((sum, asset) => sum + (parseInt(asset.tempC) || 40), 0) / estateAssets.length - 6)}°C, {fmtGst(new Date())}
+          </span>
+        ) : null}
         <span className="session-pill"><LockKeyhole size={15} />{t(profile.role)}</span>
         <div className="notification-shell">
           <button
@@ -3711,6 +3718,15 @@ function DispatchDialog({
   );
 }
 
+// Origen Control Centre (Figma DOOH Page 4): the page IS the map. A full-bleed
+// dark basemap carries floating overlays - zone pill + KPI strip (top-left),
+// alert toast + More actions (top-right), a click-popover per asset, and the
+// Asset board filmstrip along the bottom. All safety actions stay reachable
+// from the More menu (kill switch keeps its danger styling and confirms).
+function fmtGst(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")} GST`;
+}
+
 function ControlCentre({
   submissions,
   published,
@@ -3720,6 +3736,7 @@ function ControlCentre({
   onKill,
   onRestore,
   goToAlerts,
+  goToNetwork,
   t,
 }: {
   submissions: Submission[];
@@ -3730,29 +3747,67 @@ function ControlCentre({
   onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
   onRestore: (payload: { scope: "asset" | "zone" | "emirate"; target?: string }) => void;
   goToAlerts: () => void;
+  goToNetwork: () => void;
   t: (value: string) => string;
 }) {
-  const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [zone, setZone] = useState("All zones");
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [boardTab, setBoardTab] = useState<"now" | "queue">("now");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [toastDismissed, setToastDismissed] = useState(false);
   const [liveViewFullscreen, setLiveViewFullscreen] = useState(false);
   const [digest, setDigest] = useState<{ en: string; ar: string; source?: string } | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [killOpen, setKillOpen] = useState(false);
-  const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? estateAssets[0];
-  const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
-  const queuedCount = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled").length;
+
   const zoneStats = useMemo(() => summarizeZones(estateAssets), []);
-  const openAlarmAssetIds = tickets.filter((ticket) => ticket.status !== "Resolved").map((ticket) => ticket.asset);
+  const visibleAssets = useMemo(
+    () => (zone === "All zones" ? estateAssets : estateAssets.filter((asset) => asset.zone === zone)),
+    [zone],
+  );
+  const openAlarmAssetIds = useMemo(
+    () => tickets.filter((ticket) => ticket.status !== "Resolved").map((ticket) => ticket.asset),
+    [],
+  );
+  const allocatedIds = useMemo(
+    () => new Set(assetAllocations.filter((allocation) => allocation.status === "Allocated").map((allocation) => allocation.assetId)),
+    [],
+  );
+  const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
+  const fleetOnline = estateAssets.filter((asset) => asset.status !== "Offline").length;
+  const queued = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled");
+  const headlineTicket = tickets.find((ticket) => ticket.status !== "Resolved") ?? null;
+  const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? null;
+
+  // Popover facts for the selected screen.
+  const selectedPublished = selectedAsset ? published.find((item) => item.asset === selectedAsset.id) ?? null : null;
+  const selectedAlarmed = selectedAsset ? openAlarmAssetIds.includes(selectedAsset.id) : false;
+  const selectedKilled = selectedAsset ? killedAssetIds.includes(selectedAsset.id) : false;
+  const nextQueued = queued[0] ?? null;
+  const now = new Date();
+  // Current playback slot: a 2.5h window that started on the last half hour
+  // minus an hour, so the remaining time always reads 1h to 1.5h.
+  const slotStart = new Date(now.getTime() - (((now.getMinutes() % 30) + 60) * 60000));
+  const slotEnd = new Date(slotStart.getTime() + 150 * 60000);
+  const remainMin = Math.max(1, Math.round((slotEnd.getTime() - now.getTime()) / 60000));
+  const remainLabel = `${Math.floor(remainMin / 60)}h ${String(remainMin % 60).padStart(2, "0")}m`;
+  const slotProgress = Math.min(96, Math.max(4, Math.round(((now.getTime() - slotStart.getTime()) / (slotEnd.getTime() - slotStart.getTime())) * 100)));
+
+  const pinKindFor = (assetId: string): "campaign" | "asset" | "alert" => {
+    if (openAlarmAssetIds.includes(assetId)) return "alert";
+    if (allocatedIds.has(assetId)) return "campaign";
+    return "asset";
+  };
 
   useEffect(() => {
     if (!liveViewFullscreen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setLiveViewFullscreen(false);
     }
-
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
@@ -3761,6 +3816,7 @@ function ControlCentre({
   }, [liveViewFullscreen]);
 
   async function summarizeEstate() {
+    setMoreOpen(false);
     setDigestLoading(true);
     const result = await aiOpsDigest();
     setDigest({ en: result.en, ar: result.ar, source: result.source });
@@ -3773,117 +3829,190 @@ function ControlCentre({
     notify(t("Technicians dispatched to") + " " + items.map((item) => item.asset).join(", "));
   }
 
+  const kpis: Array<{ icon: LucideIcon; value: string; label: string }> = [
+    { icon: MonitorPlay, value: `${liveCount}/${estateAssets.length}`, label: "Assets live" },
+    { icon: Globe2, value: `${fleetOnline}/${estateAssets.length}`, label: "Fleet online" },
+    { icon: ShieldCheck, value: "99.62%", label: "Proof of play" },
+    { icon: Bell, value: String(tickets.filter((ticket) => ticket.status !== "Resolved").length), label: "Active alerts" },
+    { icon: CalendarClock, value: queued.length ? `${queued.length} · ${t("next")} ${fmtGst(slotEnd).slice(0, 5)}` : "0", label: "Queued campaigns" },
+  ];
+
   return (
-    <PageBody>
-      <div className="operator-actions">
-        <div>
-          <strong>{t("Operator quick actions")}</strong>
-          <small>{t("One-click operational controls. All actions are logged.")}</small>
-        </div>
-        <div className="operator-actions-row">
-          <Button icon={ShieldAlert} onClick={goToAlerts}>{t("Launch emergency alert")}</Button>
-          <Button icon={Power} variant="danger" onClick={() => setKillOpen(true)}>{killedAssetIds.length ? `${t("Kill switch")} (${killedAssetIds.length})` : t("Kill switch")}</Button>
-          <Button icon={Send} variant="secondary" onClick={() => notify(t("Refresh forced on all edge caches"))}>{t("Refresh edge feeds")}</Button>
-          <Button icon={Wrench} variant="secondary" onClick={() => setDispatchOpen(true)}>{t("Dispatch technician")}</Button>
-          <Button icon={LockKeyhole} variant="secondary" onClick={() => notify(t("Schedule frozen. New publishes are blocked."))}>{t("Freeze schedule")}</Button>
-          <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}>{digestLoading ? t("Summarizing") : t("Summarize")}</Button>
-        </div>
-      </div>
-      {killOpen ? <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} onClose={() => setKillOpen(false)} t={t} /> : null}
-      {dispatchOpen ? <DispatchDialog onCancel={() => setDispatchOpen(false)} onDispatch={handleDispatch} t={t} /> : null}
-      {digest ? (
-        <section className="ai-review-card clear">
-          <div className="ai-review-summary">
-            <div className="ai-review-icon"><Sparkles size={18} /></div>
-            <div>
-              <span>{t("MediaGPT shift handover")}</span>
-              <strong>{isArabicInterface(t) ? digest.ar : digest.en}</strong>
-              <small>{digest.source === "openai" ? t("Generated from live platform state") : t("Offline fallback from platform state")}</small>
-            </div>
-            <StatusPill label={digest.source === "openai" ? "OpenAI" : "Offline"} tone={digest.source === "openai" ? "good" : "warn"} />
-          </div>
-        </section>
-      ) : null}
+    <div className="cc-page">
+      <LiveMap
+        assets={visibleAssets}
+        selectedAssetId={selectedAssetId}
+        onMarkerClick={(id) => setSelectedAssetId(id === selectedAssetId ? "" : id)}
+        openAlarmAssetIds={openAlarmAssetIds}
+        variant="canvas"
+        pinKindFor={pinKindFor}
+        t={t}
+      />
 
-
-      <MetricGrid>
-        <Metric label={t("Assets live")} value={`${liveCount}/${estateAssets.length}`} helper="Screens currently playing" tone="good" />
-        <Metric label={t("Proof-of-play")} value="99.4%" helper="Signed playback evidence" tone="good" />
-        <Metric label={t("Open alarms")} value={String(tickets.length)} helper="Operations follow-up" tone="danger" />
-        <Metric label={t("Queued campaigns")} value={String(queuedCount)} helper="Approved or scheduled" tone="info" />
-      </MetricGrid>
-
-      <Panel icon={Layers3} title={t("Asset board")}>
-        <div className="asset-board">
-          {published.map((item) => (
-            <article key={item.id} className="asset-tile">
-              <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
-              <div>
-                <strong>{item.asset}</strong>
-                <span>{t(item.campaign)}</span>
-              </div>
-              <StatusPill label="Playing" tone="good" />
-            </article>
-          ))}
-        </div>
-      </Panel>
-
-      <section className="control-estate-group" aria-label={t("Live estate map")}>
-        <header className="control-estate-group-header">
-          <div>
-            <span className="panel-icon"><MapPinned size={18} /></span>
-            <h2>{t("Live estate map")}</h2>
-          </div>
-          <Legend />
-        </header>
-        <div className="split-grid map-zones">
-          <Panel icon={Building2} title={t("Zones")}>
-            <div className="zone-list">
-              {zoneStats.map((zone) => (
-                <button key={zone.name} type="button" onClick={() => setSelectedAssetId(zone.firstAssetId)}>
-                  <span>
-                    <strong>{t(zone.name)}</strong>
-                    <small>{zone.live} {t("live")}, {zone.issue} {t("need attention")}</small>
-                  </span>
-                  <em>{zone.total}</em>
+      <div className="cc-top">
+        <div className="cc-zone">
+          <button type="button" className="cc-zone-pill" onClick={() => setZoneOpen((open) => !open)} aria-expanded={zoneOpen}>
+            {t(zone === "All zones" ? "Abu Dhabi City" : zone)} <ChevronDown size={15} />
+          </button>
+          {zoneOpen ? (
+            <div className="cc-zone-menu" role="menu">
+              <button type="button" onClick={() => { setZone("All zones"); setZoneOpen(false); }}>{t("Abu Dhabi City")} <em>{estateAssets.length}</em></button>
+              {zoneStats.map((item) => (
+                <button key={item.name} type="button" onClick={() => { setZone(item.name); setZoneOpen(false); }}>
+                  {t(item.name)} <em>{item.total}</em>
                 </button>
               ))}
             </div>
-          </Panel>
-          <Panel icon={MapPinned} title={t("Live map")}>
-            <LiveMap
-              assets={estateAssets}
-              selectedAssetId={selectedAssetId}
-              onMarkerClick={setSelectedAssetId}
-              openAlarmAssetIds={openAlarmAssetIds}
-              t={t}
-            />
-          </Panel>
-          <Panel
-            icon={MonitorPlay}
-            title="Live view"
-            action={<Button icon={Maximize2} variant="secondary" onClick={() => setLiveViewFullscreen(true)}>{t("Full screen")}</Button>}
-          >
-            <LiveView asset={selectedAsset} />
-          </Panel>
+          ) : null}
         </div>
-      </section>
+        <div className="cc-kpis">
+          {kpis.map((kpi) => (
+            <div key={kpi.label} className="cc-kpi">
+              <span className="cc-kpi-icon"><kpi.icon size={17} /></span>
+              <div>
+                <strong>{kpi.value}</strong>
+                <small>{t(kpi.label)}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      <Panel icon={AlertTriangle} title={t("Open alarms")}>
-        <ObjectList
-          rows={tickets.map((ticket) => ({
-            id: ticket.id,
-            title: ticket.title,
-            meta: `${ticket.asset} / ${ticket.team}`,
-            tone: severityTone(ticket.severity),
-            status: ticket.status,
-          }))}
-        />
-      </Panel>
-      {liveViewFullscreen ? (
+      <div className="cc-right">
+        {headlineTicket && !toastDismissed ? (
+          <div className="cc-toast" role="status">
+            <span className="cc-toast-icon"><Bell size={18} /></span>
+            <div>
+              <strong>{t(headlineTicket.title)}</strong>
+              <small>{headlineTicket.asset} · {t(estateAssets.find((asset) => asset.id === headlineTicket.asset)?.name ?? headlineTicket.team)}</small>
+              <small className="cc-toast-time">12 {t("min ago")}</small>
+            </div>
+            <button type="button" className="cc-handle" onClick={goToAlerts}>{t("Handle")}</button>
+          </div>
+        ) : null}
+        <div className="cc-more">
+          <button type="button" className="cc-more-btn" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen}>
+            {t("More")} <ChevronDown size={14} />
+          </button>
+          {moreOpen ? (
+            <div className="cc-more-menu" role="menu">
+              <button type="button" onClick={() => { setMoreOpen(false); goToAlerts(); }}><ShieldAlert size={15} /> {t("Launch emergency alert")}</button>
+              <button type="button" className="danger" onClick={() => { setMoreOpen(false); setKillOpen(true); }}><Power size={15} /> {killedAssetIds.length ? `${t("Kill switch")} (${killedAssetIds.length})` : t("Kill switch")}</button>
+              <button type="button" onClick={() => { setMoreOpen(false); setDispatchOpen(true); }}><Wrench size={15} /> {t("Dispatch technician")}</button>
+              <button type="button" onClick={() => { setMoreOpen(false); notify(t("Refresh forced on all edge caches")); }}><Send size={15} /> {t("Refresh edge feeds")}</button>
+              <button type="button" onClick={() => { setMoreOpen(false); notify(t("Schedule frozen. New publishes are blocked.")); }}><LockKeyhole size={15} /> {t("Freeze schedule")}</button>
+              <button type="button" disabled={!aiAvailable || digestLoading} onClick={summarizeEstate}><Sparkles size={15} /> {digestLoading ? t("Summarizing") : t("Summarize shift")}</button>
+              {toastDismissed && headlineTicket ? <button type="button" onClick={() => { setToastDismissed(false); setMoreOpen(false); }}><Bell size={15} /> {t("Show latest alert")}</button> : null}
+            </div>
+          ) : null}
+        </div>
+        {digest ? (
+          <div className="cc-digest">
+            <span className="cc-toast-icon good"><Sparkles size={16} /></span>
+            <div>
+              <strong>{t("MediaGPT shift handover")}</strong>
+              <small>{isArabicInterface(t) ? digest.ar : digest.en}</small>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => setDigest(null)} aria-label={t("Close")}>×</button>
+          </div>
+        ) : null}
+      </div>
+
+      {selectedAsset ? (
+        <section className="cc-popover" role="dialog" aria-label={selectedAsset.id}>
+          <header>
+            <div>
+              <strong>{selectedAsset.id}</strong>
+              <small><MapPinned size={13} /> {t(selectedAsset.name)}</small>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => setSelectedAssetId("")} aria-label={t("Close")}>×</button>
+          </header>
+          <button
+            type="button"
+            className="cc-popover-media"
+            style={{ backgroundImage: `url("${creativeBackground(selectedPublished?.creativeId ?? published[0]?.creativeId ?? "etihad-retail")}")` }}
+            onClick={() => setLiveViewFullscreen(true)}
+            aria-label={t("Open live view")}
+          />
+          <div className="cc-timeline">
+            <div className="cc-timeline-head">
+              <small>{t("Start time")}</small>
+              <span className="cc-remaining">{remainLabel}</span>
+              <small>{t("End time")}</small>
+            </div>
+            <div className="cc-timeline-track"><span style={{ width: `${slotProgress}%` }} /></div>
+            <div className="cc-timeline-foot">
+              <strong>{fmtGst(slotStart).slice(0, 5)}</strong>
+              <strong>{fmtGst(slotEnd).slice(0, 5)}</strong>
+            </div>
+          </div>
+          <div className="cc-rows">
+            <div className="cc-row"><small>{t("Server")}</small><span>{t(allocatedIds.has(selectedAsset.id) ? "Commercial" : "Civic")}</span></div>
+            <div className="cc-row">
+              <small>{t("Status")}</small>
+              <StatusPill
+                label={selectedKilled ? "Killed" : selectedAlarmed ? "Fault" : selectedAsset.status}
+                tone={selectedKilled || selectedAlarmed || selectedAsset.status === "Offline" ? "danger" : selectedAsset.status === "Live" ? "good" : "warn"}
+              />
+            </div>
+            <div className="cc-row"><small>{t("Next slot")}</small><span>{nextQueued ? `${t(nextQueued.campaign)} · ${nextQueued.requestedStart}` : t("Civic road safety rotation")}</span></div>
+          </div>
+          <footer>
+            <Button variant="secondary" icon={HardDrive} onClick={goToNetwork}>{t("View digital twin")}</Button>
+            <Button icon={Wrench} onClick={() => setDispatchOpen(true)}>{t("Dispatch technician")}</Button>
+          </footer>
+        </section>
+      ) : null}
+
+      <div className="cc-board">
+        <div className="cc-board-inner">
+          <div className="cc-board-head">
+            <strong>{t("Asset board")}</strong>
+            <div className="cc-board-tabs" role="tablist">
+              <button type="button" className={boardTab === "now" ? "active" : ""} onClick={() => setBoardTab("now")}>{t("Now")}</button>
+              <button type="button" className={boardTab === "queue" ? "active" : ""} onClick={() => setBoardTab("queue")}>{t("Queue")}</button>
+            </div>
+          </div>
+          <div className="cc-strip">
+            {boardTab === "now"
+              ? published.map((item) => {
+                  const asset = estateAssets.find((entry) => entry.id === item.asset);
+                  return (
+                    <button key={item.id} type="button" className="cc-card" onClick={() => setSelectedAssetId(item.asset)}>
+                      <span className="cc-card-media" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }}>
+                        <em className="cc-badge live">● {t("Live")}</em>
+                        <span className="cc-card-foot">
+                          <span>{t(asset?.name ?? item.asset)}</span>
+                          <span>{fmtGst(now)}</span>
+                        </span>
+                      </span>
+                      <small>{item.asset}</small>
+                    </button>
+                  );
+                })
+              : queued.map((item) => (
+                  <button key={item.id} type="button" className="cc-card" onClick={goToAlerts}>
+                    <span className="cc-card-media" style={{ backgroundImage: `url("${item.creativeUrl || creativeBackground(item.creativeId)}")` }}>
+                      <em className="cc-badge queued">{t("Queued")}</em>
+                      <span className="cc-card-foot">
+                        <span>{t(item.campaign)}</span>
+                        <span>{item.requestedStart}</span>
+                      </span>
+                    </span>
+                    <small>{item.id}</small>
+                  </button>
+                ))}
+            {boardTab === "queue" && !queued.length ? <p className="cc-empty">{t("Nothing queued. Approved campaigns appear here before playout.")}</p> : null}
+          </div>
+        </div>
+      </div>
+
+      {killOpen ? <KillSwitchPanel killedAssetIds={killedAssetIds} onKill={onKill} onRestore={onRestore} onClose={() => setKillOpen(false)} t={t} /> : null}
+      {dispatchOpen ? <DispatchDialog onCancel={() => setDispatchOpen(false)} onDispatch={handleDispatch} t={t} /> : null}
+      {liveViewFullscreen && selectedAsset ? (
         <LiveViewFullscreen asset={selectedAsset} onClose={() => setLiveViewFullscreen(false)} />
       ) : null}
-    </PageBody>
+    </div>
   );
 }
 

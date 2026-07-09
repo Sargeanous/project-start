@@ -476,18 +476,21 @@ function addThemedTiles(L: any, map: any): () => void {
   return () => observer.disconnect();
 }
 
+// Origen status tones (Figma pin system): live green, degraded amber,
+// fault alert-red, idle grey.
 const statusColor: Record<string, string> = {
-  Live: "#1f9d57",
-  Attention: "#d08400",
-  Warning: "#d08400",
-  Maintenance: "#d08400",
-  Offline: "#c0392b",
+  Live: "#009b5d",
+  Attention: "#f77e15",
+  Warning: "#f77e15",
+  Maintenance: "#f77e15",
+  Offline: "#606060",
+  Fault: "#e54d2e",
   // Commercial allocation statuses (FIN-601 map) - additive keys so the health map is unaffected.
-  Allocated: "#185fa5",
-  Available: "#1f9d57",
-  "In bidding": "#7c4ab7",
-  "Under maintenance": "#d08400",
-  "Emergency override": "#c0392b",
+  Allocated: "#5b9cf5",
+  Available: "#009b5d",
+  "In bidding": "#8b6ee0",
+  "Under maintenance": "#f77e15",
+  "Emergency override": "#e54d2e",
 };
 
 interface LiveMapAsset {
@@ -501,12 +504,39 @@ interface LiveMapAsset {
   y: number;
 }
 
+export type PinKind = "campaign" | "asset" | "alert";
+
 interface LiveMapProps {
   assets: LiveMapAsset[];
   selectedAssetId: string;
   onMarkerClick: (id: string) => void;
   openAlarmAssetIds: string[];
   t: (value: string) => string;
+  /* Origen canvas mode: full-bleed map with hexagonal status pins. */
+  variant?: "panel" | "canvas";
+  pinKindFor?: (assetId: string) => PinKind;
+}
+
+// Origen hexagonal pin (Figma components frame): hexagon fill = status tone,
+// glyph = what the screen is doing (campaign / asset / alert), chevron tail.
+const HEX_GLYPHS: Record<PinKind, string> = {
+  campaign:
+    '<circle cx="9" cy="9" r="6.4" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M2.8 9h12.4M9 2.6c2.3 1.8 2.3 11 0 12.8M9 2.6c-2.3 1.8-2.3 11 0 12.8" fill="none" stroke="#fff" stroke-width="1.1"/><text x="9" y="11.8" text-anchor="middle" font-size="7.5" font-weight="700" fill="#fff">$</text>',
+  asset:
+    '<rect x="3" y="4" width="12" height="7" rx="1.2" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M9 11v4M6.5 15h5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
+  alert:
+    '<path d="M9 3.2a4.2 4.2 0 0 1 4.2 4.2c0 2.9 1 3.7 1.5 4.2H3.3c.5-.5 1.5-1.3 1.5-4.2A4.2 4.2 0 0 1 9 3.2Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.6 14.4a1.5 1.5 0 0 0 2.8 0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
+};
+
+function hexPinHtml(asset: LiveMapAsset, selected: boolean, kind: PinKind): string {
+  const color = statusColor[asset.status] ?? "#009b5d";
+  return `<div class="hex-pin ${selected ? "selected" : ""}" style="--pin:${color}">
+    <svg viewBox="0 0 36 46" width="36" height="46" aria-hidden="true">
+      <path d="M18 1.5 L33.5 10 V27 L18 35.5 L2.5 27 V10 Z" fill="var(--pin)" stroke="rgba(0,0,0,0.28)" stroke-width="1"/>
+      <path d="M14 36 L18 42 L22 36 Z" fill="var(--pin)"/>
+      <g transform="translate(9,9.4)">${HEX_GLYPHS[kind]}</g>
+    </svg>
+  </div>`;
 }
 
 function pinHtml(asset: LiveMapAsset, selected: boolean): string {
@@ -518,14 +548,29 @@ function pinHtml(asset: LiveMapAsset, selected: boolean): string {
   </div>`;
 }
 
-export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAssetIds, t }: LiveMapProps) {
+export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAssetIds, t, variant = "panel", pinKindFor }: LiveMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<Record<string, unknown>>({});
   const clickRef = useRef(onMarkerClick);
   clickRef.current = onMarkerClick;
   const disposeTilesRef = useRef<(() => void) | null>(null);
+  const alarmsRef = useRef(openAlarmAssetIds);
+  alarmsRef.current = openAlarmAssetIds;
+  const kindRef = useRef(pinKindFor);
+  kindRef.current = pinKindFor;
   const [failed, setFailed] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function iconFor(L: any, asset: LiveMapAsset, selected: boolean) {
+    if (variant === "canvas") {
+      const alarmed = alarmsRef.current.includes(asset.id);
+      const kind: PinKind = kindRef.current?.(asset.id) ?? (alarmed ? "alert" : "asset");
+      const drawn = alarmed && asset.status !== "Offline" ? { ...asset, status: "Fault" } : asset;
+      return L.divIcon({ className: "hex-pin-icon", html: hexPinHtml(drawn, selected, kind), iconSize: [36, 46], iconAnchor: [18, 44] });
+    }
+    return L.divIcon({ className: "map-pin-icon", html: pinHtml(asset, selected), iconSize: [30, 38], iconAnchor: [15, 38] });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -550,13 +595,25 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
         mapRef.current = map;
         markersRef.current = {};
         assets.forEach((asset) => {
-          const icon = L.divIcon({ className: "map-pin-icon", html: pinHtml(asset, asset.id === selectedAssetId), iconSize: [30, 38], iconAnchor: [15, 38] });
+          const icon = iconFor(L, asset, asset.id === selectedAssetId);
           const marker = L.marker([asset.lat, asset.lng], { icon, title: asset.name }).addTo(map);
           marker.on("click", () => clickRef.current(asset.id));
           markersRef.current[asset.id] = marker;
         });
-        const bounds = L.latLngBounds(assets.map((asset) => [asset.lat, asset.lng]));
-        map.fitBounds(bounds, { padding: [44, 44], maxZoom: 12 });
+        if (variant === "canvas") {
+          // City-level default view (Figma): fit the dense cluster and let far
+          // outliers (e.g. Al Ain) stay off-canvas until panned or filtered.
+          const meanLat = assets.reduce((sum, a) => sum + a.lat, 0) / assets.length;
+          const meanLng = assets.reduce((sum, a) => sum + a.lng, 0) / assets.length;
+          const cluster = assets.filter((a) => Math.abs(a.lat - meanLat) < 0.6 && Math.abs(a.lng - meanLng) < 0.6);
+          const fitTo = cluster.length >= 3 ? cluster : assets;
+          const bounds = L.latLngBounds(fitTo.map((asset) => [asset.lat, asset.lng]));
+          // Leave headroom for the KPI strip (top) and asset filmstrip (bottom).
+          map.fitBounds(bounds, { paddingTopLeft: [90, 160], paddingBottomRight: [90, 300], maxZoom: 13 });
+        } else {
+          const bounds = L.latLngBounds(assets.map((asset) => [asset.lat, asset.lng]));
+          map.fitBounds(bounds, { padding: [44, 44], maxZoom: 12 });
+        }
         setTimeout(() => map && map.invalidateSize(), 220);
       } catch {
         setFailed(true);
@@ -582,7 +639,7 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
     assets.forEach((asset) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const marker = markersRef.current[asset.id] as any;
-      if (marker) marker.setIcon(L.divIcon({ className: "map-pin-icon", html: pinHtml(asset, asset.id === selectedAssetId), iconSize: [30, 38], iconAnchor: [15, 38] }));
+      if (marker) marker.setIcon(iconFor(L, asset, asset.id === selectedAssetId));
     });
     const selected = assets.find((asset) => asset.id === selectedAssetId);
     if (selected) map.panTo([selected.lat, selected.lng]);
@@ -605,7 +662,7 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
     );
   }
 
-  return <div className="live-map" ref={containerRef} role="application" aria-label={t("Live estate map")} />;
+  return <div className={`live-map ${variant === "canvas" ? "canvas" : ""}`} ref={containerRef} role="application" aria-label={t("Live estate map")} />;
 }
 
 /* ------------------------------------------------------------------ *\
