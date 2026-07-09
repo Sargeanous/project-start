@@ -590,7 +590,8 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
         return;
       }
       try {
-        map = L.map(containerRef.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([24.45, 54.42], 10);
+        map = L.map(containerRef.current, { zoomControl: variant !== "canvas", attributionControl: true, scrollWheelZoom: false }).setView([24.45, 54.42], 10);
+        if (variant === "canvas") L.control.zoom({ position: "topright" }).addTo(map);
         disposeTilesRef.current = addThemedTiles(L, map);
         mapRef.current = map;
         markersRef.current = {};

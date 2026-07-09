@@ -339,6 +339,17 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
   const [sel, setSel] = useState<{ info: PartInfo; obj: THREE.Object3D } | null>(null);
   const [showSpec, setShowSpec] = useState(false);
   const sceneRef = useRef<THREE.Object3D | null>(null);
+  // 3D stage backdrop follows the app theme (dark studio vs daylight).
+  const [sceneBg, setSceneBg] = useState(() =>
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light" ? "#dce7f1" : "#242827",
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setSceneBg(document.documentElement.dataset.theme === "light" ? "#dce7f1" : "#242827");
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
 
   const faultCount = ISSUE_LIST.filter((i) => i.state === "fault").length;
   const degCount = ISSUE_LIST.filter((i) => i.state === "degrading").length;
@@ -375,7 +386,7 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
           gl={{ preserveDrawingBuffer: true, antialias: true }}
           onPointerMissed={() => setSel(null)}
         >
-          <color attach="background" args={["#dce7f1"]} />
+          <color attach="background" args={[sceneBg]} />
           <hemisphereLight intensity={0.95} color="#eaf2fb" groundColor="#7d8a6f" />
           <directionalLight position={[14, 20, -10]} intensity={1.5} />
           <directionalLight position={[-12, 8, 12]} intensity={0.4} />

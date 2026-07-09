@@ -3727,6 +3727,21 @@ function fmtGst(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")} GST`;
 }
 
+// Photographic context shots for the Asset board (Figma cards are billboards
+// photographed in situ, not flat creatives). Generated once with gpt-image-1
+// into public/billboards/, mapped by asset type.
+const BOARD_PHOTOS: Record<string, string> = {
+  "Highway billboard": "highway-billboard",
+  "Highway gantry": "highway-gantry",
+  "Digital pylon": "digital-pylon",
+  "Bridge display": "bridge-display",
+  "Dual-sided bus stop": "bus-stop",
+  "Mall facade LED": "mall-facade",
+  "Indoor/outdoor LED": "indoor-led",
+  "Street unipole": "street-unipole",
+};
+const boardPhoto = (type?: string) => `/billboards/${BOARD_PHOTOS[type ?? ""] ?? "highway-billboard"}.jpg`;
+
 function ControlCentre({
   submissions,
   published,
@@ -3918,6 +3933,18 @@ function ControlCentre({
         ) : null}
       </div>
 
+      <div className="cc-kill">
+        <button
+          type="button"
+          onClick={() => setKillOpen(true)}
+          title={t("Kill switch")}
+          aria-label={t("Kill switch")}
+        >
+          <Power size={17} />
+          {killedAssetIds.length ? <em>{killedAssetIds.length}</em> : null}
+        </button>
+      </div>
+
       {selectedAsset ? (
         <section className="cc-popover" role="dialog" aria-label={selectedAsset.id}>
           <header>
@@ -3979,7 +4006,7 @@ function ControlCentre({
                   const asset = estateAssets.find((entry) => entry.id === item.asset);
                   return (
                     <button key={item.id} type="button" className="cc-card" onClick={() => setSelectedAssetId(item.asset)}>
-                      <span className="cc-card-media" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }}>
+                      <span className="cc-card-media" style={{ backgroundImage: `url("${boardPhoto(asset?.type)}")` }}>
                         <em className="cc-badge live">● {t("Live")}</em>
                         <span className="cc-card-foot">
                           <span>{t(asset?.name ?? item.asset)}</span>
