@@ -49,6 +49,8 @@ import {
   Terminal,
   ShoppingBag,
   Sparkles,
+  Sun,
+  Moon,
   Upload,
   UserRound,
   UserPlus,
@@ -1168,6 +1170,8 @@ const translations: Record<string, string> = {
   "Alert reset. Re-run checks.": "تم إعادة تعيين التنبيه. أعد تشغيل الفحوصات.",
   "Live on network": "مباشر على الشبكة",
   "Notifications": "الإشعارات",
+  "Switch to light mode": "التبديل إلى الوضع الفاتح",
+  "Switch to dark mode": "التبديل إلى الوضع الداكن",
   "Notification center": "مركز الإشعارات",
   "unread": "غير مقروء",
   "All caught up": "لا توجد إشعارات جديدة",
@@ -2638,6 +2642,15 @@ function isNotificationAllowed(notification: PlatformNotification, preferences: 
 
 function App() {
   const [lang, setLang] = useState<Lang>("en");
+  // Origen theme: dark is the designed default; light is the derived mode.
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem("dooh-theme") === "light" ? "light" : "dark";
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("dooh-theme", theme);
+  }, [theme]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [page, setPage] = useState<Page>("control");
   const [submissions, setSubmissions] = useState<Submission[]>(seedSubmissions);
@@ -3061,6 +3074,8 @@ function App() {
             page={page}
             lang={lang}
             setLang={setLang}
+            theme={theme}
+            onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
             notifications={visibleNotifications}
             notificationPreferences={notificationPreferences}
             onToggleNotificationPreference={updateNotificationPreference}
@@ -3277,6 +3292,8 @@ function Topbar({
   page,
   lang,
   setLang,
+  theme,
+  onToggleTheme,
   notifications,
   notificationPreferences,
   onToggleNotificationPreference,
@@ -3289,6 +3306,8 @@ function Topbar({
   page: Page;
   lang: Lang;
   setLang: (lang: Lang) => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
   notifications: PlatformNotification[];
   notificationPreferences: NotificationPreferences;
   onToggleNotificationPreference: (key: NotificationPreferenceKey, enabled: boolean) => void;
@@ -3335,6 +3354,9 @@ function Topbar({
             />
           ) : null}
         </div>
+        <button className="icon-button" type="button" onClick={onToggleTheme} aria-label={t(theme === "dark" ? "Switch to light mode" : "Switch to dark mode")}>
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
         <button className="icon-button" type="button" onClick={() => setLang(lang === "en" ? "ar" : "en")}>
           <Globe2 size={18} />
           {lang === "en" ? "AR" : "EN"}
