@@ -7923,3 +7923,11 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
 
 /* Toast glyph: the exported Figma asset, untouched */
 .cc-toast-glyph { width: 40px; height: 40px; flex: none; object-fit: contain; }
+
+/* Node-exact toast card: vertical #464948->#2f3030 at 80%, r8, blur 16, no border.
+   Glyph box 40x40 with the blur bleed (render 112.64x116.76, offset -36.32/-38.38). */
+.cc-toast { background: linear-gradient(180deg, rgba(70, 73, 72, 0.8) 0%, rgba(47, 48, 48, 0.8) 100%); backdrop-filter: blur(16px); border: 0; }
+html[data-theme="light"] .cc-toast { background: color-mix(in srgb, #ffffff 86%, transparent); border: 1px solid var(--line); }
+.cc-toast-glyph-box { position: relative; width: 40px; height: 40px; flex: none; }
+.cc-toast-glyph-box img { position: absolute; width: 112.64px; height: 116.76px; left: -36.32px; top: -38.38px; max-width: none; pointer-events: none; }
+[dir="rtl"] .cc-toast-glyph-box img { left: auto; right: -36.32px; }

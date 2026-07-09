@@ -3898,8 +3898,8 @@ function ControlCentre({
         {headlineTicket && !toastDismissed ? (
           <div className="cc-toast" role="status">
             {/* The alert glyph is the design's own exported asset (node 127:3743),
-                not a rebuilt approximation. */}
-            <img className="cc-toast-glyph" src="/icons/alert-bell.png" alt="" width={40} height={40} />
+                blur bounds included: 112.6x116.8 render around a 40x40 layout box. */}
+            <span className="cc-toast-glyph-box"><img src="/icons/alert-bell.png" alt="" /></span>
             <div>
               <strong>{t(headlineTicket.title)}</strong>
               <small>{headlineTicket.asset} • {t(estateAssets.find((asset) => asset.id === headlineTicket.asset)?.name ?? headlineTicket.team)}</small>
