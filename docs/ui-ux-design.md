@@ -294,3 +294,57 @@ advertiser's artwork.
 - [ ] Bilingual strings added; RTL checked.
 - [ ] View toggles at top/bottom; scrollbars conditional; no `min-height` on grid rows.
 - [ ] Walk the actual rendered page before calling it done.
+
+---
+
+## 16. Origen theme (July 2026 redesign) — the current design language
+
+The platform now implements the **Origen theme** from Figma ("DOOH" file, Page 4
+frames + "Origen UI Kit"). The Figma node tree is the source of truth; specs
+below were extracted from it, not read off renders.
+
+### Extraction discipline (hard rules, learned the expensive way)
+1. **Positions** come from `absoluteBoundingBox` offsets, never from eyeballing.
+2. **Colors** must be read through `boundVariables` and gradient stops —
+   variable-bound fills show placeholder greys in the plain fill array.
+3. **Composed glyphs** (e.g. the alert bell) are **exported as assets** from the
+   node (`/v1/images`, default bounds so blur bleed survives) and mounted at
+   their true render bounds — never redrawn by hand.
+4. **Effects**: shadows/blur come from the kit's effect styles (level-1
+   floating layer = `0 4px 12px rgba(0,0,0,0.25)`, background blur 16).
+
+### Tokens (dark default / light derived)
+Canvas `#181b1a` / `#f5f7f6` · surface `#1f2221` / `#fff` · elevated `#2f3030`
+/ `#fff` · input `#202221` / `#f2f4f3` · ink `#fdfffe/98` · secondary
+`#f4fefb/71` · muted `#e5fdf6/49` · primary `#009b5d` (deep `#02542d`) ·
+alert `#e54d2e` · danger `#f53f3f` · amber `#f77e15` · idle `#606060` ·
+radii 8/4/pill · font **Manrope** (Arabic: Noto Sans Arabic). Theme switch via
+`data-theme` on `<html>`, toggle in the topbar, dark by default.
+
+### Control Centre = the map
+Full-bleed CARTO basemap (dark_all/light_all follows theme) with floating
+overlays: zone pill + KPI strip (top-left), node-exact alert toast
+(400w/pad 24/#464948→#2f3030 @80% + blur 16 + kit shadow, exported bell glyph,
+neutral-outline Handle) top-right with a More menu holding all operator quick
+actions (kill switch keeps danger styling + password confirm), hexagonal
+status pins (campaign/asset/alert glyphs × live/degraded/fault/idle), click
+popover (live creative, slot timeline, Server/Status/Next slot, View digital
+twin + Dispatch technician), right control rail (MediaGPT · zoom · kill), and
+the Asset board filmstrip: full estate, 251×176 cards, photo 144h, status tag
+top-right 12/12 (60% toned fill + toned stroke + white dot + 12/16 white text),
+location + GST time in-image at 12/16 71%, asset id below 600 14/20 98%.
+Asset photography lives in `public/billboards/` (gpt-image-1, one per type).
+
+### MediaGPT dock & sidebar
+Chat = full-height right sidebar ("New Chat" 600 16/24 header, prompt-hint
+rows `#2f3030` r4 that fire real capabilities, input well `#202221` r8 with
+39%-mint placeholder, 32px r8 green send). Sidebar = 240px on elevated
+surface: 40px nav rows (active = darker `#181b1a` pill with green icon+600
+text — NOT a green fill), sentence-case group labels 600 12/16 at 49%, footer
+profile card (darker r8 well, 40px avatar, chevrons) switches profile.
+
+### Figma access for future work
+Read-only token in `.env` (`FIGMA_TOKEN`); file keys `jgApFSaXeJTFk2t3u3UstL`
+(DOOH, Page 4 canonical) and `p6JTAseyoPjBh9fSv94xTC` (Origen UI Kit). Only the
+Control Centre is designed; all other pages derive this language and keep
+their layouts. Demo videos still film the pre-Origen UI (re-render deferred).

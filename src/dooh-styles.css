@@ -6513,7 +6513,7 @@ html[dir="rtl"] .network-tabs button.active {
   max-width: calc(100% - 24px);
   padding: 7px 11px;
   border-radius: 999px;
-  background: rgba(11, 26, 23, 0.76);
+  background: color-mix(in srgb, var(--surface-elevated) 82%, transparent);
   backdrop-filter: blur(8px);
 }
 
