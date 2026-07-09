@@ -5400,6 +5400,15 @@ function NetworkPage({
   const [selectedId, setSelectedId] = useState(estateAssets[1].id);
   const [networkTab, setNetworkTab] = useState<NetworkTab>("assetOperations");
   const [twinFullscreen, setTwinFullscreen] = useState(false);
+  // Escape closes the fullscreen twin, like every other overlay.
+  useEffect(() => {
+    if (!twinFullscreen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setTwinFullscreen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [twinFullscreen]);
   const [estateQuery, setEstateQuery] = useState("");
   const [estateFilter, setEstateFilter] = useState<EstateFilter | null>(null);
   const [estateFiltering, setEstateFiltering] = useState(false);
