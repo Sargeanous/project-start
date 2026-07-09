@@ -4002,25 +4002,37 @@ function ControlCentre({
           </div>
           <div className="cc-strip">
             {boardTab === "now"
-              ? published.map((item) => {
-                  const asset = estateAssets.find((entry) => entry.id === item.asset);
+              ? estateAssets.map((asset) => {
+                  // Full estate, one card per screen (Figma). Status tag rides
+                  // inside the image; the asset id sits below the card.
+                  const alarmed = openAlarmAssetIds.includes(asset.id);
+                  const killed = killedAssetIds.includes(asset.id);
+                  const tag = killed
+                    ? { label: "Killed", cls: "danger" }
+                    : alarmed
+                      ? { label: "Fault", cls: "danger" }
+                      : asset.status === "Live"
+                        ? { label: "Live", cls: "live" }
+                        : asset.status === "Offline"
+                          ? { label: "Offline", cls: "idle" }
+                          : { label: asset.status, cls: "warn" };
                   return (
-                    <button key={item.id} type="button" className="cc-card" onClick={() => setSelectedAssetId(item.asset)}>
-                      <span className="cc-card-media" style={{ backgroundImage: `url("${boardPhoto(asset?.type)}")` }}>
-                        <em className="cc-badge live">● {t("Live")}</em>
+                    <button key={asset.id} type="button" className="cc-card" onClick={() => setSelectedAssetId(asset.id)}>
+                      <span className="cc-card-media" style={{ backgroundImage: `url("${boardPhoto(asset.type)}")` }}>
+                        <em className={`cc-tag ${tag.cls}`}>{t(tag.label)}</em>
                         <span className="cc-card-foot">
-                          <span>{t(asset?.name ?? item.asset)}</span>
+                          <span><MapPinned size={12} /> {t(asset.name)}</span>
                           <span>{fmtGst(now)}</span>
                         </span>
                       </span>
-                      <small>{item.asset}</small>
+                      <small>{asset.id}</small>
                     </button>
                   );
                 })
               : queued.map((item) => (
                   <button key={item.id} type="button" className="cc-card" onClick={goToAlerts}>
                     <span className="cc-card-media" style={{ backgroundImage: `url("${item.creativeUrl || creativeBackground(item.creativeId)}")` }}>
-                      <em className="cc-badge queued">{t("Queued")}</em>
+                      <em className="cc-tag warn">{t("Queued")}</em>
                       <span className="cc-card-foot">
                         <span>{t(item.campaign)}</span>
                         <span>{item.requestedStart}</span>

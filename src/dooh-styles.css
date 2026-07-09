@@ -7749,3 +7749,85 @@ html[dir="rtl"] .network-tabs button.active {
   box-shadow: 20px 0 48px rgba(0, 0, 0, 0.4);
 }
 .chat-panel header { border-radius: 0; }
+
+/* ---- Figma-exact overrides (extracted from the DOOH node tree) ---- */
+
+/* Toast: 400w, pad 24, gap 16, r8, blur. Title 600 16/24 white; subtitle and
+   time stacked (gap 4) at 400 14/20 #e5fdf6/49. Handle = neutral-outline pill
+   (#f1fbfa/19 stroke) with green text. */
+.cc-right { width: 400px; }
+.cc-toast {
+  padding: 24px;
+  gap: 16px;
+  border-radius: 8px;
+  align-items: center;
+  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+}
+.cc-toast-icon {
+  width: 40px; height: 40px; min-width: 40px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-alert) 24%, transparent);
+  color: #f53f3f;
+}
+.cc-toast > div { gap: 8px; }
+.cc-toast strong { font-size: 16px; line-height: 24px; font-weight: 600; color: #ffffff; }
+.cc-toast small { font-size: 14px; line-height: 20px; color: rgba(229, 253, 246, 0.49); }
+.cc-toast .cc-toast-time { margin-top: -4px; color: rgba(229, 253, 246, 0.49); }
+.cc-handle {
+  border: 1px solid rgba(241, 251, 250, 0.19);
+  color: var(--primary);
+  padding: 6px 12px;
+  font-size: 14px; line-height: 20px; font-weight: 400;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.cc-handle:hover { border-color: var(--primary); background: var(--primary-soft); }
+html[data-theme="light"] .cc-toast strong { color: var(--ink); }
+html[data-theme="light"] .cc-toast small,
+html[data-theme="light"] .cc-toast .cc-toast-time { color: var(--muted); }
+html[data-theme="light"] .cc-handle { border-color: var(--line-strong); }
+
+/* Board container: pad 24, gap 16, r8, blur */
+.cc-board { padding: 14px 24px 20px; }
+.cc-board-inner {
+  padding: 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+.cc-board-head { margin-bottom: 16px; }
+.cc-board-head strong { font-size: 14px; line-height: 20px; font-weight: 600; color: #ffffff; }
+html[data-theme="light"] .cc-board-head strong { color: var(--ink); }
+.cc-board-tabs { background: #2f3030; border: 0; border-radius: 8px; padding: 4px; gap: 0; }
+.cc-board-tabs button {
+  border-radius: 4px; padding: 2px 8px; font-size: 14px; line-height: 20px; font-weight: 400;
+  color: rgba(229, 253, 246, 0.49);
+}
+.cc-board-tabs button.active { background: #464948; color: rgba(253, 255, 254, 0.98); }
+html[data-theme="light"] .cc-board-tabs { background: var(--surface-2); }
+html[data-theme="light"] .cc-board-tabs button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* Cards: 251x176, media 251x144 r8, id below 600 14/20 #fdfffe/98, gap 12 */
+.cc-strip { gap: 16px; }
+.cc-card { width: 251px; gap: 12px; }
+.cc-card-media { aspect-ratio: 251 / 144; border-radius: 8px; border: 0; }
+.cc-card-media::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.02) 46%, rgba(0, 0, 0, 0.66) 100%); }
+.cc-card > small { font-size: 14px; line-height: 20px; font-weight: 600; color: rgba(253, 255, 254, 0.98); letter-spacing: 0; }
+html[data-theme="light"] .cc-card > small { color: var(--ink); }
+.cc-card-foot {
+  inset-inline: 10px; bottom: 8px;
+  font-size: 12px; line-height: 16px; font-weight: 400;
+  color: rgba(244, 254, 251, 0.71); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+.cc-card-foot span:first-child { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Status tags inside media (Figma Tag): r4, pad 2/8, 12/16, translucent fill
+   + toned 1px stroke. */
+.cc-tag {
+  position: absolute; top: 8px; inset-inline-start: 8px; z-index: 1;
+  font-style: normal; font-size: 12px; line-height: 16px; font-weight: 400;
+  border-radius: 4px; padding: 2px 8px; border: 1px solid transparent;
+  backdrop-filter: blur(3px);
+}
+.cc-tag.live { border-color: #46a758; color: #6fdc8f; background: rgba(70, 167, 88, 0.16); }
+.cc-tag.warn { border-color: #f77e15; color: #ffb26e; background: rgba(247, 126, 21, 0.16); }
+.cc-tag.danger { border-color: #e54d2e; color: #ff8f78; background: rgba(255, 53, 35, 0.17); }
+.cc-tag.idle { border-color: #8b9490; color: #c3cbc7; background: rgba(96, 96, 96, 0.3); }
