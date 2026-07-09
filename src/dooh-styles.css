@@ -7896,3 +7896,7 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
 .chat-panel .chat-log { align-content: start; }
 .chat-hints { align-content: start; }
 .chat-hints button { min-height: 0; }
+
+/* Node-tree exact: status tag top-RIGHT 12/12; card footer 12px insets */
+.cc-tag { top: 12px; inset-inline-end: 12px; inset-inline-start: auto; }
+.cc-card-foot { inset-inline: 12px; bottom: 12px; }
