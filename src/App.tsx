@@ -53,6 +53,7 @@ import {
   Moon,
   ChevronDown,
   CalendarClock,
+  CornerDownRight,
   Upload,
   UserRound,
   UserPlus,
@@ -9218,9 +9219,9 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
     if ("actions" in result && Array.isArray(result.actions)) setPendingActions(result.actions);
   }
 
-  async function ask() {
-    if (!query.trim()) return;
-    const nextQuery = query;
+  async function ask(text?: string) {
+    const nextQuery = (text ?? query).trim();
+    if (!nextQuery) return;
     setQuery("");
     setLoading(true);
     setMessages((items) => [...items, { role: "user", body: nextQuery }]);
@@ -9278,13 +9279,36 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
     );
   }
 
+  // Figma "Chat Floating": contextual prompt hints shown on a fresh thread,
+  // each firing a real MediaGPT capability.
+  const chatHints = [
+    "Draft a maintenance ticket for AD-HWY-009 with high severity.",
+    "Generate a shift handover summary.",
+    "Which assets are offline or need attention right now?",
+  ];
+
   return (
     <section className={`chat-panel ${expanded ? "expanded" : ""}`} aria-label="MediaGPT">
       <header>
-        <strong>MediaGPT</strong>
-        <button type="button" onClick={() => setOpen(false)}>{t("Close")}</button>
+        <div className="chat-title">
+          <strong>{t("New Chat")}</strong>
+          <ChevronDown size={15} />
+        </div>
+        <div className="chat-head-actions">
+          <button type="button" className="chat-icon-btn" onClick={() => { setMessages((items) => items.slice(0, 1)); setQuery(""); }} aria-label={t("New dialog")} title={t("New dialog")}><Plus size={16} /></button>
+          <button type="button" className="chat-icon-btn" onClick={() => setOpen(false)} aria-label={t("Close")} title={t("Close")}><X size={16} /></button>
+        </div>
       </header>
       <div className="chat-log">
+        {messages.length <= 1 ? (
+          <div className="chat-hints">
+            {chatHints.map((hint) => (
+              <button key={hint} type="button" onClick={() => ask(hint)} disabled={loading}>
+                <CornerDownRight size={14} /> {t(hint)}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {messages.map((message, index) => (
           <article key={`${message.role}-${index}`} className={message.role}>
             {message.role === "assistant" && message.source === "openai" ? (
@@ -9324,8 +9348,13 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
         ) : null}
       </div>
       <footer>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Ask MediaGPT")} onKeyDown={(event) => event.key === "Enter" && !loading && ask()} />
-        <button type="button" onClick={ask} disabled={loading} aria-label={t("Send")} title={t("Send")}><Send size={17} /></button>
+        <div className="chat-input-area">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("Ask MediaGPT anything, or type @ to mention")} onKeyDown={(event) => event.key === "Enter" && !loading && ask()} />
+          <div className="chat-function-bar">
+            <small>MediaGPT</small>
+            <button type="button" className="chat-send" onClick={() => ask()} disabled={loading} aria-label={t("Send")} title={t("Send")}><Send size={15} /></button>
+          </div>
+        </div>
       </footer>
       {pendingActions.length ? (
         <details className="approval-inbox" open={expanded}>
