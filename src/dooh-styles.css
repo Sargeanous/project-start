@@ -8000,11 +8000,12 @@ html[data-theme="light"] .sidebar-profile { background: var(--surface-2); }
   --disabled-ink: rgba(235, 253, 246, 0.39);
   --ctrl-border: rgba(241, 251, 250, 0.19);
   --ctrl-border-dim: rgba(243, 245, 244, 0.13);
-  --tag-good-bg: rgba(70, 167, 88, 0.16);   --tag-good-bd: #46a758;  --tag-good-ink: #6fdc8f;
-  --tag-warn-bg: rgba(247, 126, 21, 0.16);  --tag-warn-bd: #f77e15;  --tag-warn-ink: #ffb26e;
-  --tag-danger-bg: rgba(255, 53, 35, 0.17); --tag-danger-bd: #e54d2e;--tag-danger-ink: #ff8f78;
-  --tag-info-bg: rgba(22, 93, 255, 0.16);   --tag-info-bd: #3c74e0;  --tag-info-ink: #94bfff;
-  --tag-idle-bg: rgba(96, 96, 96, 0.30);    --tag-idle-bd: #8b9490;  --tag-idle-ink: #c3cbc7;
+  /* node-exact from kit Tag page: tinted fill + semantic border + semantic text */
+  --tag-good-bg: rgba(112, 254, 140, 0.11); --tag-good-bd: #46a758;  --tag-good-ink: #46a758;
+  --tag-warn-bg: rgba(255, 97, 0, 0.29);    --tag-warn-bd: #f77e15;  --tag-warn-ink: #f77e15;
+  --tag-danger-bg: rgba(255, 53, 35, 0.17); --tag-danger-bd: #e54d2e;--tag-danger-ink: #e54d2e;
+  --tag-info-bg: #0d2847;                   --tag-info-bd: #0090ff;  --tag-info-ink: #0090ff;
+  --tag-idle-bg: #2f3030;                   --tag-idle-bd: rgba(243, 245, 244, 0.08); --tag-idle-ink: rgba(253, 255, 254, 0.98);
   --field-bg: var(--surface-2);
 }
 html[data-theme="light"] {
@@ -8016,7 +8017,7 @@ html[data-theme="light"] {
   --tag-good-bg: rgba(70, 167, 88, 0.12);   --tag-good-bd: #2f9e57;  --tag-good-ink: #1d7c40;
   --tag-warn-bg: rgba(247, 126, 21, 0.12);  --tag-warn-bd: #dd6b0d;  --tag-warn-ink: #a54e07;
   --tag-danger-bg: rgba(229, 77, 46, 0.10); --tag-danger-bd: #d64226;--tag-danger-ink: #ad3013;
-  --tag-info-bg: rgba(22, 93, 255, 0.10);   --tag-info-bd: #3c74e0;  --tag-info-ink: #1d4fb8;
+  --tag-info-bg: rgba(0, 144, 255, 0.10);   --tag-info-bd: #0090ff;  --tag-info-ink: #0b68b8;
   --tag-idle-bg: rgba(96, 96, 96, 0.10);    --tag-idle-bd: #9aa39f;  --tag-idle-ink: #545d59;
   --field-bg: #ffffff;
 }
@@ -8088,12 +8089,13 @@ html[data-theme="light"] {
 .linked-detail-head .panel-icon, .panel-header .panel-icon { margin-inline-end: 2px; }
 .panel-action { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em; }
 
-/* ---- Status pills: kit tag recipe (tinted fill, semantic border) ---- */
+/* ---- Status pills: kit Tag small, node-exact (h24: r2, 14/20 w400,
+   pad 2/8, gap 4, tinted fill + semantic border + semantic text) ---- */
 .status-pill, .status-pill.tone-good, .status-pill.tone-warn, .status-pill.tone-danger,
 .status-pill.tone-info, .status-pill.tone-neutral {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: 4px;
-  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  padding: 2px 8px; border-radius: 2px;
+  font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
   text-transform: none; border: 1px solid transparent;
 }
 .status-pill::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex: none; }
@@ -8103,22 +8105,30 @@ html[data-theme="light"] {
 .status-pill.tone-info  { background: var(--tag-info-bg);  border-color: var(--tag-info-bd);  color: var(--tag-info-ink); }
 .status-pill.tone-neutral{background: var(--tag-idle-bg);  border-color: var(--tag-idle-bd);  color: var(--tag-idle-ink); }
 
-/* ---- Tabs: kit button-tab (underline, not pills or blocks) ---- */
+/* ---- Tabs: kit tabs-line, node-exact (gap 32, pad 10/0, 2px underline,
+   hover = subtle r2 block) ---- */
 .segmented, .segmented-tabs, .network-tabs {
-  display: flex; gap: 24px; align-items: flex-end;
+  display: flex; gap: 32px; align-items: flex-end;
   background: transparent; border: 0; border-bottom: 1px solid var(--line);
   border-radius: 0; padding: 0; box-shadow: none; width: 100%;
 }
 .segmented button, .segmented-tabs button, .network-tabs button {
   background: transparent; border: 0; border-radius: 0;
-  padding: 9px 2px; margin-bottom: -1px;
+  padding: 10px 2px; margin-bottom: -1px;
   font-family: inherit; font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
   color: var(--muted); box-shadow: none; flex: 0 0 auto;
   border-bottom: 2px solid transparent;
   transition: color 0.14s ease, border-color 0.14s ease;
 }
 .network-tabs button strong { font-weight: inherit; font-size: inherit; letter-spacing: inherit; }
-.segmented button:hover, .segmented-tabs button:hover, .network-tabs button:hover { color: var(--ink); background: transparent; }
+.segmented button:hover, .segmented-tabs button:hover, .network-tabs button:hover {
+  color: var(--ink);
+  background: #464948;
+  border-radius: 2px 2px 0 0;
+}
+html[data-theme="light"] .segmented button:hover,
+html[data-theme="light"] .segmented-tabs button:hover,
+html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21, 0.06); }
 .segmented button.active, .segmented-tabs button.active, .network-tabs button.active,
 .segmented button[aria-pressed="true"], .segmented-tabs button[aria-pressed="true"],
 .segmented button[aria-selected="true"], .segmented-tabs button[aria-selected="true"],
@@ -8139,16 +8149,17 @@ html[data-theme="light"] {
   background: transparent; border-color: var(--primary); color: var(--primary); font-weight: 600;
 }
 
-/* ---- Tables: quiet header, hairline rows, readable cells ---- */
+/* ---- Tables: kit table-cell, node-exact (header = filled #2f3030 well,
+   14/20 muted; body cells 14/20 ink, pad 14/16, 13% separators) ---- */
 .table-card { border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
 .table-card table { border-collapse: collapse; }
 .table-card th {
-  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
   text-transform: none; color: var(--muted);
-  background: transparent; border-bottom: 1px solid var(--line);
-  padding: 10px 16px;
+  background: var(--surface-2); border-bottom: 1px solid var(--ctrl-border-dim);
+  padding: 14px 16px;
 }
-.table-card td { font-size: 14px; line-height: 20px; padding: 12px 16px; border-top: 1px solid var(--ctrl-border-dim); }
+.table-card td { font-size: 14px; line-height: 20px; padding: 14px 16px; border-top: 1px solid var(--ctrl-border-dim); }
 .table-card tbody tr:first-child td { border-top: 0; }
 .table-card tbody tr:hover td { background: var(--surface-input); }
 .cell-note { font-size: 12px; line-height: 16px; color: var(--muted); }
@@ -8167,6 +8178,7 @@ html[data-theme="light"] {
   box-shadow: none;
 }
 .workspace textarea { min-height: 72px; }
+.workspace select { border-color: var(--ctrl-border); }
 .workspace input::placeholder, .workspace textarea::placeholder { color: var(--muted); }
 .workspace input:focus, .workspace select:focus, .workspace textarea:focus {
   outline: none; border-color: var(--primary); box-shadow: none;
@@ -8221,7 +8233,7 @@ html[data-theme="light"] {
    stay node-exact per the DOOH Figma frames.) */
 .twin-badge, .kill-chip, .gov-chip, .boundary-badge, .agent-chip,
 .approval-sig, .pop-sig, .twin-window-badge, .session-pill, .chat-source {
-  border-radius: 4px;
+  border-radius: 2px;
   font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
   text-transform: none;
   padding: 2px 8px;
@@ -8310,7 +8322,7 @@ html[data-theme="light"] {
 }
 .rules-list-head { font-weight: 500; }
 .studio-recos strong { text-transform: none; letter-spacing: 0.02em; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--primary); }
-.workspace th { text-transform: none; letter-spacing: 0.02em; font-weight: 500; color: var(--muted); }
+.workspace th { text-transform: none; letter-spacing: 0.02em; font-weight: 400; color: var(--muted); }
 
 /* ---- Weight discipline: kit stops at 600 ---- */
 .workspace strong, .workspace b { font-weight: 600; }

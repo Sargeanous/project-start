@@ -394,8 +394,27 @@ computed from estate data, advisor panel beside a "How the advisor decides"
 panel, and a governance note ("the advisor only proposes").
 
 ### Kit extraction status
-Consumed node-exact: Button, Input, Colors, Typography, Shadows & blurs.
-Pending (Figma REST quota exhausted this session): Table, Tag, Tabs, Picker,
-Checkbox, Radio, Switch, Menu, BASE COMPONENTS, EO, AI Agent pages — fetch
-JSON via `/v1/files/p6JTAseyoPjBh9fSv94xTC/nodes?ids=...` when quota resets
-and refine numbers if they differ from the inferred recipes.
+Consumed node-exact: Button, Input, Colors, Typography, Shadows & blurs,
+**Table, Tag, Tabs, Picker, Checkbox, Radio, Switch, Menu, EO** (whole file
+pulled in one `GET /v1/files/:key` call — that endpoint sits in a different
+rate bucket than `/nodes`, which is the workaround when `/nodes` is quota
+starved). BASE COMPONENTS and AI Agent canvases are empty in the file.
+
+True-ups applied after full extraction (all node-exact now):
+- **Tags**: r2 (not r4), small h24 = 14/20 w400 + pad 2/8 + gap 4; semantic
+  TEXT = border color. Exact fills: success `rgba(112,254,140,0.11)/#46a758`,
+  warning `rgba(255,97,0,0.29)/#f77e15`, error `rgba(255,53,35,0.17)/#e54d2e`,
+  info `#0d2847/#0090ff`, neutral `#2f3030` + 8% border + ink text.
+  (CC map tags keep their own DOOH-frame spec: r4, 12/16, white dot.)
+- **Tabs** (tabs-line): strip gap 32, tab pad 10/0 (h40), selected = 2px
+  `#009b5d` underline + w600 green text, hover = subtle `#464948` r2 block,
+  disabled 39% mint.
+- **Tables**: header is a FILLED `#2f3030` well, 14/20 w400 at 49% muted,
+  pad 14/16 (h48); body cells 14/20 ink, pad 14/16 (h49), separators 13%.
+- **Selects/pickers**: trigger border is the 19% hairline (inputs use 13%);
+  dropdown panels `#2f3030`-`#464948`, r2, shadow `0 4 10 rgba(0,0,0,0.1)`.
+- **Menus**: rows h38, pad 9/16-20, hover `#202221` turns icon+text green,
+  destructive hover = danger tint + `#e54d2e`, selected = trailing green check.
+- **Status dots** (badge/status): 6px dot + gap 8 + 14/20 ink text; dot
+  palette: progress `#0090ff`, success `#46a758`, warn `#f77e15`,
+  danger `#e54d2e`, amber `#ffc53d`, teal `#12a594`, purple `#5b5bd6`.
