@@ -7982,3 +7982,8 @@ html[data-theme="light"] .cc-toast { background: color-mix(in srgb, #ffffff 86%,
 html[data-theme="light"] .sidebar { background: #ffffff; border-inline-end: 1px solid var(--line); }
 html[data-theme="light"] .nav-group button.active { background: var(--primary-soft); }
 html[data-theme="light"] .sidebar-profile { background: var(--surface-2); }
+
+/* Chart cards follow the theme inside the dock */
+.chat-chart { background: var(--surface-2) !important; border: 1px solid var(--line); border-radius: 10px; }
+.chat-chart text { fill: var(--muted); }
+.chat-chart .recharts-cartesian-grid line { stroke: var(--line); }
