@@ -59,27 +59,37 @@ const SCENES = [
         },
       },
       {
-        say: "In the control room, operators watch the estate breathe: every screen, its health, and what it is playing, live on the map.",
+        say: "In the control room, the map is the workplace: every screen, its health, and what it is playing, breathing live across the city.",
         async do(h) {
           await h.card(null);
-          await h.click(h.page.locator("button", { hasText: "ADMO Control Room" }).first(), { settle: 1200 });
-          await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
-          await h.page.locator(".asset-board").scrollIntoViewIfNeeded().catch(() => {});
-          await h.pace(1200);
-          await h.page.locator(".control-estate-group").scrollIntoViewIfNeeded().catch(() => {});
-          const zones = h.page.locator(".zone-list button");
-          await h.click(zones.nth(1), { settle: 700 });
-          await h.click(zones.nth(2), { settle: 700 });
+          await h.click(h.page.locator("button", { hasText: "ADMO Control Room" }).first(), { settle: 1400 });
+          await h.page.locator(".hex-pin").first().waitFor({ timeout: 20000 });
+          await h.pace(2000);
+          // Zone filter: open the pill, focus one zone, come back to the city.
+          await h.click(h.page.locator(".cc-zone-pill").first(), { settle: 700 });
+          await h.click(h.page.locator(".cc-zone-menu button").nth(2), { settle: 1300 });
+          await h.click(h.page.locator(".cc-zone-pill").first(), { settle: 500 });
+          await h.click(h.page.locator(".cc-zone-menu button").first(), { settle: 1100 });
         },
       },
       {
-        say: "And any display is one click away, exactly as it looks on the street.",
+        say: "And any display is one click away: what is on it now, how long it has left, and what plays next, exactly as it looks on the street.",
         async do(h) {
-          const fs = h.page.locator("button", { hasText: "Full screen" }).first();
-          if (await h.has(fs, "s1: live view Full screen")) {
-            await h.click(fs, { settle: 1000 });
-            await h.pace(2600);
+          // Click a pin -> asset popover -> live view fullscreen.
+          await h.page.evaluate(() => {
+            const markers = document.querySelectorAll(".leaflet-marker-icon.hex-pin-icon");
+            markers[Math.min(4, markers.length - 1)].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          });
+          await h.page.locator(".cc-popover").waitFor({ timeout: 8000 }).catch(() => h.issues.push("s1: popover did not open"));
+          await h.pace(2400);
+          const media = h.page.locator(".cc-popover-media").first();
+          if (await h.has(media, "s1: popover media")) {
+            await h.click(media, { settle: 1000 });
+            await h.pace(2200);
             await h.page.keyboard.press("Escape");
+            await h.pace(400);
+            const close = h.page.locator(".cc-popover .icon-btn").first();
+            if (await close.count()) await h.click(close, { settle: 500 });
           }
         },
       },
@@ -287,7 +297,7 @@ const SCENES = [
         async do(h) {
           const approve = h.page.locator(".chat-panel .agent-action-card button", { hasText: "Approve" }).first();
           if (await h.has(approve, "s5: approve proposal")) await h.click(approve, { settle: 1200 });
-          await h.click(h.page.locator(".chat-panel header button", { hasText: "Close" }).first(), { settle: 600 });
+          await h.click(h.page.locator(".chat-head-actions button").last(), { settle: 600 });
         },
       },
     ],
@@ -423,18 +433,20 @@ const SCENES = [
     title: "The response: crews out, screens dark on command",
     beats: [
       {
-        say: "A screen struggles in the storm. Dispatch shows exactly which sites get a crew before anyone commits.",
+        say: "A screen struggles in the storm. From the More menu, dispatch shows exactly which sites get a crew before anyone commits.",
         async do(h) {
           await h.nav("Control Centre");
-          await h.click(h.page.locator(".operator-actions-row button", { hasText: "Dispatch technician" }).first(), { settle: 900 });
-          await h.pace(1600);
+          await h.page.locator(".hex-pin").first().waitFor({ timeout: 20000 });
+          await h.click(h.page.locator(".cc-more-btn").first(), { settle: 700 });
+          await h.click(h.page.locator(".cc-more-menu button", { hasText: "Dispatch technician" }).first(), { settle: 1100 });
+          await h.pace(1400);
           await h.click(h.page.locator(".dispatch-dialog button", { hasText: "Dispatch to" }).first(), { settle: 1200 });
         },
       },
       {
-        say: "And when a display must go dark right now, the kill switch, password confirmed and fully audited, blanks it in seconds and restores it just as fast.",
+        say: "And when a display must go dark right now, the kill switch sits one press away on the map. Password confirmed, fully audited, it blanks the screen in seconds and restores it just as fast.",
         async do(h) {
-          await h.click(h.page.locator(".operator-actions-row button", { hasText: "Kill switch" }).first(), { settle: 900 });
+          await h.click(h.page.locator(".cc-kill button").first(), { settle: 900 });
           const modal = h.page.locator(".kill-modal");
           await h.typeInto(modal.locator(".kill-form input").first(), "Storm incident DR-11");
           await h.click(modal.locator("button", { hasText: "Blank displays" }).first(), { settle: 800 });
@@ -692,8 +704,13 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     await pace(500);
   }
   async function switchProfile(name) {
-    const sw = page.locator("button", { hasText: "Switch profile" }).first();
-    if (await sw.count()) await click(sw, { settle: 700 });
+    // The sidebar profile card (aria-label) replaced the old text button.
+    const card = page.locator(".sidebar-profile").first();
+    if (await card.count()) await click(card, { settle: 700 });
+    else {
+      const sw = page.locator("button", { hasText: "Switch profile" }).first();
+      if (await sw.count()) await click(sw, { settle: 700 });
+    }
     await click(page.locator("button", { hasText: name }).first(), { settle: 1200 });
   }
   async function lowerThird(text) { await page.evaluate((t) => window.__lowerThird(t), text); }

@@ -105,7 +105,7 @@ const SCENES = [
       {
         say: "It creates, too. Give the studio a brief, and it writes the campaign in Arabic and English.",
         async do(h) {
-          await h.click(h.page.locator(".chat-panel header button", { hasText: "Close" }).first(), { settle: 500 });
+          await h.click(h.page.locator(".chat-head-actions button").last(), { settle: 500 });
           await h.nav("MediaGPT");
           const studio = h.page.locator("button", { hasText: "MediaGPT Studio" }).filter({ hasText: "civic" }).first();
           if (await h.has(studio, "reel: Studio skill")) await h.click(studio, { settle: 800 });
@@ -447,8 +447,13 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
   async function lowerThird(text) { await page.evaluate((t) => window.__lowerThird(t), text); }
   async function card(title, subtitle) { await page.evaluate(([a, b]) => window.__card(a, b), [title, subtitle]); }
   async function switchProfile(name) {
-    const sw = page.locator("button", { hasText: "Switch profile" }).first();
-    if (await sw.count()) await click(sw, { settle: 700 });
+    // The sidebar profile card (aria-label) replaced the old text button.
+    const card = page.locator(".sidebar-profile").first();
+    if (await card.count()) await click(card, { settle: 700 });
+    else {
+      const sw = page.locator("button", { hasText: "Switch profile" }).first();
+      if (await sw.count()) await click(sw, { settle: 700 });
+    }
     await click(page.locator("button", { hasText: name }).first(), { settle: 1200 });
   }
   async function askChat(question, timeout = 50000) {

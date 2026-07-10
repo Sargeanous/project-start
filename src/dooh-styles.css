@@ -3090,7 +3090,7 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 .approvals-action label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
 .approvals-action select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; background: var(--surface-input); color: var(--ink); min-width: 240px; }
 .approvals-empty { margin: 8px 0 0; font-size: 11.5px; color: #8a5a08; }
-.mfa-backdrop { z-index: 240; }
+.mfa-backdrop { z-index: 1440; }
 .mfa-hint { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
 
 /* Rules engine simulator + live ruleset */
@@ -3757,8 +3757,8 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .reviewer-thread p{margin:4px 0 0;font-size:12.5px;color:var(--ink)}
 
 /* Wizard */
-.wizard-backdrop{position:fixed;inset:0;background:rgba(24,32,28,.58);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
-.revision-backdrop{z-index:230}
+.wizard-backdrop{position:fixed;inset:0;background:rgba(24,32,28,.58);backdrop-filter:blur(4px);z-index:1400;display:flex;align-items:center;justify-content:center;padding:24px}
+.revision-backdrop{z-index:1430}
 .revision-dialog{width:min(780px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-3);border:1px solid var(--border);border-radius:18px;box-shadow:0 36px 90px rgba(0,0,0,.34)}
 .revision-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 22px;border-bottom:1px solid var(--border);background:var(--surface-3)}
 .revision-header span{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
