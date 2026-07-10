@@ -885,6 +885,24 @@ const marketplacePackages = [
 type Translator = (value: string) => string;
 
 const translations: Record<string, string> = {
+  // Yield advisor page
+  "Screens in estate": "الشاشات في الأسطول",
+  "live now": "مباشر الآن",
+  "Zones covered": "المناطق المغطاة",
+  "City, airport and leisure": "المدينة والمطار والترفيه",
+  "Weekly reach": "الوصول الأسبوعي",
+  "Estate-wide audience": "جمهور الأسطول بالكامل",
+  "Working budget": "الميزانية الحالية",
+  "How the advisor decides": "كيف يقرر المستشار",
+  "Footfall and audience": "الحركة والجمهور",
+  "Weekly reach per screen, by daypart": "الوصول الأسبوعي لكل شاشة حسب الفترة",
+  "Dwell time": "زمن المكوث",
+  "Slow traffic and waiting areas rank higher": "تتقدم مناطق الازدحام والانتظار في الترتيب",
+  "Zone saturation": "تشبع المنطقة",
+  "Budget spreads away from crowded zones": "توزع الميزانية بعيدا عن المناطق المزدحمة",
+  "Rate card": "بطاقة الأسعار",
+  "Projected impressions per dirham": "الانطباعات المتوقعة لكل درهم",
+  "The advisor only proposes. Booking still flows through bid approvals and the standard checks, and every run is logged in the audit trail.": "المستشار يقترح فقط. يمر الحجز عبر موافقات العطاءات والفحوصات المعتادة، وتسجل كل عملية في سجل التدقيق.",
   // Knowledge and rules governance
   "Ontology entities": "كيانات النموذج المفاهيمي",
   "Shared DOOH vocabulary": "قاموس موحد للإعلانات الخارجية الرقمية",
@@ -7097,7 +7115,7 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
         <Metric label={t("Radius")} value={`${radiusKm.toFixed(1)} km`} helper="Adjustable" tone="neutral" />
       </MetricGrid>
 
-      <Panel icon={Target} title={t("Radius broadcast")} action={<StatusPill label={t("AI proposes, humans approve")} tone="info" />}>
+      <Panel icon={Target} title={t("Radius broadcast")} action={<StatusPill label={t("AI proposes, humans approve")} tone="good" />}>
         <RadiusMap assets={estateAssets} center={center} radiusM={radiusM} insideIds={insideIds} flaggedIds={flaggedIds} onPick={onPick} t={t} />
         <div className="radius-presets">
           <span className="radius-presets-label">{t("Centre on")}:</span>
@@ -7231,10 +7249,20 @@ function YieldAdvisorPage({ notify, t }: { notify: (message: string) => void; t:
   }
 
   const maxImpr = advice ? Math.max(...advice.recommendations.map((r) => r.projectedImpressions), 1) : 1;
+  const liveScreens = estateAssets.filter((asset) => asset.status === "Live").length;
+  const zoneCount = new Set(estateAssets.map((asset) => asset.zone)).size;
+  const weeklyReach = estateAssets.reduce((sum, asset) => sum + (parseInt(asset.audience) || 0), 0);
 
   return (
     <PageBody>
-      <Panel icon={Gauge} title={t("Yield advisor")} action={<StatusPill label={t("Where the budget works hardest")} tone="info" />}>
+      <MetricGrid>
+        <Metric label="Screens in estate" value={String(estateAssets.length)} helper={`${liveScreens} ${t("live now")}`} tone="good" />
+        <Metric label="Zones covered" value={String(zoneCount)} helper={t("City, airport and leisure")} tone="neutral" />
+        <Metric label="Weekly reach" value={`${(weeklyReach / 1000).toFixed(1)}M`} helper={t("Estate-wide audience")} tone="info" />
+        <Metric label="Working budget" value={`AED ${Number(budget.replace(/[^\d]/g, "") || 0).toLocaleString()}`} helper={t(YIELD_GOALS.find((g) => g.value === goal)?.label ?? "Retail sales")} tone="neutral" />
+      </MetricGrid>
+      <div className="split-grid wide-left">
+      <Panel icon={Gauge} title={t("Yield advisor")} action={<StatusPill label={t("Where the budget works hardest")} tone="good" />}>
         <div className="yield-form">
           <label><span>{t("Budget")} (AED)</span><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="numeric" /></label>
           <label><span>{t("Goal")}</span><select value={goal} onChange={(event) => setGoal(event.target.value)}>{YIELD_GOALS.map((g) => <option key={g.value} value={g.value}>{t(g.label)}</option>)}</select></label>
@@ -7276,6 +7304,16 @@ function YieldAdvisorPage({ notify, t }: { notify: (message: string) => void; t:
           <p className="cell-note">{t("Set a budget and goal, and MediaGPT ranks the screens where it will perform best, with the reasoning.")}</p>
         )}
       </Panel>
+      <Panel icon={Sparkles} title={t("How the advisor decides")}>
+        <div className="detail-cards yield-factors">
+          <Detail label={t("Footfall and audience")} value={t("Weekly reach per screen, by daypart")} />
+          <Detail label={t("Dwell time")} value={t("Slow traffic and waiting areas rank higher")} />
+          <Detail label={t("Zone saturation")} value={t("Budget spreads away from crowded zones")} />
+          <Detail label={t("Rate card")} value={t("Projected impressions per dirham")} />
+        </div>
+        <p className="cell-note">{t("The advisor only proposes. Booking still flows through bid approvals and the standard checks, and every run is logged in the audit trail.")}</p>
+      </Panel>
+      </div>
     </PageBody>
   );
 }

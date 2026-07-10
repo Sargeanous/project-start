@@ -3246,11 +3246,9 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 .ai-review-card,
 .ai-recommendation {
   position: relative;
-  border: 1px solid color-mix(in oklab, #4f46e5 26%, var(--border, #ddd));
-  background:
-    linear-gradient(180deg, rgba(79, 70, 229, 0.065), rgba(42, 94, 79, 0.035)),
-    var(--bg-panel, #ffffff);
-  box-shadow: 0 12px 26px rgba(49, 46, 129, 0.08);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  box-shadow: none;
 }
 
 .ai-recommendation {
@@ -3268,7 +3266,7 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
   border-radius: 999px;
   background: var(--blue-soft);
   border: 1px solid rgba(79, 70, 229, 0.18);
-  color: #3730a3;
+  color: var(--primary);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -3305,12 +3303,12 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
   align-items: center;
   justify-content: center;
   background: var(--blue-soft);
-  color: #3730a3;
+  color: var(--primary);
 }
 
 .ai-review-summary span {
   display: block;
-  color: #3730a3;
+  color: var(--primary);
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.11em;
@@ -3342,7 +3340,7 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 
 .deepscan-panel {
   padding-top: 14px;
-  border-top: 1px solid color-mix(in oklab, #4f46e5 18%, var(--border, #ddd));
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 720px) {
@@ -4585,9 +4583,9 @@ html[dir="rtl"] .network-tabs button.active {
   justify-content: space-between;
   gap: 14px;
   padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, #4f46e5 18%, var(--line));
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.06), rgba(255, 255, 255, 0.86));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
 }
 
 .ai-mini-panel > div:first-child {
@@ -4597,7 +4595,7 @@ html[dir="rtl"] .network-tabs button.active {
 }
 
 .ai-mini-panel > div:first-child > span:first-child {
-  color: #3730a3;
+  color: var(--primary);
   font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.08em;
@@ -5083,7 +5081,7 @@ html[dir="rtl"] .network-tabs button.active {
   border: 1px solid rgba(79, 70, 229, 0.2);
   border-radius: 999px;
   background: var(--blue-soft);
-  color: #3730a3;
+  color: var(--primary);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -5238,7 +5236,7 @@ html[dir="rtl"] .network-tabs button.active {
   border: 1px solid color-mix(in srgb, #4f46e5 20%, var(--line));
   border-radius: 999px;
   background: rgba(238, 242, 255, 0.72);
-  color: #3730a3;
+  color: var(--primary);
   font-size: 11px;
   font-weight: 750;
 }
@@ -5921,11 +5919,9 @@ html[dir="rtl"] .network-tabs button.active {
   gap: 9px;
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid color-mix(in oklab, #4f46e5 24%, var(--line, #ddd));
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(79, 70, 229, 0.045), rgba(47, 128, 100, 0.03)),
-    var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
 }
 
 .citation-columns {
@@ -6279,9 +6275,9 @@ html[dir="rtl"] .network-tabs button.active {
 .asset-supply-table .ai-recommendation {
   max-width: 430px;
   padding: 10px 12px;
-  border-color: color-mix(in srgb, #4f46e5 18%, var(--line)) !important;
-  border-inline-start: 4px solid #4f46e5 !important;
-  background: color-mix(in srgb, #eef2ff 62%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent) !important;
+  border-inline-start: 3px solid var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface)) !important;
   box-shadow: none;
   font-size: 12px;
 }
@@ -7921,7 +7917,8 @@ html[data-theme="light"] .chat-input-area input::placeholder { color: var(--mute
   right: 16px; left: auto; bottom: auto; top: calc(50dvh - 122px);
   width: 40px; min-height: 40px; height: 40px; padding: 0;
   border-radius: 10px; font-size: 0; gap: 0;
-  display: grid; place-items: center;
+  display: grid; place-items: center; place-content: center;
+  line-height: 0;
   box-shadow: var(--shadow-lg);
 }
 [dir="rtl"] .app:has(.workspace.map-canvas) .chat-fab { right: auto; left: 16px; }
@@ -7987,3 +7984,347 @@ html[data-theme="light"] .sidebar-profile { background: var(--surface-2); }
 .chat-chart { background: var(--surface-2) !important; border: 1px solid var(--line); border-radius: 10px; }
 .chat-chart text { fill: var(--muted); }
 .chat-chart .recharts-cartesian-grid line { stroke: var(--line); }
+
+/* ================================================================
+   ORIGEN REFIT - platform-wide kit primitives (node-exact)
+   Source: Origen UI Kit (Button / Input / Typography / Colors pages)
+   Controls r2, containers r8. Manrope 400/600 only, ls 0.02em:
+   12/16 caption - 14/20 body - 16/24 subtitle - 20/32 - 24/36.
+   Primary #009b5d, hover #008043, disabled #024023 + 39% mint ink.
+   Hairlines: 13% for rests, 19% for interactive borders.
+   ================================================================ */
+
+:root {
+  --primary-hover: #008043;
+  --primary-disabled: #024023;
+  --disabled-ink: rgba(235, 253, 246, 0.39);
+  --ctrl-border: rgba(241, 251, 250, 0.19);
+  --ctrl-border-dim: rgba(243, 245, 244, 0.13);
+  --tag-good-bg: rgba(70, 167, 88, 0.16);   --tag-good-bd: #46a758;  --tag-good-ink: #6fdc8f;
+  --tag-warn-bg: rgba(247, 126, 21, 0.16);  --tag-warn-bd: #f77e15;  --tag-warn-ink: #ffb26e;
+  --tag-danger-bg: rgba(255, 53, 35, 0.17); --tag-danger-bd: #e54d2e;--tag-danger-ink: #ff8f78;
+  --tag-info-bg: rgba(22, 93, 255, 0.16);   --tag-info-bd: #3c74e0;  --tag-info-ink: #94bfff;
+  --tag-idle-bg: rgba(96, 96, 96, 0.30);    --tag-idle-bd: #8b9490;  --tag-idle-ink: #c3cbc7;
+  --field-bg: var(--surface-2);
+}
+html[data-theme="light"] {
+  --primary-hover: #02542d;
+  --primary-disabled: #9fcdb6;
+  --disabled-ink: rgba(255, 255, 255, 0.85);
+  --ctrl-border: rgba(2, 32, 21, 0.22);
+  --ctrl-border-dim: rgba(2, 32, 21, 0.12);
+  --tag-good-bg: rgba(70, 167, 88, 0.12);   --tag-good-bd: #2f9e57;  --tag-good-ink: #1d7c40;
+  --tag-warn-bg: rgba(247, 126, 21, 0.12);  --tag-warn-bd: #dd6b0d;  --tag-warn-ink: #a54e07;
+  --tag-danger-bg: rgba(229, 77, 46, 0.10); --tag-danger-bd: #d64226;--tag-danger-ink: #ad3013;
+  --tag-info-bg: rgba(22, 93, 255, 0.10);   --tag-info-bd: #3c74e0;  --tag-info-ink: #1d4fb8;
+  --tag-idle-bg: rgba(96, 96, 96, 0.10);    --tag-idle-bd: #9aa39f;  --tag-idle-ink: #545d59;
+  --field-bg: #ffffff;
+}
+
+/* ---- Buttons (kit Button-Default: r2, h32 medium / h24 mini) ---- */
+.button {
+  min-height: 32px;
+  padding: 6px 16px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: none;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.button.primary { background: var(--primary); border-color: var(--primary); color: #fafafa; }
+.button.primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+.button.primary:disabled { background: var(--primary-disabled); border-color: var(--primary-disabled); color: var(--disabled-ink); opacity: 1; }
+.button.secondary { background: transparent; border-color: var(--ctrl-border); color: var(--ink); }
+.button.secondary:hover:not(:disabled) { background: transparent; border-color: var(--ctrl-border); color: var(--primary); }
+.button.secondary:disabled { border-color: var(--ctrl-border-dim); color: var(--disabled-ink); opacity: 1; }
+.button.danger { background: var(--alert, #e54d2e); border-color: var(--alert, #e54d2e); color: #fafafa; border-radius: 2px; }
+.button.danger:hover:not(:disabled) { background: #c23a20; border-color: #c23a20; }
+.row-actions .button, .row-actions .btn, .button.mini {
+  min-height: 24px; padding: 4px 8px; font-size: 12px; line-height: 16px; border-radius: 2px;
+}
+.icon-btn, .icon-button, .chat-icon-btn {
+  border-radius: 2px; background: transparent; border: 1px solid transparent; color: var(--muted);
+}
+.icon-btn:hover, .icon-button:hover, .chat-icon-btn:hover { background: var(--surface-2); color: var(--ink); border-color: transparent; }
+
+/* ---- KPI metrics: flat cards, no neon outlines, tone = dot ---- */
+.metric, .metric.tone-good, .metric.tone-warn, .metric.tone-danger, .metric.tone-info, .metric.tone-neutral {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 18px;
+  gap: 6px;
+  box-shadow: none;
+}
+.metric::before { display: none !important; }
+.metric span {
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  text-transform: none; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.metric span::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--line-strong, var(--line));
+}
+.metric.tone-good span::before { background: var(--tag-good-bd); }
+.metric.tone-warn span::before { background: var(--tag-warn-bd); }
+.metric.tone-danger span::before { background: var(--tag-danger-bd); }
+.metric.tone-info span::before { background: var(--tag-info-bd); }
+.metric strong { font-size: 24px; line-height: 36px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); }
+.metric small { font-size: 12px; line-height: 16px; font-weight: 400; color: var(--muted); }
+
+/* ---- Panels: r8 surface cards; icon = plain green glyph, no disc ---- */
+.panel { border-radius: 8px; box-shadow: none; padding: 20px 24px; }
+.panel-header { margin-bottom: 16px; padding-bottom: 12px; }
+.panel-header h2 { font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: 0.02em; }
+.panel-icon {
+  width: auto; height: auto; min-width: 0;
+  background: transparent !important; border: 0; border-radius: 0;
+  color: var(--primary);
+  display: inline-flex; align-items: center;
+}
+.linked-detail-head .panel-icon, .panel-header .panel-icon { margin-inline-end: 2px; }
+.panel-action { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em; }
+
+/* ---- Status pills: kit tag recipe (tinted fill, semantic border) ---- */
+.status-pill, .status-pill.tone-good, .status-pill.tone-warn, .status-pill.tone-danger,
+.status-pill.tone-info, .status-pill.tone-neutral {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  text-transform: none; border: 1px solid transparent;
+}
+.status-pill::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex: none; }
+.status-pill.tone-good  { background: var(--tag-good-bg);  border-color: var(--tag-good-bd);  color: var(--tag-good-ink); }
+.status-pill.tone-warn  { background: var(--tag-warn-bg);  border-color: var(--tag-warn-bd);  color: var(--tag-warn-ink); }
+.status-pill.tone-danger{ background: var(--tag-danger-bg);border-color: var(--tag-danger-bd);color: var(--tag-danger-ink); }
+.status-pill.tone-info  { background: var(--tag-info-bg);  border-color: var(--tag-info-bd);  color: var(--tag-info-ink); }
+.status-pill.tone-neutral{background: var(--tag-idle-bg);  border-color: var(--tag-idle-bd);  color: var(--tag-idle-ink); }
+
+/* ---- Tabs: kit button-tab (underline, not pills or blocks) ---- */
+.segmented, .segmented-tabs, .network-tabs {
+  display: flex; gap: 24px; align-items: flex-end;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 0; box-shadow: none; width: 100%;
+}
+.segmented button, .segmented-tabs button, .network-tabs button {
+  background: transparent; border: 0; border-radius: 0;
+  padding: 9px 2px; margin-bottom: -1px;
+  font-family: inherit; font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
+  color: var(--muted); box-shadow: none; flex: 0 0 auto;
+  border-bottom: 2px solid transparent;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.network-tabs button strong { font-weight: inherit; font-size: inherit; letter-spacing: inherit; }
+.segmented button:hover, .segmented-tabs button:hover, .network-tabs button:hover { color: var(--ink); background: transparent; }
+.segmented button.active, .segmented-tabs button.active, .network-tabs button.active,
+.segmented button[aria-pressed="true"], .segmented-tabs button[aria-pressed="true"],
+.segmented button[aria-selected="true"], .segmented-tabs button[aria-selected="true"],
+.network-tabs button[aria-selected="true"] {
+  background: transparent; color: var(--primary); font-weight: 600;
+  border-bottom-color: var(--primary); box-shadow: none;
+}
+
+/* ---- Filter chips: kit mini secondary buttons ---- */
+.filter-row { gap: 8px; }
+.filter-row button {
+  min-height: 24px; padding: 4px 8px; border-radius: 2px;
+  background: transparent; border: 1px solid var(--ctrl-border);
+  font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0.02em; color: var(--ink);
+}
+.filter-row button:hover { color: var(--primary); background: transparent; }
+.filter-row button.active {
+  background: transparent; border-color: var(--primary); color: var(--primary); font-weight: 600;
+}
+
+/* ---- Tables: quiet header, hairline rows, readable cells ---- */
+.table-card { border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+.table-card table { border-collapse: collapse; }
+.table-card th {
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  text-transform: none; color: var(--muted);
+  background: transparent; border-bottom: 1px solid var(--line);
+  padding: 10px 16px;
+}
+.table-card td { font-size: 14px; line-height: 20px; padding: 12px 16px; border-top: 1px solid var(--ctrl-border-dim); }
+.table-card tbody tr:first-child td { border-top: 0; }
+.table-card tbody tr:hover td { background: var(--surface-input); }
+.cell-note { font-size: 12px; line-height: 16px; color: var(--muted); }
+
+/* ---- Fields: kit Input (elevated well, hairline, r2, h32) ---- */
+.workspace input[type="text"], .workspace input[type="number"], .workspace input[type="search"],
+.workspace input[type="email"], .workspace input[type="date"], .workspace input[type="time"],
+.workspace select, .workspace textarea {
+  background: var(--field-bg);
+  border: 1px solid var(--ctrl-border-dim);
+  border-radius: 2px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-family: inherit; font-size: 14px; line-height: 20px; letter-spacing: 0.02em;
+  color: var(--ink);
+  box-shadow: none;
+}
+.workspace textarea { min-height: 72px; }
+.workspace input::placeholder, .workspace textarea::placeholder { color: var(--muted); }
+.workspace input:focus, .workspace select:focus, .workspace textarea:focus {
+  outline: none; border-color: var(--primary); box-shadow: none;
+}
+.workspace label { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); text-transform: none; }
+
+/* ---- Detail fact wells ---- */
+.detail-cards > div {
+  background: var(--surface-input);
+  border: 1px solid var(--ctrl-border-dim);
+  border-radius: 4px;
+  box-shadow: none;
+}
+.detail-cards span { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em; text-transform: none; color: var(--muted); }
+.detail-cards strong { font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: 0.02em; }
+
+/* ---- Entity chips ---- */
+.chip-row span {
+  background: var(--surface-2); border: 1px solid var(--ctrl-border-dim); border-radius: 2px;
+  padding: 2px 8px; font-size: 12px; line-height: 16px; letter-spacing: 0.02em; color: var(--ink);
+}
+
+/* ---- AI assist panels: green identity, quiet tint ---- */
+.ai-mini-panel, .ai-recommendation, .supply-ai-recommendation, .media-notice {
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+/* ---- Lifecycle stepper: square r2 markers, green line of custody ---- */
+.lifecycle-step .lifecycle-num {
+  border-radius: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--ctrl-border-dim);
+  color: var(--muted);
+  font-size: 12px; font-weight: 600;
+}
+.lifecycle-step.done .lifecycle-num { background: var(--primary-disabled); border-color: transparent; color: var(--disabled-ink); }
+.lifecycle-step.active .lifecycle-num { background: var(--primary); border-color: var(--primary); color: #fafafa; }
+.lifecycle-step .lifecycle-label { font-size: 12px; line-height: 16px; letter-spacing: 0.02em; }
+.lifecycle-step.active .lifecycle-label { color: var(--primary); font-weight: 600; }
+
+/* ---- Code / hash chips ---- */
+.hash-chip { background: var(--surface-2); border: 1px solid var(--ctrl-border-dim); border-radius: 2px; padding: 2px 6px; }
+
+/* ---- Topbar utilities pick up kit control shapes ---- */
+.topbar .icon-button, .topbar .icon-btn { border-radius: 2px; }
+
+/* ---- Badge unification: every ad-hoc pill becomes a kit tag ----
+   (CC map overlays - cc-zone-pill, cc-badge, weather-chip, chat-fab -
+   stay node-exact per the DOOH Figma frames.) */
+.twin-badge, .kill-chip, .gov-chip, .boundary-badge, .agent-chip,
+.approval-sig, .pop-sig, .twin-window-badge, .session-pill, .chat-source {
+  border-radius: 4px;
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 2px 8px;
+}
+.twin-badge { background: var(--tag-idle-bg); border: 1px solid var(--tag-idle-bd); color: var(--tag-idle-ink); }
+.twin-badge.tone-fault { background: var(--tag-danger-bg); border-color: var(--tag-danger-bd); color: var(--tag-danger-ink); }
+.twin-badge.tone-degrading { background: var(--tag-warn-bg); border-color: var(--tag-warn-bd); color: var(--tag-warn-ink); }
+.kill-chip { background: var(--tag-danger-bg); border: 1px solid var(--tag-danger-bd); color: var(--tag-danger-ink); font-weight: 500; }
+.approval-sig { background: var(--tag-good-bg); border: 1px solid var(--tag-good-bd); color: var(--tag-good-ink); font-weight: 500; }
+.chat-source.live { background: var(--tag-good-bg); border: 1px solid var(--tag-good-bd); color: var(--tag-good-ink); }
+
+/* ---- Control shapes: r2 for interactive, quiet borders ---- */
+.radius-presets button {
+  border-radius: 2px; border: 1px solid var(--ctrl-border); background: transparent;
+  font-size: 12px; line-height: 16px; letter-spacing: 0.02em; color: var(--ink); padding: 4px 10px;
+}
+.radius-presets button:hover { color: var(--primary); }
+.notification-actions button { border-radius: 2px; }
+.chat-suggestions span, .citation-row span {
+  border-radius: 2px; font-size: 12px; line-height: 16px; letter-spacing: 0.02em;
+}
+.twin-spec-trigger { border-radius: 2px; }
+.knowledge-search { border-radius: 2px; }
+.ai-search-row input { border-radius: 2px; }
+.ai-search-row > button:not(.button) { border-radius: 2px; }
+
+/* ---- Indigo purge: retire the #4f46e5 "MediaGPT card" treatment ----
+   AI surfaces speak Origen green; no floating stamps, no indigo glow. */
+.agent-rail, .workbench, .workbench-result, .workbench-empty,
+.ai-intervention-box, .mediagpt-prompt, .agent-card,
+.scenario-result, .family-agents, .technical-table {
+  border: 1px solid var(--line) !important;
+  background: var(--surface) !important;
+  box-shadow: none !important;
+  border-radius: 8px;
+}
+.ai-recommendation {
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface)) !important;
+  box-shadow: none !important;
+}
+.chat-log article.assistant {
+  border: 1px solid var(--line) !important;
+  background: var(--surface-2) !important;
+  box-shadow: none !important;
+}
+.workbench::before, .workbench-result::before, .ai-intervention-box::before,
+.mediagpt-prompt::before, .chat-log article.assistant::before,
+.agent-card::before, .scenario-result::before, .family-agents::before,
+.technical-table::before, .ai-recommendation::before, .ai-review-card::before {
+  content: none !important;
+}
+.agent-rail-item { border-radius: 4px; }
+.agent-rail-item:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.agent-rail-item.active {
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+[dir="rtl"] .agent-rail-item.active { box-shadow: inset -3px 0 0 var(--primary); }
+.agent-rail-body strong { color: var(--ink); }
+.agent-rail-body small, .workbench-title small { color: var(--muted); }
+.workbench-title strong { color: var(--ink); }
+.boundary-badge.tone-info { background: var(--tag-info-bg); border: 1px solid var(--tag-info-bd); color: var(--tag-info-ink); }
+.boundary-badge.tone-neutral { background: var(--tag-idle-bg); border: 1px solid var(--tag-idle-bd); color: var(--tag-idle-ink); }
+.boundary-badge.tone-warn { background: var(--tag-warn-bg); border: 1px solid var(--tag-warn-bd); color: var(--tag-warn-ink); }
+.boundary-badge.tone-danger { background: var(--tag-danger-bg); border: 1px solid var(--tag-danger-bd); color: var(--tag-danger-ink); }
+
+/* ---- Caption discipline: kit 12/16 w500 sentence case ----
+   Kickers that are page identity (topbar p, sidebar brand) keep tracking. */
+.stack-form label, .scenario-result span, .detail span, .auction-stats span,
+.auction-form label, .rules-list-head, .ai-review-summary span,
+.governance-card > header, .workbench-field > span, .integration-card dt,
+.rule-editor label, .edge-gauge span, .rule-simulator-select span,
+.ai-mini-panel > div:first-child > span:first-child, .kanban section > strong,
+.permission-matrix th, .agent-rail-title,
+.workbench-empty strong, .workbench-starters strong,
+.supply-actions-strip > span, .twin-fullscreen-header span, .twin-tip span,
+.twin-window-action span, .twin-issues-head, .agent-action-card span,
+.radius-message span, .studio-copy span, .studio-wording label span,
+.notification-drawer header span {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 12px; line-height: 16px; font-weight: 500;
+  color: var(--muted);
+}
+.rules-list-head { font-weight: 500; }
+.studio-recos strong { text-transform: none; letter-spacing: 0.02em; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--primary); }
+.workspace th { text-transform: none; letter-spacing: 0.02em; font-weight: 500; color: var(--muted); }
+
+/* ---- Weight discipline: kit stops at 600 ---- */
+.workspace strong, .workspace b { font-weight: 600; }
+.workspace span.head-meta, .workspace .twin-spec-trigger,
+.workspace span.bad, .workspace span.warn, .workspace dd { font-weight: 600; }
+.kill-tag { text-transform: none; letter-spacing: 0.02em; border-radius: 4px; font-weight: 500; }
+
+/* ---- Legends and micro-chips lose the pill ---- */
+.alloc-legend, .twin-legend { border-radius: 4px; }
+.twin-issue em, .twin-issue i {
+  border-radius: 4px; font-style: normal;
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em;
+}
+
+/* ---- Yield advisor: factors stack in the side panel ---- */
+.yield-factors { grid-template-columns: 1fr; }
+.yield-factors + .cell-note { margin-top: 12px; }
