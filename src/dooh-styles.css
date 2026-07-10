@@ -3759,7 +3759,7 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .revision-backdrop{z-index:1430}
 .revision-dialog{width:min(780px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-3);border:1px solid var(--border);border-radius:18px;box-shadow:0 36px 90px rgba(0,0,0,.34)}
 .revision-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 22px;border-bottom:1px solid var(--border);background:var(--surface-3)}
-.revision-header span{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.revision-header span{display:block;font-size:12px;line-height:16px;font-weight:500;letter-spacing:0.02em;text-transform:none;color:var(--muted)}
 .revision-header strong{display:block;margin-top:5px;font-family:var(--font-display,inherit);font-size:22px;color:var(--ink)}
 .revision-header small{display:block;margin-top:4px;font-size:13px;color:var(--muted)}
 .revision-body{display:flex;flex-direction:column;gap:16px;padding:20px 22px;overflow:auto;background:var(--surface)}
@@ -8328,6 +8328,24 @@ html[data-theme="light"] {
 /* ---- Yield advisor: factors stack in the side panel ---- */
 .yield-factors { grid-template-columns: 1fr; }
 .yield-factors + .cell-note { margin-top: 12px; }
+
+/* ---- Audit round 2: last weight/caption/pill strays ---- */
+.selected-alert-summary span {
+  text-transform: none; letter-spacing: 0.02em;
+  font-size: 12px; line-height: 16px; font-weight: 500; color: var(--muted);
+}
+.selected-alert-summary strong { font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: 0.02em; }
+.chip-row span { font-weight: 500; }
+.knowledge-list small { font-weight: 500; }
+.verification-step > span:first-child { font-weight: 600; }
+.workbench-starters button { font-weight: 500; }
+.bar-row span { font-weight: 500; }
+.bar-row > div, .bar-row i { border-radius: 2px; }
+.edge-gauge > div, .edge-gauge i { border-radius: 2px; }
+.role-grid article > span { font-weight: 600; }
+.role-grid article small { font-weight: 500; }
+.asset-pane-actions span { font-weight: 600; letter-spacing: 0.02em; }
+.notification-badge { font-weight: 600; }
 
 /* ---- KPI strip flows: 5 metrics share one row instead of orphaning ---- */
 .metric-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }

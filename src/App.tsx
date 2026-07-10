@@ -4196,7 +4196,7 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
   }
 
   return (
-    <Panel icon={PenTool} title={t("Creative studio")} action={<StatusPill label={t("ADMO civic creative")} tone="info" />}>
+    <Panel icon={PenTool} title={t("Creative studio")} action={<StatusPill label={t("ADMO civic creative")} tone="good" />}>
       <Segmented value={mode} onChange={(m) => { setMode(m); setReview(null); setSent(null); }} items={[
         { id: "generate", label: t("Generate a visual") },
         { id: "review", label: t("Review my visual") },
