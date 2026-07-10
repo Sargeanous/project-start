@@ -3859,14 +3859,15 @@ function ControlCentre({
 
   useEffect(() => {
     if (!liveViewFullscreen) return;
-    const previousOverflow = document.body.style.overflow;
+    // Restore unconditionally: capturing the previous value can re-lock the
+    // page if two opens interleave or a hot reload orphans the inline style.
     document.body.style.overflow = "hidden";
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setLiveViewFullscreen(false);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = "";
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [liveViewFullscreen]);
