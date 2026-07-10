@@ -3120,7 +3120,7 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 .cap-bodies blockquote { margin: 0; padding: 10px 12px; border-left: 3px solid #c0392b; background: var(--red-soft); border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.5; color: #2a3a34; }
 .cap-bodies blockquote[dir="rtl"] { border-left: none; border-right: 3px solid #c0392b; border-radius: 8px 0 0 8px; }
 .cap-bodies small { font-size: 11px; color: var(--muted); font-style: italic; }
-.emg-assist { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--blue-soft); }
+.emg-assist { margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
 .emg-assist-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .emg-assist-head strong { font-size: 13px; }
 .emg-assist-body { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -4447,8 +4447,8 @@ html[dir="rtl"] .network-tabs button.active {
 
 .knowledge-list button:hover,
 .knowledge-list button.selected {
-  border-color: color-mix(in srgb, var(--primary) 60%, var(--line));
-  background: color-mix(in srgb, var(--primary-soft) 70%, #fff);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
 }
 
 .knowledge-list button.selected {
@@ -8328,3 +8328,6 @@ html[data-theme="light"] {
 /* ---- Yield advisor: factors stack in the side panel ---- */
 .yield-factors { grid-template-columns: 1fr; }
 .yield-factors + .cell-note { margin-top: 12px; }
+
+/* ---- KPI strip flows: 5 metrics share one row instead of orphaning ---- */
+.metric-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }

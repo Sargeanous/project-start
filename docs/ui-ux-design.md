@@ -347,4 +347,55 @@ profile card (darker r8 well, 40px avatar, chevrons) switches profile.
 Read-only token in `.env` (`FIGMA_TOKEN`); file keys `jgApFSaXeJTFk2t3u3UstL`
 (DOOH, Page 4 canonical) and `p6JTAseyoPjBh9fSv94xTC` (Origen UI Kit). Only the
 Control Centre is designed; all other pages derive this language and keep
-their layouts. Demo videos still film the pre-Origen UI (re-render deferred).
+their layouts. Both demo videos are rendered on the Origen UI.
+
+## 17. Origen refit — kit primitives platform-wide (July 2026)
+
+Every inner page now speaks the Origen Kit component vocabulary, extracted
+node-exact from the kit's Button and Input pages plus the Colors / Typography /
+Shadows foundations. The authoritative layer is the `ORIGEN REFIT` section at
+the end of `src/dooh-styles.css`; it re-derives every shared primitive and
+intentionally wins the cascade.
+
+### Kit recipes in force
+- **Type ramp** (Manrope, ls 0.02em, weights 400/600 only): 12/16 caption,
+  14/20 body, 16/24 subtitle, 18/26, 20/32, 24/36. Captions are sentence case,
+  12/16 w500 at muted — the uppercase-tracked micro-label pattern is retired
+  platform-wide (page kicker and sidebar brand keep their identity styling).
+- **Buttons** (`.button`): r2, h32 medium (pad 6/16) and h24 mini (pad 4/8),
+  text weight 400. Primary `#009b5d`, hover `#008043`, disabled `#024023` with
+  39%-mint ink. Secondary = transparent + 19% hairline border; hover turns the
+  LABEL green (border unchanged). Row actions inside tables render mini.
+- **Fields**: dark wells `#2f3030` (light: white), 13% hairline, r2, h32,
+  pad 6/12, focus border = primary, placeholder at 49%.
+- **Tags** (`.status-pill` + all ad-hoc badges): r4, 12/16 w500, 4px dot,
+  tinted fill + semantic border. Tone tokens
+  `--tag-{good|warn|danger|info|idle}-{bg|bd|ink}` defined for both themes.
+- **Tabs** (`.segmented`, `.segmented-tabs`, `.network-tabs`): kit underline
+  tabs — transparent strip with bottom hairline, 14/20 w400 muted, hover ink,
+  selected green w600 + 2px underline. No pills, no filled blocks.
+- **Tables** (`.table-card`): r8 surface, sentence-case 12/16 muted header,
+  hairline row separators at 13%/8%, row hover = input surface.
+- **KPI metrics** (`.metric`): flat r8 surface cards — the colored-outline
+  look is dead. Label carries a 6px tone dot; value 24/36 w600.
+  `.metric-grid` uses auto-fit (min 220px) so 5 KPIs share one row.
+- **Panels**: r8, `panel-icon` is a bare green glyph (no circular well).
+- **AI identity is green**: the legacy indigo `#4f46e5` "MediaGPT card"
+  treatment (floating stamps, gradients, glows) is purged. AI surfaces =
+  7% primary tint + 30% primary border; agent-rail selection = green inset bar.
+- **Weight cap 600** everywhere; radius vocabulary: r2 controls, r4 tags/wells,
+  r8 containers; pill shapes remain only where the DOOH frames use them
+  (chat launcher, CC zone pill, weather chip).
+
+### Layout logic
+Pages follow the Control Centre logic: KPI strip, then content panels with a
+clear hierarchy. Yield Advisor is the template for thin pages: metric strip
+computed from estate data, advisor panel beside a "How the advisor decides"
+panel, and a governance note ("the advisor only proposes").
+
+### Kit extraction status
+Consumed node-exact: Button, Input, Colors, Typography, Shadows & blurs.
+Pending (Figma REST quota exhausted this session): Table, Tag, Tabs, Picker,
+Checkbox, Radio, Switch, Menu, BASE COMPONENTS, EO, AI Agent pages — fetch
+JSON via `/v1/files/p6JTAseyoPjBh9fSv94xTC/nodes?ids=...` when quota resets
+and refine numbers if they differ from the inferred recipes.
