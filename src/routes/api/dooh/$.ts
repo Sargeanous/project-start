@@ -270,6 +270,10 @@ export const Route = createFileRoute("/api/dooh/$")({
               scheduleWindow: typeof body.scheduleWindow === "string" ? body.scheduleWindow : undefined,
               category: typeof body.category === "string" ? body.category : undefined,
               daypart: typeof body.daypart === "string" ? body.daypart : undefined,
+              overlapPolicy: body.overlapPolicy === "exclude" ? "exclude" : "override",
+              creativeId: typeof body.creativeId === "string" ? body.creativeId : undefined,
+              creativeUrl: typeof body.creativeUrl === "string" ? body.creativeUrl : undefined,
+              visualSource: typeof body.visualSource === "string" ? body.visualSource : undefined,
             }, actor));
           }
 

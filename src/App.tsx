@@ -64,6 +64,17 @@ import {
   Wrench,
   Zap,
   Trash2,
+  Monitor,
+  Wifi,
+  ListChecks,
+  LayoutGrid,
+  Package,
+  MoreVertical,
+  Minus,
+  ChevronLeft,
+  GitBranch,
+  SlidersHorizontal,
+  Thermometer,
   type LucideIcon,
 } from "lucide-react";
 import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -908,11 +919,33 @@ const translations: Record<string, string> = {
   "Message": "الرسالة",
   "What plays on these screens": "ما يُعرض على هذه الشاشات",
   "Schedule window": "نافذة الجدولة",
-  "AI proposes, humans approve. This goes to the approval queue.": "الذكاء الاصطناعي يقترح والبشر يوافقون. يذهب هذا إلى قائمة الموافقات.",
   "Queue schedule": "إضافة الجدولة للطابور",
   "Queue display": "إضافة العرض للطابور",
   "Name the campaign or message first": "سمِّ الحملة أو الرسالة أولًا",
   "Enter a message first": "أدخل رسالة أولًا",
+  "Choose or create a visual first": "اختر أو أنشئ مرئياً أولاً",
+  "will play": "سيتم تشغيلها",
+  "overlap": "تداخل",
+  "Choose whether MediaGPT should override the current commitment or hold those screens out.": "اختر ما إذا كان على MediaGPT تجاوز الالتزام الحالي أو استبعاد تلك الشاشات.",
+  "Override and display": "تجاوز واعرض",
+  "Keep this action possible; route the override for named approval.": "اجعل الإجراء ممكناً ووجّه التجاوز لاعتماد مسمى.",
+  "Hold overlaps out": "استبعاد التداخلات",
+  "Do not disturb committed screens; only clear screens will play.": "لا تغيّر الشاشات الملتزمة؛ سيتم تشغيل الشاشات الخالية فقط.",
+  "Checking rules and overlaps...": "جارٍ فحص القواعد والتداخلات...",
+  "English message": "الرسالة الإنجليزية",
+  "Arabic message": "الرسالة العربية",
+  "Use media library": "استخدام مكتبة الوسائط",
+  "Upload visual": "رفع مرئي",
+  "Create with MediaGPT": "إنشاء عبر MediaGPT",
+  "MediaGPT visual prompt": "موجه مرئي MediaGPT",
+  "Generate visual and copy": "إنشاء المرئي والنص",
+  "MediaGPT could not generate a visual right now.": "تعذر على MediaGPT إنشاء مرئي الآن.",
+  "Playback preview": "معاينة التشغيل",
+  "Now": "الآن",
+  "Visual": "المرئي",
+  "Screens": "الشاشات",
+  "Overlap handling": "معالجة التداخل",
+  "No overlap": "لا يوجد تداخل",
   "Could not queue the action": "تعذّر إضافة الإجراء للطابور",
   "Sending": "جارٍ الإرسال",
   // Yield advisor page
@@ -942,6 +975,23 @@ const translations: Record<string, string> = {
   "Hide ontology": "إخفاء النموذج المفاهيمي",
   "Show details": "إظهار التفاصيل",
   "Hide details": "إخفاء التفاصيل",
+  "Overview": "نظرة عامة",
+  "MediaGPT": "MediaGPT",
+  "Governance": "الحوكمة",
+  "Activity": "النشاط",
+  "Creative and campaign facts": "التصميم وبيانات الحملة",
+  "AI checks and actions": "فحوص الذكاء والإجراءات",
+  "Approvals and notes": "الموافقات والملاحظات",
+  "Journal and audit trail": "السجل ومسار التدقيق",
+  "Submission workspace sections": "أقسام مساحة عمل الطلب",
+  "Expand sidebar": "إظهار القائمة الجانبية",
+  "Collapse sidebar": "إخفاء القائمة الجانبية",
+  "No approval action for this stage": "لا يوجد إجراء موافقة في هذه المرحلة",
+  "Approval controls appear when the selected submission is in review.": "تظهر أدوات الموافقة عندما يكون الطلب المحدد قيد المراجعة.",
+  "Hide queue": "إخفاء القائمة",
+  "Show queue": "إظهار القائمة",
+  "Review queue": "قائمة المراجعة",
+  "need review": "تحتاج مراجعة",
   "Show tests": "إظهار الاختبارات",
   "Hide tests": "إخفاء الاختبارات",
   "Show simulator": "إظهار المحاكي",
@@ -1198,6 +1248,14 @@ const translations: Record<string, string> = {
   "Checks bilingual payload, authority, SLA, and edge route before broadcast.": "يفحص الرسالة باللغتين، والجهة المعتمدة، ومستوى الخدمة، ومسار الحافة قبل البث.",
   "Ready for approval": "جاهز للاعتماد",
   "Run MediaGPT checks": "تشغيل فحوصات MediaGPT",
+  "Alert queue": "قائمة التنبيهات",
+  "active": "نشط",
+  "Selected alert": "التنبيه المحدد",
+  "Emergency visual approval": "اعتماد مرئي للطوارئ",
+  "Named approval required": "يتطلب اعتماداً من معتمد محدد",
+  "Approved for broadcast": "معتمد للبث",
+  "MediaGPT checks": "فحوصات MediaGPT",
+  "Dissemination assist": "مساعدة التوزيع",
   "Reports & BI": "التقارير وذكاء الأعمال",
   "Regulatory and operational reports": "تقارير تنظيمية وتشغيلية",
   "Report": "التقرير",
@@ -1206,7 +1264,6 @@ const translations: Record<string, string> = {
   "Reports respect RBAC and tenant scoping; exports reflect the current live platform state.": "تحترم التقارير صلاحيات الوصول ونطاق المستأجر؛ وتعكس الصادرات الحالة الحية للمنصة.",
   "Remote display control (kill switch)": "التحكم عن بُعد بالشاشات (مفتاح الإيقاف)",
   "blanked": "معطّلة",
-  "All live": "الكل يعمل",
   "Per asset": "لكل أصل",
   "Per zone": "لكل منطقة",
   "Emirate-wide": "على مستوى الإمارة",
@@ -1447,6 +1504,7 @@ const translations: Record<string, string> = {
   "Published to network": "تم النشر على الشبكة",
   "Waiting for bidder revision": "بانتظار تعديل المزايد",
   "Owner": "المالك",
+  "Due": "الاستحقاق",
   "Budget": "الميزانية",
   "Language": "اللغة",
   "Submitted": "مقدم",
@@ -1528,6 +1586,16 @@ const translations: Record<string, string> = {
   "BoM, service orders and POs": "قائمة المواد وأوامر الخدمة وأوامر الشراء",
   "AI recommendations enabled": "توصيات الذكاء الاصطناعي مفعلة",
   "service tasks": "مهام خدمة",
+  "open orders": "أوامر مفتوحة",
+  "Selected asset": "الأصل المحدد",
+  "Health state": "حالة الأصل",
+  "Linked work": "الأعمال المرتبطة",
+  "No open work order": "لا يوجد أمر عمل مفتوح",
+  "No open purchase order": "لا يوجد أمر شراء مفتوح",
+  "Asset command workspace": "مساحة قيادة الأصول",
+  "Inspect, select and act on one asset": "افحص أصلاً واحداً وحدده ونفذ الإجراء",
+  "shown": "معروضة",
+  "Ask about assets": "اسأل عن الأصول",
   "BOM items": "عناصر قائمة المواد",
   "Open SOs": "أوامر الخدمة المفتوحة",
   "Open POs": "أوامر الشراء المفتوحة",
@@ -1627,6 +1695,10 @@ const translations: Record<string, string> = {
   "Scenario target": "هدف السيناريو",
   "Budget and revenue breakdown": "تفصيل الميزانية والإيرادات",
   "Bid scenario": "سيناريو المزايدة",
+  "Approvals": "الاعتمادات",
+  "Commercial desk": "المكتب التجاري",
+  "Scenarios": "السيناريوهات",
+  "Settlement": "التسوية",
   "Segment": "الشريحة",
   "Actual": "الفعلي",
   "Variance": "الانحراف",
@@ -2482,15 +2554,12 @@ const translations: Record<string, string> = {
   "Moved submission to Changes requested": "نقل الطلب إلى مطلوب تعديل",
   "Summer retail launch": "إطلاق التجزئة الصيفي",
   "Kill switch": "مفتاح الإيقاف",
-  "Restricted": "صلاحية مقيدة",
-  "Blanks live displays in the field within seconds. Password confirmation is required and every activation is written to the audit trail.": "يقوم بتعتيم الشاشات الحية في الميدان خلال ثوانٍ. يتطلب تأكيد كلمة المرور، ويُسجَّل كل تفعيل في سجل التدقيق.",
   "Confirm display blackout": "تأكيد تعتيم الشاشات",
   "Takes effect immediately on live screens": "يسري فورًا على الشاشات الحية",
   "Target": "الهدف",
   "Displays affected": "الشاشات المتأثرة",
   "Every display in the emirate": "جميع الشاشات في الإمارة",
   "Operator password": "كلمة مرور المشغل",
-  "Demo: any password of 6+ characters verifies.": "تجريبي: أي كلمة مرور من 6 أحرف فأكثر تُقبل.",
   "Blank displays now": "تعتيم الشاشات الآن",
   "Dispatch technicians": "إرسال الفنيين",
   "Review where field crews will be sent before confirming.": "راجع المواقع التي سترسل إليها الفرق الميدانية قبل التأكيد.",
@@ -3152,6 +3221,8 @@ function App() {
             setLang={setLang}
             theme={theme}
             onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
             notifications={visibleNotifications}
             notificationPreferences={notificationPreferences}
             onToggleNotificationPreference={updateNotificationPreference}
@@ -3204,7 +3275,7 @@ function App() {
             />
           )}
           {page === "mediagpt" && <MediaGptSuite aiAvailable={aiAvailable} t={t} />}
-          {page === "radiusBroadcast" && <RadiusBroadcastPage profile={profile} aiAvailable={aiAvailable} notify={notify} t={t} />}
+          {page === "radiusBroadcast" && <RadiusBroadcastPage aiAvailable={aiAvailable} notify={notify} t={t} />}
           {page === "yieldAdvisor" && <YieldAdvisorPage notify={notify} t={t} />}
           {page === "knowledge" && <KnowledgeBasePage t={t} />}
           {page === "rules" && <RulesPage enforcementEvents={enforcementEvents} t={t} />}
@@ -3388,6 +3459,8 @@ function Topbar({
   setLang,
   theme,
   onToggleTheme,
+  sidebarCollapsed,
+  onToggleSidebar,
   notifications,
   notificationPreferences,
   onToggleNotificationPreference,
@@ -3402,6 +3475,8 @@ function Topbar({
   setLang: (lang: Lang) => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   notifications: PlatformNotification[];
   notificationPreferences: NotificationPreferences;
   onToggleNotificationPreference: (key: NotificationPreferenceKey, enabled: boolean) => void;
@@ -3421,6 +3496,17 @@ function Topbar({
         <h1>{t(meta.label)}</h1>
       </div>
       <div className="topbar-actions">
+        {sidebarCollapsed ? (
+          <button
+            className="icon-button sidebar-open-btn"
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label={t("Expand sidebar")}
+            title={t("Expand sidebar")}
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        ) : null}
         {page === "control" ? (
           <span className="weather-chip">
             <Sun size={14} /> {Math.round(estateAssets.reduce((sum, asset) => sum + (parseInt(asset.tempC) || 40), 0) / estateAssets.length - 6)}°C, {fmtGst(new Date())}
@@ -3435,7 +3521,10 @@ function Topbar({
             aria-label={t("Notifications")}
             aria-expanded={notificationOpen}
           >
-            <Bell size={18} />
+            <svg className="notification-bell-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 22a2.7 2.7 0 0 0 2.55-1.8h-5.1A2.7 2.7 0 0 0 12 22Z" />
+              <path d="M19.62 16.37 18 14.75V10a6 6 0 0 0-4.5-5.8v-.7a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 10v4.75l-1.62 1.62A1.35 1.35 0 0 0 5.33 18.7h13.34a1.35 1.35 0 0 0 .95-2.33Z" />
+            </svg>
             {unreadCount ? <span className="notification-badge">{unreadCount}</span> : null}
           </button>
           {notificationOpen ? (
@@ -3602,17 +3691,11 @@ function KillSwitchPanel({
         <div>
           <span className="panel-icon"><Power size={18} /></span>
           <h2>{t("Kill switch")}</h2>
-          <span className="kill-tag">{t("Restricted")}</span>
         </div>
         <div className="panel-action">
-          <StatusPill label={killedAssetIds.length ? String(killedAssetIds.length) + " " + t("blanked") : t("All live")} tone={killedAssetIds.length ? "danger" : "good"} />
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}>×</button>
         </div>
       </header>
-      <p className="kill-caution">
-        <ShieldAlert size={14} />
-        {t("Blanks live displays in the field within seconds. Password confirmation is required and every activation is written to the audit trail.")}
-      </p>
       <div className="kill-form">
         <label>{t("Scope")}
           <select value={scope} onChange={(e) => setScope(e.target.value as "asset" | "zone" | "emirate")}>
@@ -3704,7 +3787,6 @@ function KillConfirmDialog({
             {t("Operator password")}
             <input type="password" value={password} placeholder="••••••••" onChange={(event) => setPassword(event.target.value)} />
           </label>
-          <p className="mfa-hint">{t("Demo: any password of 6+ characters verifies.")}</p>
         </div>
         <footer className="revision-footer">
           <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
@@ -3878,10 +3960,19 @@ function SelectionActionDialog({
   t: (value: string) => string;
 }) {
   const [screens, setScreens] = useState<SelectionScreen[] | null>(null);
-  const [campaign, setCampaign] = useState("");
-  const [messageEn, setMessageEn] = useState("");
-  const [scheduleWindow, setScheduleWindow] = useState("Tomorrow 06:00 - 10:00");
+  const [campaign, setCampaign] = useState(actionKind === "schedule" ? "Reem Island evening rotation" : "Immediate civic takeover");
+  const [messageEn, setMessageEn] = useState(actionKind === "schedule" ? "Visit Abu Dhabi this weekend" : "Road safety update: reduce speed and keep distance");
+  const [messageAr, setMessageAr] = useState(actionKind === "schedule" ? "اكتشف أبوظبي هذا الأسبوع" : "تحديث السلامة المرورية: خفف السرعة واترك مسافة آمنة");
+  const [scheduleWindow, setScheduleWindow] = useState("Today 18:00 - 22:00");
+  const [visualMode, setVisualMode] = useState<"library" | "upload" | "generate">("library");
+  const [selectedLibraryId, setSelectedLibraryId] = useState("MED-008");
+  const [visualUrl, setVisualUrl] = useState("");
+  const [visualSource, setVisualSource] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("Abu Dhabi civic message, clean bilingual outdoor creative, high contrast, premium DOOH layout");
+  const [overlapPolicy, setOverlapPolicy] = useState<"exclude" | "override">("override");
   const [submitting, setSubmitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -3902,11 +3993,74 @@ function SelectionActionDialog({
   const conflicts = (screens ?? []).filter((s) => s.conflict);
   const hardConflicts = conflicts.filter((s) => s.conflictLevel === "hard");
   const flagged = (screens ?? []).filter((s) => s.status === "flagged");
-  const clearCount = (screens?.length ?? 0) - flagged.length;
+  const ruleFlagged = flagged.filter((s) => !s.conflict);
+  const heldForOverlap = overlapPolicy === "exclude" ? hardConflicts : [];
+  const clearCount = Math.max(0, (screens?.length ?? 0) - ruleFlagged.length - heldForOverlap.length);
+  const libraryItems = seedMediaAssets.filter((item) => item.status === "Approved" && item.type !== "Document").slice(0, 6);
+  const selectedLibraryIndex = Math.max(0, libraryItems.findIndex((item) => item.id === selectedLibraryId));
+  const selectedLibrary = libraryItems[selectedLibraryIndex] ?? libraryItems[0];
+  const selectedLibraryCreativeId = mediaCreative(selectedLibraryIndex + 1);
+  const selectedVisual =
+    visualMode === "library"
+      ? creativeBackground(selectedLibraryCreativeId)
+      : visualUrl;
+  const selectedVisualLabel =
+    visualMode === "library"
+      ? selectedLibrary?.title ?? "Approved media"
+      : visualMode === "generate"
+        ? visualSource === "offline" ? "MediaGPT generated fallback" : "MediaGPT generated visual"
+        : "Uploaded visual";
+
+  function onFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setVisualUrl(String(reader.result));
+      setVisualSource("upload");
+      setVisualMode("upload");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function generateCreative() {
+    const brief = `${campaign}. ${messageEn}. ${aiPrompt}`;
+    setGenerating(true);
+    try {
+      if (!messageAr.trim()) {
+        const copy = await aiGenerateCreativeCopy({ brief, tone: "official, concise, premium roadside", ratios: ["16:9", "6:1"] }).catch(() => null);
+        const concept = copy?.concepts?.[0];
+        if (concept) {
+          setMessageEn((value) => value.trim() || concept.headline_en);
+          setMessageAr((value) => value.trim() || concept.headline_ar);
+        }
+      }
+      const image = await aiGenerateVisual({
+        brief,
+        headline: campaign,
+        overlay: {
+          kicker: "ABU DHABI MEDIA OFFICE",
+          en: messageEn || campaign,
+          ar: messageAr || "رسالة أبوظبي",
+          sub: actionKind === "schedule" ? scheduleWindow : "Now",
+        },
+      }).catch(() => null);
+      if (image?.image) {
+        setVisualUrl(image.image);
+        setVisualSource(image.source ?? "generated");
+        setVisualMode("generate");
+      } else {
+        notify(t("MediaGPT could not generate a visual right now."));
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function submit() {
     if (!campaign.trim()) { notify(t("Name the campaign or message first")); return; }
     if (!messageEn.trim()) { notify(t("Enter a message first")); return; }
+    if (!selectedVisual) { notify(t("Choose or create a visual first")); return; }
     setSubmitting(true);
     try {
       const res = await fetch("/api/dooh/mediagpt/selection/queue", {
@@ -3916,8 +4070,13 @@ function SelectionActionDialog({
           assetIds,
           campaign,
           messageEn,
+          messageAr,
           actionKind,
           scheduleWindow: actionKind === "schedule" ? scheduleWindow : undefined,
+          overlapPolicy,
+          creativeId: visualMode === "library" ? selectedLibraryCreativeId : "selection-custom",
+          creativeUrl: visualMode === "library" ? undefined : selectedVisual,
+          visualSource: selectedVisualLabel,
           actor: "Control Room",
         }),
       });
@@ -3938,58 +4097,129 @@ function SelectionActionDialog({
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}>×</button>
         </header>
 
-        <div className="selection-summary">
-          <span><strong>{assetIds.length}</strong> {assetIds.length === 1 ? t("screen selected") : t("screens selected")}</span>
-          <span className="good"><strong>{clearCount}</strong> {t("clear")}</span>
-          {flagged.length ? <span className="warn"><strong>{flagged.length}</strong> {t("flagged by rules")}</span> : null}
-          {conflicts.length ? <span className="danger"><strong>{conflicts.length}</strong> {t("with existing commitments")}</span> : null}
-        </div>
-
-        {hardConflicts.length ? (
-          <div className="selection-overlap" role="alert">
-            <AlertTriangle size={15} />
-            <div>
-              <strong>{t("Overlapping commitments")}</strong>
-              <small>{t("These screens are already committed. They will be held out and routed for review before anything overrides them.")}</small>
+        <div className="selection-modal-grid">
+          <aside className="selection-scope-panel">
+            <div className="selection-summary">
+              <span><strong>{assetIds.length}</strong> {assetIds.length === 1 ? t("screen selected") : t("screens selected")}</span>
+              <span className="good"><strong>{clearCount}</strong> {t("will play")}</span>
+              {ruleFlagged.length ? <span className="warn"><strong>{ruleFlagged.length}</strong> {t("flagged by rules")}</span> : null}
+              {conflicts.length ? <span className="danger"><strong>{conflicts.length}</strong> {t("overlap")}</span> : null}
             </div>
-          </div>
-        ) : null}
 
-        <div className="selection-screens">
-          {(screens ?? []).map((s) => (
-            <div key={s.assetId} className={`selection-screen-row ${s.conflictLevel === "hard" ? "conflict" : ""}`}>
-              <span className={`dot ${s.conflictLevel === "hard" ? "danger" : s.status === "flagged" || s.conflict ? "warn" : "good"}`} />
-              <span className="selection-screen-main">
-                <strong>{s.assetId}</strong>
-                <small>{t(s.name)} · {t(s.zone)}</small>
-              </span>
-              <span className="selection-screen-note">
-                {s.conflict ? t(s.conflict) : s.flagLabel ? t(s.flagLabel) : t("Clear")}
-              </span>
+            {hardConflicts.length ? (
+              <div className="selection-policy">
+                <span>{t("Overlapping commitments")}</span>
+                <button type="button" className={overlapPolicy === "override" ? "active" : ""} onClick={() => setOverlapPolicy("override")}>
+                  <strong>{t("Override and display")}</strong>
+                  <span>{t("Keep this action possible; route the override for named approval.")}</span>
+                </button>
+                <button type="button" className={overlapPolicy === "exclude" ? "active" : ""} onClick={() => setOverlapPolicy("exclude")}>
+                  <strong>{t("Hold overlaps out")}</strong>
+                  <span>{t("Do not disturb committed screens; only clear screens will play.")}</span>
+                </button>
+              </div>
+            ) : null}
+
+            <div className="selection-screens">
+              {(screens ?? []).map((s) => (
+                <div key={s.assetId} className={`selection-screen-row ${s.conflictLevel === "hard" ? "conflict" : ""}`}>
+                  <span className={`dot ${s.conflictLevel === "hard" ? "danger" : s.status === "flagged" || s.conflict ? "warn" : "good"}`} />
+                  <span className="selection-screen-main">
+                    <strong>{s.assetId}</strong>
+                    <small>{t(s.name)} | {t(s.zone)}</small>
+                  </span>
+                  <span className="selection-screen-note">
+                    {s.conflict ? t(s.conflict) : s.flagLabel ? t(s.flagLabel) : t("Clear")}
+                  </span>
+                </div>
+              ))}
+              {screens === null ? <p className="cell-note">{t("Checking rules and overlaps...")}</p> : null}
             </div>
-          ))}
-          {screens === null ? <p className="cell-note">{t("Checking rules and overlaps…")}</p> : null}
-        </div>
+          </aside>
 
-        <div className="selection-form">
-          <label>{t("Campaign or message name")}
-            <input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder={t("e.g. Summer road-safety push")} />
-          </label>
-          <label>{t("Message")}
-            <textarea value={messageEn} onChange={(e) => setMessageEn(e.target.value)} placeholder={t("What plays on these screens")} />
-          </label>
-          {actionKind === "schedule" ? (
-            <label>{t("Schedule window")}
-              <input value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)} />
-            </label>
-          ) : null}
+          <section className="selection-compose-panel">
+            <div className="selection-form">
+              <label>{t("Campaign or message name")}
+                <input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder={t("e.g. Summer road-safety push")} />
+              </label>
+              <div className="selection-message-grid">
+                <label>{t("English message")}
+                  <textarea value={messageEn} onChange={(e) => setMessageEn(e.target.value)} placeholder={t("What plays on these screens")} />
+                </label>
+                <label dir="rtl">{t("Arabic message")}
+                  <textarea dir="rtl" value={messageAr} onChange={(e) => setMessageAr(e.target.value)} placeholder="الرسالة التي ستظهر على الشاشات" />
+                </label>
+              </div>
+              {actionKind === "schedule" ? (
+                <label>{t("Schedule window")}
+                  <input value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)} />
+                </label>
+              ) : null}
+            </div>
+
+            <div className="selection-visual-source">
+              <button type="button" className={visualMode === "library" ? "active" : ""} onClick={() => setVisualMode("library")}>
+                <ImageIcon size={16} /> {t("Use media library")}
+              </button>
+              <button type="button" className={visualMode === "upload" ? "active" : ""} onClick={() => fileRef.current?.click()}>
+                <Upload size={16} /> {t("Upload visual")}
+              </button>
+              <button type="button" className={visualMode === "generate" ? "active" : ""} onClick={() => setVisualMode("generate")}>
+                <Sparkles size={16} /> {t("Create with MediaGPT")}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files)} />
+            </div>
+
+            {visualMode === "library" ? (
+              <div className="selection-library-grid">
+                {libraryItems.map((item, index) => (
+                  <button key={item.id} type="button" className={selectedLibraryId === item.id ? "active" : ""} onClick={() => setSelectedLibraryId(item.id)}>
+                    <span style={{ backgroundImage: `url("${creativeBackground(mediaCreative(index + 1))}")` }} />
+                    <strong>{t(item.title)}</strong>
+                    <small>{item.tags.map((tag) => t(tag)).join(" | ")}</small>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {visualMode === "generate" ? (
+              <div className="selection-ai-generate">
+                <label>{t("MediaGPT visual prompt")}
+                  <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+                </label>
+                <Button icon={Sparkles} disabled={generating} onClick={generateCreative}>{generating ? t("Generating") : t("Generate visual and copy")}</Button>
+                {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template with the correct wording.")}</small> : null}
+              </div>
+            ) : null}
+          </section>
+
+          <aside className="selection-preview-panel">
+            <span>{t("Playback preview")}</span>
+            {selectedVisual ? (
+              <div className="selection-creative-preview" style={{ backgroundImage: `url("${selectedVisual}")` }}>
+                <div>
+                  <small>ADMO | {actionKind === "schedule" ? t("Scheduled") : t("Now")}</small>
+                  <strong>{messageEn || campaign}</strong>
+                  <em dir="rtl">{messageAr}</em>
+                </div>
+              </div>
+            ) : (
+              <div className="selection-creative-empty"><ImageIcon size={24} /><span>{t("Choose or create a visual first")}</span></div>
+            )}
+            <div className="selection-review-cards">
+              <div><span>{t("Visual")}</span><strong>{t(selectedVisualLabel)}</strong></div>
+              <div><span>{t("Screens")}</span><strong>{clearCount} / {assetIds.length}</strong></div>
+              <div><span>{t("Overlap handling")}</span><strong>{hardConflicts.length ? t(overlapPolicy === "override" ? "Override and display" : "Hold overlaps out") : t("No overlap")}</strong></div>
+              <div><span>{t("Governance")}</span><strong>{t("Named approval required")}</strong></div>
+            </div>
+          </aside>
         </div>
 
         <footer className="revision-footer">
-          <span className="cell-note">{t("AI proposes, humans approve. This goes to the approval queue.")}</span>
+          <span />
           <div>
             <button type="button" className="button secondary" onClick={onClose}>{t("Cancel")}</button>
-            <button type="button" className="button primary" disabled={submitting} onClick={submit}>
+            <button type="button" className="button primary" disabled={submitting || !selectedVisual || !clearCount} onClick={submit}>
               {submitting ? t("Sending") : actionKind === "schedule" ? t("Queue schedule") : t("Queue display")}
             </button>
           </div>
@@ -4178,7 +4408,7 @@ function ControlCentre({
               <small>{headlineTicket.asset} • {t(estateAssets.find((asset) => asset.id === headlineTicket.asset)?.name ?? headlineTicket.team)}</small>
               <small className="cc-toast-time">12 {t("min ago")}</small>
             </div>
-            <button type="button" className="cc-handle" onClick={goToAlerts}>{t("Handle")}</button>
+            <button type="button" className="cc-handle" onClick={goToNetwork}>{t("Handle")}</button>
           </div>
         ) : null}
         <div className="cc-more">
@@ -4588,6 +4818,7 @@ function CmsPage({
 }) {
   const [tab, setTab] = useState<CmsTab>("submissions");
   const [selectedId, setSelectedId] = useState(submissions[0]?.id || "");
+  const [queueOpen, setQueueOpen] = useState(true);
   const selected = submissions.find((item) => item.id === selectedId) ?? submissions[0];
   const approved = submissions.filter((item) => ["Approved", "Scheduled", "Published"].includes(item.stage)).length;
   const pending = submissions.filter((item) => item.stage === "Submitted" || item.stage === "In review").length;
@@ -4612,22 +4843,52 @@ function CmsPage({
       {tab === "create" ? <CreativeStudio onCreateCreative={onCreateCreative} aiAvailable={aiAvailable} t={t} /> : null}
 
       {tab === "submissions" && selected ? (
-        <Panel icon={FileCheck2} title={t("Submissions")} action={itemCountLabel(submissions.length, t)}>
+        <Panel
+          icon={FileCheck2}
+          title={t("Submissions")}
+          action={
+            <div className="cms-panel-actions">
+              <span>{itemCountLabel(submissions.length, t)}</span>
+              <button type="button" onClick={() => setQueueOpen((open) => !open)}>
+                {queueOpen ? t("Hide queue") : t("Show queue")}
+              </button>
+            </div>
+          }
+        >
+          <div className={`cms-review-workspace ${queueOpen ? "" : "queue-collapsed"}`}>
+            {queueOpen ? (
+              <aside className="cms-submission-queue" aria-label={t("Submissions")}>
+                <header>
+                  <span>{t("Review queue")}</span>
+                  <strong>{pending} {t("need review")}</strong>
+                </header>
             <div className="submission-list submissions-catalogue">
               {submissions.map((item) => (
                 <button key={item.id} className={item.id === selected.id ? "selected" : ""} type="button" onClick={() => setSelectedId(item.id)}>
                   <span className={`dot ${priorityTone(item.priority)}`} />
-                  <span>
+                  <span className="submission-card-copy">
                     <strong>{t(item.campaign)}</strong>
-                    <small>{t(item.bidder)} / {t(item.stage)}</small>
+                    <small>{t(item.bidder)}</small>
+                    <span className="submission-card-meta">
+                      <em>{t(item.stage)}</em>
+                      <em>{t(item.packageName)}</em>
+                    </span>
+                    <span className="submission-card-foot">
+                      <b>{item.budget}</b>
+                      <b>{t(item.requestedStart)}</b>
+                    </span>
                   </span>
-                  <StatusPill label={item.priority} tone={priorityTone(item.priority)} />
                 </button>
               ))}
             </div>
+              </aside>
+            ) : null}
+            <section className="cms-selected-submission">
           <LinkedDetail icon={ClipboardCheck} title={t(selected.campaign)} action={<span className="head-meta">{selected.id}</span>}>
             <SubmissionDetail submission={selected} profile={profile} aiAvailable={aiAvailable} onStage={onStage} onRequestChanges={onRequestChanges} onApprove={onApprove} />
           </LinkedDetail>
+            </section>
+          </div>
         </Panel>
       ) : null}
 
@@ -4659,6 +4920,7 @@ function SubmissionDetail({
   const [triage, setTriage] = useState<SubmissionTriageResponse | null>(null);
   const [triageLoading, setTriageLoading] = useState(false);
   const [mfaDialog, setMfaDialog] = useState<{ approverName: string; reason: string } | null>(null);
+  const [section, setSection] = useState<"overview" | "mediagpt" | "governance" | "activity">("overview");
 
   // Triage/tag results belong to one submission; clear them when the reviewer
   // switches items so a stale proposal can never be acted on against the wrong one.
@@ -4668,6 +4930,7 @@ function SubmissionDetail({
     setTags(null);
     setTagLoading(false);
     setMfaDialog(null);
+    setSection("overview");
   }, [submission.id]);
 
   function sendRevisionRequest(message: string) {
@@ -4696,100 +4959,158 @@ function SubmissionDetail({
     if ("action" in result && triage) setTriage({ ...triage, action: result.action });
   }
 
+  const actionControls = (
+    <>
+      {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
+      {submission.stage === "In review" && (
+        <>
+          <Button variant="secondary" icon={Send} onClick={() => setRevisionDialogOpen(true)}>Prepare bidder message</Button>
+          <Button variant="secondary" onClick={() => onStage(submission.id, "Submitted")}>Return to intake</Button>
+        </>
+      )}
+      {submission.stage === "Approved" && <Button onClick={() => onStage(submission.id, "Scheduled")}>Add to schedule</Button>}
+      {submission.stage === "Scheduled" && <Button onClick={() => onStage(submission.id, "Published")}>Publish</Button>}
+      {submission.stage === "Published" && <StatusPill label="Published to network" tone="good" />}
+      {submission.stage === "Changes requested" && <StatusPill label="Waiting for bidder revision" tone="warn" />}
+    </>
+  );
+
+  const sections: Array<{ id: typeof section; label: string; helper: string }> = [
+    { id: "overview", label: "Overview", helper: "Creative and campaign facts" },
+    { id: "mediagpt", label: "MediaGPT", helper: "AI checks and actions" },
+    { id: "governance", label: "Governance", helper: "Approvals and notes" },
+    { id: "activity", label: "Activity", helper: "Journal and audit trail" },
+  ];
+
   return (
-    <div className="detail-stack">
+    <div className="submission-workspace">
       <StageTracker stage={submission.stage} />
-      <section className="ai-mini-panel">
-        <div>
-          <span>{tags ? "MediaGPT routing" : "MediaGPT tagging"}</span>
-          <strong>
-            {tags
-              ? `${tags.industry} | ${tags.riskTier} risk | ${tags.suggestedApprover}`
-              : "Classify submission risk, route and review window"}
-          </strong>
-          {tags ? (
-            <small>{tags.suggestedWindow}</small>
-          ) : (
-            <small>{aiAvailable ? "Uses submission metadata and platform rules." : "AI key unavailable."}</small>
-          )}
-        </div>
-        <div className="chip-row">
-          {tags?.tags.map((tag) => <span key={tag}>{tag}</span>)}
-          <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || tagLoading} onClick={runTagging}>{tagLoading ? "Tagging" : "Auto-tag"}</Button>
-          <Button icon={Workflow} variant="secondary" disabled={!aiAvailable || triageLoading} onClick={runTriage}>{triageLoading ? "Triaging" : "Run agent triage"}</Button>
-        </div>
-      </section>
-      {triage ? (
-        <section className="ai-mini-panel agent-triage-panel">
+
+      <section className="submission-context-bar">
+        <div className="submission-context-main">
+          <div className="submission-context-thumb" style={{ backgroundImage: `url("${submission.creativeUrl || creativeBackground(submission.creativeId)}")` }} />
           <div>
-            <span>MediaGPT triage</span>
-            <strong>{triage.proposal.summary}</strong>
-            <small>{triage.proposal.reasons?.slice(0, 2).join(" | ")}</small>
-            {triage.proposal.citations?.length ? (
-              <div className="citation-row">
-                {triage.proposal.citations.slice(0, 4).map((citation) => <span key={citation}>{citation}</span>)}
-              </div>
-            ) : null}
+            <span>{submission.id} | {t(submission.stage)} | {t(submission.priority)}</span>
+            <strong>{t(submission.campaign)}</strong>
+            <small>{t(submission.bidder)} | {t(submission.packageName)} | {t(submission.budget)}</small>
           </div>
-          {triage.action ? (
-            <AgentActionCard
-              action={triage.action}
-              onApprove={() => decideTriageAction(triage.action as PendingAgentAction, "approve")}
-              onReject={() => decideTriageAction(triage.action as PendingAgentAction, "reject")}
-              t={t}
-            />
-          ) : (
-            <StatusPill label="No stage change proposed" tone="neutral" />
-          )}
-        </section>
-      ) : null}
-      <AiDeepScan
-        submission={submission}
-        onRequestChanges={() => setRevisionDialogOpen(true)}
-        onStage={(stage) => onStage(submission.id, stage)}
-      />
-      <div className="submission-hero">
-        <div className="creative-frame large" style={{ backgroundImage: `url("${submission.creativeUrl || creativeBackground(submission.creativeId)}")` }} />
-        <div className="detail-cards compact">
-          <Detail label="Owner" value={submission.owner} />
-          <Detail label="Package" value={submission.packageName} />
-          <Detail label="Budget" value={submission.budget} />
-          <Detail label="Start" value={submission.requestedStart} />
-          <Detail label="Language" value={submission.language} />
         </div>
-      </div>
+        <div className="submission-context-actions">{actionControls}</div>
+      </section>
 
-      <ReviewerNotes submissionId={submission.id} />
+      <nav className="review-section-tabs" aria-label={t("Submission workspace sections")}>
+        {sections.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={[section === item.id ? "active" : "", item.id === "mediagpt" ? "ai-tab" : ""].filter(Boolean).join(" ")}
+            onClick={() => setSection(item.id)}
+          >
+            <strong>{t(item.label)}</strong>
+            <span>{t(item.helper)}</span>
+          </button>
+        ))}
+      </nav>
 
-      {submission.stage === "In review" ? (
-        <SubmissionApprovals
-          submission={submission}
-          onRequestApproval={(approverName) => {
-            if (submission.category === "routine") {
-              onApprove(submission.id, approverName, "Named approver signed", "");
-            } else {
-              setMfaDialog({ approverName, reason: "Named approver signed with MFA step-up" });
-            }
-          }}
-          t={t}
-        />
-      ) : null}
+      <section className="review-section-panel">
+        {section === "overview" ? (
+          <div className="submission-hero">
+            <div className="creative-frame large" style={{ backgroundImage: `url("${submission.creativeUrl || creativeBackground(submission.creativeId)}")` }} />
+            <div className="detail-cards compact">
+              <Detail label="Owner" value={submission.owner} />
+              <Detail label="Package" value={submission.packageName} />
+              <Detail label="Budget" value={submission.budget} />
+              <Detail label="Start" value={submission.requestedStart} />
+              <Detail label="Language" value={submission.language} />
+            </div>
+          </div>
+        ) : null}
 
-      <SubmissionJournal submission={submission} t={t} />
+        {section === "mediagpt" ? (
+          <div className="review-section-stack">
+            <section className="ai-mini-panel">
+              <div>
+                <span>{tags ? "MediaGPT routing" : "MediaGPT tagging"}</span>
+                <strong>
+                  {tags
+                    ? `${tags.industry} | ${tags.riskTier} risk | ${tags.suggestedApprover}`
+                    : "Classify submission risk, route and review window"}
+                </strong>
+                {tags ? (
+                  <small>{tags.suggestedWindow}</small>
+                ) : (
+                  <small>{aiAvailable ? "Uses submission metadata and platform rules." : "AI key unavailable."}</small>
+                )}
+              </div>
+              <div className="chip-row">
+                {tags?.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || tagLoading} onClick={runTagging}>{tagLoading ? "Tagging" : "Auto-tag"}</Button>
+                <Button icon={Workflow} variant="secondary" disabled={!aiAvailable || triageLoading} onClick={runTriage}>{triageLoading ? "Triaging" : "Run agent triage"}</Button>
+              </div>
+            </section>
+            {triage ? (
+              <section className="ai-mini-panel agent-triage-panel">
+                <div>
+                  <span>MediaGPT triage</span>
+                  <strong>{triage.proposal.summary}</strong>
+                  <small>{triage.proposal.reasons?.slice(0, 2).join(" | ")}</small>
+                  {triage.proposal.citations?.length ? (
+                    <div className="citation-row">
+                      {triage.proposal.citations.slice(0, 4).map((citation) => <span key={citation}>{citation}</span>)}
+                    </div>
+                  ) : null}
+                </div>
+                {triage.action ? (
+                  <AgentActionCard
+                    action={triage.action}
+                    onApprove={() => decideTriageAction(triage.action as PendingAgentAction, "approve")}
+                    onReject={() => decideTriageAction(triage.action as PendingAgentAction, "reject")}
+                    t={t}
+                  />
+                ) : (
+                  <StatusPill label="No stage change proposed" tone="neutral" />
+                )}
+              </section>
+            ) : null}
+            <AiDeepScan
+              submission={submission}
+              onRequestChanges={() => setRevisionDialogOpen(true)}
+              onStage={(stage) => onStage(submission.id, stage)}
+            />
+          </div>
+        ) : null}
 
-      <ActionRow>
-        {submission.stage === "Submitted" && <Button onClick={() => onStage(submission.id, "In review")}>Start review</Button>}
-        {submission.stage === "In review" && (
-          <>
-            <Button variant="secondary" icon={Send} onClick={() => setRevisionDialogOpen(true)}>Prepare bidder message</Button>
-            <Button variant="secondary" onClick={() => onStage(submission.id, "Submitted")}>Return to intake</Button>
-          </>
-        )}
-        {submission.stage === "Approved" && <Button onClick={() => onStage(submission.id, "Scheduled")}>Add to schedule</Button>}
-        {submission.stage === "Scheduled" && <Button onClick={() => onStage(submission.id, "Published")}>Publish</Button>}
-        {submission.stage === "Published" && <StatusPill label="Published to network" tone="good" />}
-        {submission.stage === "Changes requested" && <StatusPill label="Waiting for bidder revision" tone="warn" />}
-      </ActionRow>
+        {section === "governance" ? (
+          <div className="review-section-stack">
+            {submission.stage === "In review" ? (
+              <SubmissionApprovals
+                submission={submission}
+                onRequestApproval={(approverName) => {
+                  if (submission.category === "routine") {
+                    onApprove(submission.id, approverName, "Named approver signed", "");
+                  } else {
+                    setMfaDialog({ approverName, reason: "Named approver signed with MFA step-up" });
+                  }
+                }}
+                t={t}
+              />
+            ) : (
+              <div className="context-empty">
+                <strong>{t("No approval action for this stage")}</strong>
+                <span>{t("Approval controls appear when the selected submission is in review.")}</span>
+              </div>
+            )}
+            <ReviewerNotes submissionId={submission.id} />
+          </div>
+        ) : null}
+
+        {section === "activity" ? (
+          <div className="review-section-stack">
+            <SubmissionJournal submission={submission} t={t} />
+          </div>
+        ) : null}
+      </section>
+
       {revisionDialogOpen ? (
         <RevisionRequestDialog
           submission={submission}
@@ -5420,6 +5741,31 @@ function CountdownBadge({ deadlineAt, t }: { deadlineAt: string; t: (v: string) 
   return <span className={`emg-countdown ${remaining === 0 ? "done" : ""}`}>{remaining === 0 ? t("On network") : `${t("Display within")} ${mm}:${ss}`}</span>;
 }
 
+function alertCreativeId(alert: EmergencyAlert) {
+  const text = `${alert.title} ${alert.scope} ${alert.area ?? ""}`.toLowerCase();
+  if (/\bweather\b|ncema|rain|storm|wind|fog/.test(text)) return "weather-alert";
+  if (text.includes("closure") || text.includes("corniche") || /\broad\b/.test(text)) return "road-safety";
+  return "weather-alert";
+}
+
+function alertPreviewCopy(alert: EmergencyAlert) {
+  const text = `${alert.title} ${alert.scope} ${alert.area ?? ""}`.toLowerCase();
+  if (!/\bweather\b|ncema|rain|storm|wind|fog/.test(text) && (text.includes("closure") || text.includes("corniche") || /\broad\b/.test(text))) {
+    return {
+      headlineEn: alert.headline || alert.title,
+      headlineAr: alert.bodyAr ? "إغلاق طريق" : "إغلاق طريق",
+      bodyEn: alert.bodyEn || "Road closed ahead. Use the signed alternative route.",
+      bodyAr: alert.bodyAr || "الطريق مغلق أمامك. يرجى استخدام المسار البديل.",
+    };
+  }
+  return {
+    headlineEn: alert.headline || alert.title,
+    headlineAr: alert.bodyAr ? "تنبيه جوي" : "تنبيه جوي",
+    bodyEn: alert.bodyEn || "Reduce speed and follow official safety instructions.",
+    bodyAr: alert.bodyAr || "خفف السرعة واتبع تعليمات السلامة الرسمية.",
+  };
+}
+
 function AlertsPage({
   alerts,
   steps,
@@ -5506,6 +5852,7 @@ function AlertsPage({
   const neededApprovals = selected.scopeMode === "citywide" ? 2 : 1;
   const canBroadcast = selected.state === "Approved" || selected.state === "Broadcast queued";
   const approverOptions = namedApprovers.filter((a) => !approvals.some((s) => s.name === a.name));
+  const preview = alertPreviewCopy(selected);
 
   return (
     <PageBody>
@@ -5516,6 +5863,198 @@ function AlertsPage({
         <Metric label="Awaiting checks" value={String(alerts.filter((a) => a.state === "Check required").length)} helper="Needs action" tone="warn" />
       </MetricGrid>
 
+      <section className="alerts-workspace" aria-label={t("Alerts and Emergencies")}>
+        <aside className="alerts-queue-card" aria-label={t("Alert queue")}>
+          <header className="alerts-card-head">
+            <div>
+              <span>{t("Alert queue")}</span>
+              <strong>{alerts.length} {t("active")}</strong>
+            </div>
+            <Bell size={18} />
+          </header>
+          <div className="alerts-list">
+            {alerts.map((alert) => (
+              <button key={alert.id} type="button" className={alert.id === selected.id ? "selected" : ""} onClick={() => setSelectedAlertId(alert.id)}>
+                <span className={`alert-state-dot tone-${alertTone(alert.state)}`} />
+                <span>
+                  <strong>{t(alert.title)}</strong>
+                  <small>{alert.capIdentifier ?? alert.identifier ?? alert.authority} | {alert.scopeMode === "citywide" ? t("Citywide") : t(alert.scope)}</small>
+                  <small>{t(alert.sla)} | {t(alert.endTime)}</small>
+                </span>
+                <StatusPill label={alert.state} tone={alertTone(alert.state)} />
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="alerts-detail-card">
+          <header className="alerts-detail-head">
+            <div>
+              <span>{t("Selected alert")}</span>
+              <h2>{t(selected.title)}</h2>
+              <p>{selected.capIdentifier ?? selected.identifier ?? selected.authority} | {selected.scopeMode === "citywide" ? t("Citywide") : t(selected.scope)}</p>
+            </div>
+          </header>
+
+          <div className="alerts-action-strip">
+            {selected.state === "Check required" ? <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button> : null}
+            {selected.state === "Approved" ? <Button icon={CalendarClock} variant="secondary" onClick={() => onQueueBroadcast(selected.id)}>{t("Queue broadcast")}</Button> : null}
+            {canBroadcast ? <Button icon={Megaphone} onClick={() => onBroadcastNow(selected.id)}>{t("Broadcast now (preempt)")}</Button> : null}
+            <Button variant="secondary" onClick={() => onResetAlert(selected.id)}>{t("Reset")}</Button>
+          </div>
+
+          <section className="alert-visual-review" aria-label={t("Emergency visual approval")}>
+            <div className="alert-creative-device">
+              <div className={`alert-creative-preview alert-creative-${alertCreativeId(selected)}`}>
+                <div className="alert-creative-overlay">
+                  <span>{t(selected.sender ?? selected.authority)} | {selected.scopeMode === "citywide" ? t("Citywide") : t(selected.scope)}</span>
+                  <strong>{t(preview.headlineEn)}</strong>
+                  <em dir="rtl">{preview.headlineAr}</em>
+                  <small>{preview.bodyEn}</small>
+                  <small dir="rtl">{preview.bodyAr}</small>
+                </div>
+              </div>
+            </div>
+            {selected.state === "Approval required" || approvals.length ? (
+              <div className="alert-inline-approval">
+                <div>
+                  <span>{approvals.length} / {neededApprovals} {t("approved")}</span>
+                  <strong>{t(selected.state === "Approval required" ? "Named approval required" : "Approved for broadcast")}</strong>
+                </div>
+              {approvals.length ? (
+                <div className="approvals-signatures compact">
+                  {approvals.map((s) => <span key={s.name} className="approval-sig"><ShieldCheck size={14} /> {t(s.name)} | {t(s.role)} | {t("MFA")}</span>)}
+                </div>
+              ) : null}
+              {selected.state === "Approval required" ? (
+                <div className="approvals-action compact">
+                  <label>{t("Approving as")}
+                    <select value={pickApprover} onChange={(e) => setPickApprover(e.target.value)}>
+                      <option value="">{t("Select a named approver")}</option>
+                      {approverOptions.map((a) => <option key={a.name} value={a.name}>{a.name} ({t(a.role)})</option>)}
+                    </select>
+                  </label>
+                  <Button icon={ShieldCheck} disabled={!pickApprover} onClick={() => setMfaApprover(pickApprover)}>{t("Approve with MFA")}</Button>
+                </div>
+              ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          <div className="alerts-summary-grid">
+            <div><span>{t("Sender")}</span><strong>{t(selected.sender ?? selected.authority)}</strong></div>
+            <div><span>{t("Severity")}</span><strong>{t(selected.severity ?? selected.criticality)}</strong></div>
+            <div><span>{t("SLA")}</span><strong>{t(selected.sla)}</strong></div>
+            <div><span>{t("Targets")}</span><strong>{selected.targetAssets?.length ?? 0} {t("assets")}</strong></div>
+          </div>
+
+          {selected.bodyEn || selected.bodyAr ? (
+            <div className="alerts-message-grid">
+              {selected.bodyEn ? <blockquote>{selected.bodyEn}</blockquote> : null}
+              {selected.bodyAr ? <blockquote dir="rtl">{selected.bodyAr}</blockquote> : null}
+            </div>
+          ) : null}
+
+          <div className="alerts-flow-grid">
+            <section className="alerts-flow-card ai-intervention-box">
+              <header>
+                <strong>{t("MediaGPT checks")}</strong>
+              </header>
+              <div className="alert-check-list">
+                {steps.map((step, index) => (
+                  <article key={step.label}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
+                    <StatusPill label={step.state} tone={step.state === "Checked" ? "good" : "warn"} />
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="alerts-flow-card alerts-assist-card">
+              <header>
+                <strong>{t("Dissemination assist")}</strong>
+                <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || assisting} onClick={runAssist}>{assisting ? t("Analyzing") : t("Run AI assist")}</Button>
+              </header>
+              {assist ? (
+                <div className="emg-assist-body">
+                  <div className="emg-assist-row">
+                    <StatusPill label={assist.parity ? t("Translation parity OK") : t("Parity issues")} tone={assist.parity ? "good" : "warn"} />
+                    {assist.parityIssues?.length ? <span className="cell-note">{assist.parityIssues.join("; ")}</span> : null}
+                  </div>
+                  <p className="cell-note"><strong>{t("Routing")}:</strong> {assist.routeRationale} ({assist.proposedAssets?.length ?? 0} {t("assets")})</p>
+                  <p className="cell-note"><strong>{t("Layout")}:</strong> {assist.layoutNote}</p>
+                </div>
+              ) : null}
+            </section>
+          </div>
+
+          {false && (selected.state === "Approval required" || approvals.length) ? (
+            <div className="approvals-panel">
+              <div className="approvals-head">
+                <div>
+                  <strong>{t("Named-approver gate")}</strong>
+                  <span>{selected.scopeMode === "citywide" ? t("Citywide requires dual control (2 approvers + MFA)") : t("Zone requires one named approver + MFA")}</span>
+                </div>
+                <StatusPill label={`${approvals.length} / ${neededApprovals} ${t("approved")}`} tone={approvals.length >= neededApprovals ? "good" : "warn"} />
+              </div>
+              {approvals.length ? (
+                <div className="approvals-signatures">
+                  {approvals.map((s) => <span key={s.name} className="approval-sig"><ShieldCheck size={14} /> {t(s.name)} | {t(s.role)} | {t("MFA")}</span>)}
+                </div>
+              ) : null}
+              {selected.state === "Approval required" ? (
+                <div className="approvals-action">
+                  <label>{t("Approving as")}
+                    <select value={pickApprover} onChange={(e) => setPickApprover(e.target.value)}>
+                      <option value="">{t("Select a named approver")}</option>
+                      {approverOptions.map((a) => <option key={a.name} value={a.name}>{a.name} ({t(a.role)})</option>)}
+                    </select>
+                  </label>
+                  <Button icon={ShieldCheck} disabled={!pickApprover} onClick={() => setMfaApprover(pickApprover)}>{t("Approve with MFA")}</Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {selected.state === "Broadcasting" && selected.deadlineAt ? (
+            <div className="emg-live">
+              <CountdownBadge deadlineAt={selected.deadlineAt} t={t} />
+              <span className="cell-note">{t("Preempting content on")} {selected.targetAssets?.length ?? 0} {t("assets")} | {t("CAP")} {selected.capIdentifier}</span>
+              <Button icon={ShieldCheck} onClick={() => onAckAlert(selected.id)}>{t("Acknowledge")}</Button>
+            </div>
+          ) : null}
+          {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {selected.ackBy.map((a) => t(a)).join(", ")}</p> : null}
+        </section>
+      </section>
+
+      <details className="alerts-create-card">
+        <summary>
+          <span><Megaphone size={18} /> {t("Ingest CAP alert")}</span>
+          <ChevronDown size={16} />
+        </summary>
+        <form className="stack-form" onSubmit={ingestCap}>
+          <div className="cap-grid">
+            <label>{t("CAP identifier")}<input value={draft.identifier} onChange={(e) => setDraft({ ...draft, identifier: e.target.value })} placeholder="NCEMA-2026-..." /></label>
+            <label>{t("Sender")}<input value={draft.sender} onChange={(e) => setDraft({ ...draft, sender: e.target.value })} /></label>
+            <label>{t("Area")}<input value={draft.area} onChange={(e) => setDraft({ ...draft, area: e.target.value })} placeholder={t("Zone or Citywide")} /></label>
+            <label>{t("Scope")}<select value={draft.scopeMode} onChange={(e) => setDraft({ ...draft, scopeMode: e.target.value as AlertScopeMode })}><option value="zone">{t("Zone")}</option><option value="citywide">{t("Citywide")}</option></select></label>
+            <label>{t("Severity")}<select value={draft.severity} onChange={(e) => setDraft({ ...draft, severity: e.target.value })}>{["Extreme","Severe","Moderate","Minor"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+            <label>{t("Urgency")}<select value={draft.urgency} onChange={(e) => setDraft({ ...draft, urgency: e.target.value })}>{["Immediate","Expected","Future"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+          </div>
+          <label>{t("Headline")}<input value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} placeholder={t("Severe dust storm - reduce speed")} /></label>
+          <div className="cap-bilingual">
+            <label>{t("Body (English)")}<textarea value={draft.bodyEn} onChange={(e) => setDraft({ ...draft, bodyEn: e.target.value })} /></label>
+            <label dir="rtl">{t("Body (Arabic)")}<textarea dir="rtl" value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
+          </div>
+          <ActionRow>
+            <Button type="submit" icon={ShieldAlert}>{t("Ingest alert")}</Button>
+          </ActionRow>
+        </form>
+      </details>
+
+      {false ? (
+        <>
       <Panel icon={Bell} title={t("NCEMA CAP alerts")}>
           <div className="table-card">
             <table>
@@ -5649,6 +6188,8 @@ function AlertsPage({
           </ActionRow>
         </form>
       </Panel>
+        </>
+      ) : null}
 
       {mfaApprover ? (
         <MfaStepUpDialog
@@ -5659,6 +6200,121 @@ function AlertsPage({
         />
       ) : null}
     </PageBody>
+  );
+}
+
+// --- Network & Devices helpers (deterministic, no Math.random so SSR/demo stay stable) ---
+function ndHash(value: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// "10.0 m x 3.0 m (30 m²)" -> "10×3 m"
+function compactDims(size: string): string {
+  const m = size.match(/([\d.]+)\s*m\s*[x×]\s*([\d.]+)\s*m/i);
+  if (!m) return size;
+  return `${Math.round(parseFloat(m[1]))}×${Math.round(parseFloat(m[2]))} m`;
+}
+
+// Cabinet count derived from the surface area in the size string (~1 cabinet / m²).
+function assetCabinets(asset: Asset): number {
+  const m = asset.size.match(/\(([\d.]+)\s*m/);
+  const area = m ? parseFloat(m[1]) : 30;
+  return Math.max(24, Math.round(area));
+}
+
+function ndFormatTime(mins: number): string {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+// The spot currently scheduled on this screen — deterministic window per asset.
+function assetSchedule(asset: Asset): { start: string; end: string } {
+  const seed = ndHash(asset.id);
+  const startH = 6 + (seed % 12);
+  const startMin = (seed >> 4) % 2 === 0 ? 0 : 30;
+  const durMin = 90 + ((seed >> 6) % 5) * 30;
+  const start = startH * 60 + startMin;
+  return { start: ndFormatTime(start), end: ndFormatTime(start + durMin) };
+}
+
+function ndCabinetCode(seed: number, n: number): string {
+  const col = ((seed >> (n * 4)) % 12) + 1;
+  const row = (seed >> (n * 3)) % 6;
+  return `C${String(col).padStart(2, "0")}R${String(row).padStart(2, "0")}`;
+}
+
+type NdIssue = { title: string; code: string; detail: string; state: "fault" | "degrading"; ring: number };
+
+// Live component-level issues for the selected asset. The featured bridge screen
+// carries the real digital-twin faults; other screens derive plausible issues from status.
+function assetIssues(asset: Asset): NdIssue[] {
+  if (asset.id === "AD-BRG-014") {
+    return [
+      { title: "Cooling fan stalled", code: "C05R01", state: "fault", ring: 0.24,
+        detail: "The cabinet fan is reading 0 RPM while the internal sensor holds 71°C, above the 65°C safe ceiling. Left unattended, the surrounding modules will auto-dim to shed heat." },
+      { title: "Service door unlatched", code: "C02R00", state: "fault", ring: 0.9,
+        detail: "The rear maintenance door is reading open with both quarter-turn locks disengaged, exposing the electronics to dust and rain on the E10 gantry." },
+      { title: "Power supply ageing", code: "C05R01", state: "degrading", ring: 0.6,
+        detail: "Ripple on the 5V rail is trending up and efficiency has slipped about 6%. The redundant supply is carrying the load, so the screen is unaffected for now." },
+    ];
+  }
+  const seed = ndHash(asset.id);
+  const c1 = ndCabinetCode(seed, 1);
+  const c2 = ndCabinetCode(seed, 2);
+  if (asset.status === "Offline") {
+    return [
+      { title: "Controller unreachable", code: asset.controller, state: "fault", ring: 0.12,
+        detail: `${asset.controller} has not checked in for 42 minutes. The screen is dark and the last proof-of-play was logged before the dropout.` },
+      { title: "Power feed interrupted", code: c1, state: "fault", ring: 0.08,
+        detail: "Mains telemetry flatlined at the cabinet distribution board. A field team is required to confirm supply on site." },
+    ];
+  }
+  if (asset.status === "Warning" || asset.status === "Maintenance") {
+    return [
+      { title: "Cabinet running hot", code: c1, state: "degrading", ring: 0.52,
+        detail: "This cabinet is averaging 8°C above its neighbours across the day, likely a partly blocked vent. No throttling yet, but it is trending toward the limit." },
+      { title: "Brightness sensor drift", code: c2, state: "degrading", ring: 0.68,
+        detail: "The ambient light sensor is reading low, so the wall is running brighter than the daypart schedule intends." },
+    ];
+  }
+  return [];
+}
+
+function NdWave({ seed }: { seed: string }) {
+  const h = ndHash(seed);
+  const bars = Array.from({ length: 30 }, (_, i) => {
+    const v = Math.sin((i + 1) * 12.9898 + h) * 43758.5453;
+    const frac = v - Math.floor(v);
+    return 22 + Math.round(frac * 74);
+  });
+  return (
+    <span className="nd-wave" aria-hidden="true">
+      {bars.map((height, i) => (
+        <span key={i} style={{ height: `${height}%` }} />
+      ))}
+    </span>
+  );
+}
+
+function NdRing({ value, state }: { value: number; state: NdIssue["state"] }) {
+  const deg = Math.round(Math.min(1, Math.max(0, value)) * 360);
+  const color = state === "fault" ? "var(--tag-danger-bd)" : "var(--tag-warn-bd)";
+  return (
+    <span
+      className="nd-ring"
+      style={{ background: `conic-gradient(${color} ${deg}deg, var(--ctrl-border-dim) ${deg}deg 360deg)` }}
+      aria-hidden="true"
+    >
+      <span className="nd-ring-hole" />
+    </span>
   );
 }
 
@@ -5711,20 +6367,32 @@ function NetworkPage({
   const [estateFiltering, setEstateFiltering] = useState(false);
   const [ticketDraft, setTicketDraft] = useState<TicketDraft | null>(null);
   const [ticketLoading, setTicketLoading] = useState(false);
+  const [registryCollapsed, setRegistryCollapsed] = useState(false);
+  const [twinZoom, setTwinZoom] = useState(1);
   const selected = estateAssets.find((asset) => asset.id === selectedId) || estateAssets[0];
   const visibleAssets = useMemo(() => applyEstateFilter(estateAssets, estateFilter), [estateFilter]);
   const live = estateAssets.filter((asset) => asset.status === "Live").length;
   const connectivity = Math.round((live / estateAssets.length) * 100);
   const openPurchaseOrders = assetSupplyRecords.reduce((sum, record) => sum + record.openPos, 0) + purchaseOrders.filter((order) => order.status !== "Received").length;
+  const attentionAssets = estateAssets.filter((asset) => asset.status !== "Live").length;
+  const activeServiceOrders = serviceOrders.filter((order) => order.status !== "Completed").length;
   const existingServiceOrder = serviceOrders.find((order) => order.assetId === selected.id && order.status !== "Completed");
   const linkedPurchaseOrders = purchaseOrders.filter((order) => order.assetId === selected.id && order.status !== "Received");
   const orderableItem = ticketDraft?.partsNeeded.find(Boolean) || existingServiceOrder?.partsNeeded.find(Boolean) || defaultProcurementItem(selected);
   const hasOpenPoForItem = linkedPurchaseOrders.some((order) => order.item.toLowerCase() === orderableItem.toLowerCase());
-  const networkTabs: Array<{ id: NetworkTab; label: string }> = [
-    { id: "assetOperations", label: "Asset operations" },
-    { id: "maintenanceWorkbench", label: "Maintenance workbench" },
-    { id: "supplyChain", label: "Supply chain" },
+  const networkTabs: Array<{ id: NetworkTab; label: string; icon: LucideIcon }> = [
+    { id: "assetOperations", label: "Asset operations", icon: Database },
+    { id: "maintenanceWorkbench", label: "Maintenance workbench", icon: LayoutGrid },
+    { id: "supplyChain", label: "Supply chain", icon: Package },
   ];
+  const networkKpis: Array<{ icon: LucideIcon; value: string; label: string }> = [
+    { icon: Monitor, value: String(estateAssets.length), label: "Registered devices" },
+    { icon: Wifi, value: `${connectivity}%`, label: "Live or reachable" },
+    { icon: ListChecks, value: String(fieldTasks.length + activeServiceOrders), label: "Service tasks" },
+    { icon: ClipboardCheck, value: String(openPurchaseOrders), label: "Open purchase orders" },
+  ];
+  const selectedIssues = assetIssues(selected);
+  const selectedSchedule = assetSchedule(selected);
 
   useEffect(() => {
     setTicketDraft(null);
@@ -5789,127 +6457,218 @@ function NetworkPage({
 
   return (
     <PageBody>
-      <MetricGrid>
-        <Metric label="Assets" value={String(estateAssets.length)} helper="Registered devices" tone="info" />
-        <Metric label="Connectivity" value={`${connectivity}%`} helper="Live or reachable" tone={connectivity > 80 ? "good" : "warn"} />
-        <Metric label="Workbench load" value={String(fieldTasks.length)} helper="Service tasks" tone="warn" />
-        <Metric label="Spare parts" value={String(openPurchaseOrders)} helper="Open purchase orders" tone="neutral" />
-      </MetricGrid>
+      <div className="nd-kpis">
+        {networkKpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} className="nd-kpi">
+              <span className="nd-kpi-icon"><Icon size={30} strokeWidth={1.5} /></span>
+              <div className="nd-kpi-body">
+                <strong>{kpi.value}</strong>
+                <span>{t(kpi.label)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="network-tabs" role="tablist" aria-label={t("Network and Devices")}>
-        {networkTabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={networkTab === tab.id}
-            className={networkTab === tab.id ? "active" : ""}
-            onClick={() => setNetworkTab(tab.id)}
-          >
-            <strong>{t(tab.label)}</strong>
-          </button>
-        ))}
+      <div className="nd-tabs" role="tablist" aria-label={t("Network and Devices")}>
+        {networkTabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={networkTab === tab.id}
+              className={`nd-tab ${networkTab === tab.id ? "active" : ""}`}
+              onClick={() => setNetworkTab(tab.id)}
+            >
+              <Icon size={16} strokeWidth={1.7} />
+              <span>{t(tab.label)}</span>
+            </button>
+          );
+        })}
       </div>
 
       {networkTab === "assetOperations" ? (
         <section className="asset-operations-group" aria-label={t("Asset operations")}>
-          <div className="asset-operations-header">
-            <strong>{t("Asset operations")}</strong>
-          </div>
-          <div className="asset-operations-workspace">
-            <section className="asset-operations-pane asset-registry-pane" aria-label={t("Asset registry")}>
-              <header className="asset-pane-header">
-                <div>
-                  <span className="panel-icon"><RadioTower size={18} /></span>
+          <div className={`nd-workspace ${registryCollapsed ? "registry-collapsed" : ""}`}>
+            {!registryCollapsed ? (
+              <section className="nd-registry" aria-label={t("Asset registry")}>
+                <header className="nd-panel-head">
                   <h2>{t("Asset registry")}</h2>
+                  <span className="nd-count">{visibleAssets.length}/{estateAssets.length}</span>
+                </header>
+                <div className="nd-asset-list">
+                  {visibleAssets.map((asset) => {
+                    const tone = assetTone(asset.status);
+                    const sched = assetSchedule(asset);
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        className={`nd-asset ${asset.id === selected.id ? "selected" : ""}`}
+                        onClick={() => setSelectedId(asset.id)}
+                      >
+                        <div className="nd-asset-top">
+                          <span className={`nd-asset-icon tone-${tone}`}><Globe2 size={16} /></span>
+                          <div className="nd-asset-name">
+                            <strong>{t(asset.name)}</strong>
+                            <small>{asset.id}</small>
+                          </div>
+                          <span className={`nd-tag ${tone}`}><i />{t(asset.status)}</span>
+                        </div>
+                        <div className="nd-asset-sched">
+                          <div className="nd-sched-col">
+                            <span>{t("Start time")}</span>
+                            <strong>{sched.start}</strong>
+                          </div>
+                          <NdWave seed={asset.id} />
+                          <div className="nd-sched-col end">
+                            <span>{t("End time")}</span>
+                            <strong>{sched.end}</strong>
+                          </div>
+                        </div>
+                        <div className="nd-asset-tags">
+                          <span className="nd-meta-tag"><MonitorPlay size={12} />{t(asset.type)}</span>
+                          <span className="nd-meta-tag"><GitBranch size={12} />{asset.controller}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </header>
-              <div className="ai-search-row">
-                <input value={estateQuery} onChange={(event) => setEstateQuery(event.target.value)} placeholder={t("Ask in words, e.g. show warning highway assets")} />
-                <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || estateFiltering} onClick={askEstateFilter}>{estateFiltering ? t("Searching") : t("Ask")}</Button>
-                {estateFilter ? <button type="button" onClick={() => { setEstateFilter(null); setEstateQuery(""); }}>{t("Clear")}</button> : null}
+              </section>
+            ) : null}
+
+            <section className="nd-viewer" aria-label={t("Asset digital twin (3D)")}>
+              <button
+                type="button"
+                className="nd-collapse-handle"
+                onClick={() => setRegistryCollapsed((value) => !value)}
+                aria-label={registryCollapsed ? t("Show asset registry") : t("Hide asset registry")}
+              >
+                {registryCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              </button>
+
+              <div className="nd-search">
+                <div className="nd-search-pill">
+                  <span className={`nd-search-orb ${estateFiltering ? "busy" : ""}`} aria-hidden="true" />
+                  <input
+                    value={estateQuery}
+                    onChange={(event) => setEstateQuery(event.target.value)}
+                    onKeyDown={(event) => event.key === "Enter" && askEstateFilter()}
+                    placeholder={t("Ask Dooh anything")}
+                    aria-label={t("Ask Dooh anything")}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="nd-search-filter"
+                  onClick={askEstateFilter}
+                  disabled={estateFiltering}
+                  aria-label={t("Filter assets")}
+                >
+                  <SlidersHorizontal size={16} />
+                </button>
               </div>
-              <div className="asset-registry">
-                {visibleAssets.map((asset) => (
-                  <button key={asset.id} className={asset.id === selected.id ? "selected" : ""} type="button" onClick={() => setSelectedId(asset.id)}>
-                    <span className={`dot ${assetTone(asset.status)}`} />
-                    <span>
-                      <strong>{t(asset.name)}</strong>
-                      <small>{asset.id} / {t(asset.type)} / {asset.controller}</small>
-                    </span>
-                    <StatusPill label={asset.status} tone={assetTone(asset.status)} />
-                  </button>
-                ))}
+
+              <div className="nd-stage-clip">
+                <div className="nd-stage-scale" style={{ transform: `scale(${twinZoom})` }}>
+                  <ClientOnlyBillboardTwin variant="stage" />
+                </div>
               </div>
+
+              <div className="nd-zoom-slider">
+                <input
+                  type="range"
+                  min={0.7}
+                  max={1.6}
+                  step={0.01}
+                  value={twinZoom}
+                  onChange={(event) => setTwinZoom(Number(event.target.value))}
+                  aria-label={t("Zoom")}
+                />
+              </div>
+
+              <div className="nd-viewer-tools">
+                <button type="button" onClick={() => setTwinZoom((z) => Math.min(1.6, Number((z + 0.1).toFixed(2))))} aria-label={t("Zoom in")}><Plus size={16} /></button>
+                <span className="nd-tool-divider" aria-hidden="true" />
+                <button type="button" onClick={() => setTwinZoom((z) => Math.max(0.7, Number((z - 0.1).toFixed(2))))} aria-label={t("Zoom out")}><Minus size={16} /></button>
+              </div>
+              <button type="button" className="nd-viewer-fs" onClick={() => setTwinFullscreen(true)} aria-label={t("Full screen")}><Maximize2 size={16} /></button>
+
+              {estateFilter ? (
+                <div className="nd-filter-note">
+                  <span>{visibleAssets.length} {t("match")}</span>
+                  <button type="button" onClick={() => { setEstateFilter(null); setEstateQuery(""); }}>{t("Clear")}</button>
+                </div>
+              ) : null}
             </section>
-            <section className="asset-operations-pane asset-twin-pane" aria-label={t("Asset digital twin (3D)")}>
-              <header className="asset-pane-header">
+
+            <section className="nd-detail" aria-label={t("Asset detail")}>
+              <header className="nd-detail-head">
+                <span className={`nd-asset-icon tone-${assetTone(selected.status)}`}><Globe2 size={18} /></span>
                 <div>
-                  <span className="panel-icon"><HardDrive size={18} /></span>
-                  <h2>{t("Asset digital twin (3D)")}</h2>
-                </div>
-                <div className="asset-pane-actions">
-                  <span>{selected.id}</span>
-                  {existingServiceOrder ? (
-                    <Button icon={Wrench} variant="secondary" onClick={() => setNetworkTab("maintenanceWorkbench")}>
-                      {t("Open work order")} {existingServiceOrder.id}
-                    </Button>
-                  ) : (
-                    <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || ticketLoading} onClick={createTicketDraft}>{ticketLoading ? t("Drafting") : t("Draft ticket")}</Button>
-                  )}
-                  <Button icon={Maximize2} variant="secondary" onClick={() => setTwinFullscreen(true)}>{t("Full screen")}</Button>
+                  <strong>{selected.id}</strong>
+                  <span>{compactDims(selected.size)} · {t(selected.type)} · {assetCabinets(selected)} {t("cabinets")}</span>
                 </div>
               </header>
-              <div className="asset-twin-stack">
-                <ClientOnlyBillboardTwin />
-                {existingServiceOrder ? (
-                  <section className="ai-mini-panel existing-work-order-panel">
-                    <div>
-                      <span>{t("Existing work order")}</span>
-                      <strong>{existingServiceOrder.id} | {t(existingServiceOrder.title)}</strong>
-                      <small>{t(existingServiceOrder.status)} / {t(existingServiceOrder.owner)} / {t(existingServiceOrder.due)}</small>
-                    </div>
-                    <div className="chip-row">
-                      {existingServiceOrder.partsNeeded.slice(0, 3).map((part) => <span key={part}>{t(part)}</span>)}
-                      {linkedPurchaseOrders.slice(0, 2).map((order) => <span key={order.id}>{order.id} / {t(order.status)}</span>)}
-                    </div>
-                    <div className="mini-panel-actions">
-                      <Button icon={Wrench} variant="secondary" onClick={() => setNetworkTab("maintenanceWorkbench")}>{t("View workbench")}</Button>
-                      {hasOpenPoForItem ? (
-                        <Button icon={ShoppingBag} variant="secondary" onClick={() => setNetworkTab("supplyChain")}>{t("View purchase order")}</Button>
-                      ) : (
-                        <Button icon={ShoppingBag} onClick={() => createPurchaseOrderFromIssue(existingServiceOrder)}>{t("Create purchase order")}</Button>
-                      )}
-                    </div>
-                  </section>
-                ) : ticketDraft ? (
-                  <section className="ai-mini-panel">
-                    <div>
-                      <span>{t("MediaGPT ticket draft")}</span>
-                      <strong>{ticketDraft.title}</strong>
-                      <small>{ticketDraft.summary}</small>
-                    </div>
-                    <div className="chip-row">
-                      <span>{ticketDraft.slaSuggestion}</span>
-                      {ticketDraft.partsNeeded.slice(0, 3).map((part) => <span key={part}>{part}</span>)}
-                    </div>
-                    <div className="mini-panel-actions">
-                      <Button icon={Wrench} onClick={createOrderFromDraft}>{t("Create service order")}</Button>
-                      {hasOpenPoForItem ? (
-                        <Button icon={ShoppingBag} variant="secondary" onClick={() => setNetworkTab("supplyChain")}>{t("View purchase order")}</Button>
-                      ) : (
-                        <Button icon={ShoppingBag} variant="secondary" onClick={() => createPurchaseOrderFromIssue()}>{t("Create purchase order")}</Button>
-                      )}
-                    </div>
-                  </section>
-                ) : null}
-                <div className="detail-cards compact">
-                  <Detail label="Selected asset" value={selected.name} />
-                  <Detail label="Network" value={selected.network} />
-                  <Detail label="Controller" value={selected.controller} />
-                  <Detail label="Temperature" value={selected.tempC} />
-                </div>
+
+              <div className="nd-section-title">{t("Asset vitals")}</div>
+              <div className="nd-vitals">
+                <div className="nd-vital-row"><span>{t("Selected asset")}</span><strong>{t(selected.name)}</strong></div>
+                <div className="nd-vital-row"><span>{t("Network")}</span><strong>{t(selected.network)}</strong></div>
+                <div className="nd-vital-row"><span>{t("Controller")}</span><strong>{selected.controller}</strong></div>
+                <div className="nd-vital-row"><span>{t("Temperature")}</span><strong>{selected.tempC}</strong></div>
               </div>
+
+              <div className="nd-section-title">
+                <span>{t("Active issues")}</span>
+                {selectedIssues.length ? <span className="nd-issue-count">{selectedIssues.length}</span> : null}
+              </div>
+              <div className="nd-issues">
+                {selectedIssues.length === 0 ? (
+                  <div className="nd-issues-empty">
+                    <CheckCircle2 size={16} />
+                    <span>{t("No active issues. Telemetry is within the expected range.")}</span>
+                  </div>
+                ) : (
+                  selectedIssues.map((issue, index) => (
+                    <article key={`${issue.code}-${index}`} className={`nd-issue ${issue.state}`}>
+                      <div className="nd-issue-head">
+                        <span className="nd-issue-icon"><Zap size={14} /></span>
+                        <div className="nd-issue-title">
+                          <strong>{t(issue.title)}</strong>
+                          <small>{issue.code}</small>
+                        </div>
+                        <NdRing value={issue.ring} state={issue.state} />
+                        <button type="button" className="nd-issue-menu" aria-label={t("Issue actions")}><MoreVertical size={15} /></button>
+                      </div>
+                      <p className="nd-issue-desc">{t(issue.detail)}</p>
+                    </article>
+                  ))
+                )}
+              </div>
+
+              {existingServiceOrder ? (
+                <div className="nd-detail-actions">
+                  <Button icon={Wrench} variant="secondary" onClick={() => setNetworkTab("maintenanceWorkbench")}>{t("Open work order")} {existingServiceOrder.id}</Button>
+                </div>
+              ) : ticketDraft ? (
+                <div className="nd-ticket-draft">
+                  <span>{t("MediaGPT ticket draft")}</span>
+                  <strong>{ticketDraft.title}</strong>
+                  <p>{ticketDraft.summary}</p>
+                  <div className="nd-detail-actions">
+                    <Button icon={Wrench} onClick={createOrderFromDraft}>{t("Create service order")}</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="nd-detail-actions">
+                  <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || ticketLoading} onClick={createTicketDraft}>{ticketLoading ? t("Drafting") : t("Draft ticket")}</Button>
+                </div>
+              )}
             </section>
           </div>
           {twinFullscreen ? (
@@ -5941,7 +6700,7 @@ function NetworkPage({
       ) : null}
 
       {networkTab === "maintenanceWorkbench" ? (
-        <Panel icon={Wrench} title="Maintenance workbench" action={`${fieldTasks.length} ${t("service tasks")}`}>
+        <Panel icon={Wrench} title="Maintenance workbench" action={`${fieldTasks.length + serviceOrders.length} ${t("service tasks")}`}>
           <KanbanBoard serviceOrders={serviceOrders} />
         </Panel>
       ) : null}
@@ -6293,26 +7052,64 @@ function KanbanBoard({ serviceOrders }: { serviceOrders: ServiceOrder[] }) {
     { label: "Completed", states: ["Completed"] },
   ];
   return (
-    <div className="kanban">
-      {columns.map((column) => (
-        <section key={column.label}>
-          <strong>{t(column.label)}</strong>
-          {serviceOrders.filter((order) => column.states.includes(order.status)).map((order) => (
-            <article key={order.id} className="service-order-card">
-              <span className={order.severity === "Critical" ? "danger" : ""}>{t(order.severity)}</span>
-              <p>{order.id} | {t(order.title)}</p>
-              <small>{order.assetId} / {t(order.owner)} / {t(order.due)}</small>
-            </article>
-          ))}
-          {fieldTasks.filter((task) => column.states.includes(task.column)).map((task) => (
-            <article key={task.id}>
-              <span className={task.column === "Overdue" ? "danger" : ""}>{t(task.column === "Overdue" ? "Overdue" : task.priority)}</span>
-              <p>{t(task.title)}</p>
-              <small>{task.asset} / {t(task.owner)} / {t(task.due)}</small>
-            </article>
-          ))}
-        </section>
-      ))}
+    <div className="kanban maintenance-kanban">
+      {columns.map((column) => {
+        const orders = serviceOrders.filter((order) => column.states.includes(order.status));
+        const tasks = fieldTasks.filter((task) => column.states.includes(task.column));
+        return (
+          <section key={column.label} className="maintenance-column">
+            <header className="maintenance-column-head">
+              <strong>{t(column.label)}</strong>
+              <span>{orders.length + tasks.length}</span>
+            </header>
+            <div className="maintenance-card-stack">
+              {orders.map((order) => (
+                <article key={order.id} className={`maintenance-task-card severity-${order.severity.toLowerCase()}`}>
+                  <div className="maintenance-card-top">
+                    <span className="maintenance-severity">{t(order.severity)}</span>
+                    <span className="maintenance-id">{order.id}</span>
+                  </div>
+                  <h3>{t(order.title)}</h3>
+                  <p>{order.assetId} / {t(order.assetName)}</p>
+                  <dl>
+                    <div>
+                      <dt>{t("Owner")}</dt>
+                      <dd>{t(order.owner)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Due")}</dt>
+                      <dd>{t(order.due)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+              {tasks.map((task) => {
+                const severity = task.column === "Overdue" ? "Overdue" : task.priority;
+                return (
+                  <article key={task.id} className={`maintenance-task-card severity-${severity.toLowerCase()}`}>
+                    <div className="maintenance-card-top">
+                      <span className="maintenance-severity">{t(severity)}</span>
+                      <span className="maintenance-id">{task.id}</span>
+                    </div>
+                    <h3>{t(task.title)}</h3>
+                    <p>{task.asset}</p>
+                    <dl>
+                      <div>
+                        <dt>{t("Owner")}</dt>
+                        <dd>{t(task.owner)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("Due")}</dt>
+                        <dd>{t(task.due)}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -6786,7 +7583,7 @@ function MediaGptSuite({ aiAvailable, t }: { aiAvailable: boolean; t: (value: st
   const ActiveIcon = active.icon;
 
   return (
-    <PageBody>
+    <PageBody className="mediagpt-page">
       <MetricGrid>
         <Metric label="Agents active" value={String(mediaGptAgents.length)} helper="Governed platform agents" tone="good" />
         <Metric label="Runs today" value={String(log.length)} helper="This session" tone="info" />
@@ -7303,9 +8100,8 @@ const RADIUS_PRESETS = [
 ];
 
 type RadiusScreen = { id: string; name: string; zone: string; distanceM: number; status: "clear" | "flagged"; flagLabel?: string; flagDetail?: string };
-type QueuedBroadcast = { id: string; campaign: string; clearCount: number; flaggedCount: number; status: string; approvedBy?: string };
 
-function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Profile | null; aiAvailable: boolean; notify: (message: string) => void; t: (value: string) => string }) {
+function RadiusBroadcastPage({ aiAvailable, notify, t }: { aiAvailable: boolean; notify: (message: string) => void; t: (value: string) => string }) {
   const [center, setCenter] = useState({ lat: 24.485, lng: 54.360 });
   const [centerLabel, setCenterLabel] = useState("Downtown Abu Dhabi");
   const [radiusKm, setRadiusKm] = useState(3.5);
@@ -7314,9 +8110,6 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
   const [messageEn, setMessageEn] = useState("");
   const [messageAr, setMessageAr] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [pending, setPending] = useState<QueuedBroadcast | null>(null);
-  const [approved, setApproved] = useState<QueuedBroadcast | null>(null);
-  const [approver, setApprover] = useState("");
   const radiusM = Math.round(radiusKm * 1000);
 
   const screens = useMemo<RadiusScreen[]>(() => {
@@ -7334,18 +8127,14 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
   const insideIds = screens.map((s) => s.id);
   const flaggedIds = screens.filter((s) => s.status === "flagged").map((s) => s.id);
   const clearCount = screens.length - flaggedIds.length;
-  const approverOptions = namedApprovers.filter((a) => a.name !== (profile?.name ?? ""));
 
-  function resetQueue() { setPending(null); setApproved(null); }
   function pickPreset(preset: (typeof RADIUS_PRESETS)[number]) {
     setCenter({ lat: preset.lat, lng: preset.lng });
     setCenterLabel(preset.label);
-    resetQueue();
   }
   function onPick(lat: number, lng: number) {
     setCenter({ lat, lng });
     setCenterLabel(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-    resetQueue();
   }
 
   async function generate() {
@@ -7362,29 +8151,6 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
     }
   }
 
-  async function queue() {
-    const res = await fetch("/api/dooh/mediagpt/radius/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ center, centerLabel, radiusM, campaign, messageEn, messageAr, actor: profile?.name ?? "Operator", role: profile?.id ?? "control-room" }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.broadcast) { setPending(data.broadcast); notify(t("Radius broadcast queued for approval")); }
-    else notify(data.error ?? t("Could not queue the broadcast"));
-  }
-
-  async function approve() {
-    if (!pending || !approver) return;
-    const res = await fetch(`/api/dooh/mediagpt/radius/${pending.id}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ actor: approver, role: "admin" }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.broadcast) { setApproved(data.broadcast); setPending(null); notify(t("Broadcast approved and queued")); }
-    else notify(data.error ?? t("Could not approve the broadcast"));
-  }
-
   return (
     <PageBody>
       <MetricGrid>
@@ -7394,7 +8160,7 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
         <Metric label={t("Radius")} value={`${radiusKm.toFixed(1)} km`} helper="Adjustable" tone="neutral" />
       </MetricGrid>
 
-      <Panel icon={Target} title={t("Radius broadcast")} action={<StatusPill label={t("AI proposes, humans approve")} tone="good" />}>
+      <Panel icon={Target} title={t("Radius broadcast")}>
         <RadiusMap assets={estateAssets} center={center} radiusM={radiusM} insideIds={insideIds} flaggedIds={flaggedIds} onPick={onPick} t={t} />
         <div className="radius-presets">
           <span className="radius-presets-label">{t("Centre on")}:</span>
@@ -7403,7 +8169,7 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
           ))}
           <label className="radius-slider">
             {t("Radius")}: <strong>{radiusKm.toFixed(1)} km</strong>
-            <input type="range" min={1} max={8} step={0.5} value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); resetQueue(); }} />
+            <input type="range" min={1} max={8} step={0.5} value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); }} />
           </label>
         </div>
 
@@ -7413,7 +8179,7 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
             <strong>{t("Compose the message")}</strong>
           </div>
           <div className="radius-compose">
-            <label><span>{t("Campaign name")}</span><input value={campaign} onChange={(event) => { setCampaign(event.target.value); resetQueue(); }} /></label>
+            <label><span>{t("Campaign name")}</span><input value={campaign} onChange={(event) => { setCampaign(event.target.value); }} /></label>
             <label><span>{t("Brief")}</span><input value={brief} onChange={(event) => setBrief(event.target.value)} /></label>
             <ActionRow>
               <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || generating} onClick={generate}>{generating ? t("Generating") : t("Generate with MediaGPT")}</Button>
@@ -7448,47 +8214,6 @@ function RadiusBroadcastPage({ profile, aiAvailable, notify, t }: { profile: Pro
           </div>
         </div>
 
-        <div className="linked-detail">
-          <div className="linked-detail-head">
-            <span className="panel-icon"><Send size={18} /></span>
-            <strong>{t("Queue and approve")}</strong>
-          </div>
-          {approved ? (
-            <div className="radius-result good">
-              <ShieldCheck size={16} />
-              <div>
-                <strong>{t("Approved and queued")}</strong>
-                <small>{approved.campaign}: {approved.clearCount} {t("screens queued")}, {approved.flaggedCount} {t("held for review")}. {t("Approved by")} {t(approved.approvedBy ?? "")}.</small>
-              </div>
-            </div>
-          ) : pending ? (
-            <div className="radius-approve">
-              <div className="radius-result warn">
-                <AlertTriangle size={16} />
-                <div>
-                  <strong>{t("Pending approval")}</strong>
-                  <small>{pending.campaign}: {pending.clearCount} {t("clear screens")}, {pending.flaggedCount} {t("flagged")}. {t("One approval queues them all.")}</small>
-                </div>
-              </div>
-              <div className="approvals-action">
-                <label>{t("Approving as")}
-                  <select value={approver} onChange={(event) => setApprover(event.target.value)}>
-                    <option value="">{t("Select a named approver")}</option>
-                    {approverOptions.map((a) => <option key={a.name} value={a.name}>{a.name} ({t(a.role)})</option>)}
-                  </select>
-                </label>
-                <Button icon={ShieldCheck} disabled={!approver} onClick={approve}>{t("Approve and queue")}</Button>
-              </div>
-              <p className="approvals-sod">{t("Segregation of duties: the operator who proposed the broadcast cannot approve it.")}</p>
-            </div>
-          ) : (
-            <ActionRow>
-              <Button icon={Send} disabled={!messageEn.trim() || !clearCount} onClick={queue}>
-                {t("Queue")} {clearCount} {t("clear screens for approval")}
-              </Button>
-            </ActionRow>
-          )}
-        </div>
       </Panel>
     </PageBody>
   );
@@ -8995,6 +9720,7 @@ function FinancialsPage({
   const [reportLoading, setReportLoading] = useState(false);
   const [chainStatus, setChainStatus] = useState<{ valid: boolean; length: number; brokenAt: string | null; verifiedAt: string } | null>(null);
   const [chainLoading, setChainLoading] = useState(false);
+  const [activeFinanceTab, setActiveFinanceTab] = useState<"overview" | "approvals" | "commercial" | "scenarios" | "settlement">("overview");
 
   async function verifyChain() {
     setChainLoading(true);
@@ -9007,6 +9733,14 @@ function FinancialsPage({
     setChainLoading(false);
   }
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
+  const pendingApprovals = approvals.filter((approval) => approval.state === "Pending").length;
+  const financeTabs = [
+    { id: "overview", label: "Overview" },
+    { id: "approvals", label: "Approvals" },
+    { id: "commercial", label: "Commercial desk" },
+    { id: "scenarios", label: "Scenarios" },
+    { id: "settlement", label: "Settlement" },
+  ] as const;
 
   async function explainScenario() {
     setYieldLoading(true);
@@ -9028,14 +9762,38 @@ function FinancialsPage({
         <Metric label="Booked revenue" value="AED 18.4M" helper="Current quarter" tone="good" />
         <Metric label="Budget consumed" value="62%" helper="Against civic and commercial targets" tone="info" />
         <Metric label="Receivables" value="AED 3.1M" helper="Open invoices" tone="warn" />
-        <Metric label="Pending approvals" value={String(approvals.filter((a) => a.state === "Pending").length)} helper="Finance sign-off" tone={approvals.filter((a) => a.state === "Pending").length ? "warn" : "good"} />
+        <Metric label="Pending approvals" value={String(pendingApprovals)} helper="Finance sign-off" tone={pendingApprovals ? "warn" : "good"} />
       </MetricGrid>
 
-      <BidApprovalsQueue approvals={approvals} onDecision={onDecision} t={t} />
+      <nav className="financial-tabs" role="tablist" aria-label={t("Financials")}>
+        {financeTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeFinanceTab === tab.id}
+            className={activeFinanceTab === tab.id ? "active" : ""}
+            onClick={() => setActiveFinanceTab(tab.id)}
+          >
+            {t(tab.label)}
+          </button>
+        ))}
+      </nav>
 
-      <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} onReconcile={onReconcile} t={t} />
+      {activeFinanceTab === "approvals" ? (
+        <div className="financial-tab-panel">
+          <BidApprovalsQueue approvals={approvals} onDecision={onDecision} t={t} />
+        </div>
+      ) : null}
 
-      <div className="split-grid wide-left">
+      {activeFinanceTab === "commercial" ? (
+        <div className="financial-tab-panel">
+          <AuctionDesk auctions={auctions} bookings={bookings} invoices={invoices} onCloseAuction={onCloseAuction} onSettlePayment={onSettlePayment} onReconcile={onReconcile} t={t} />
+        </div>
+      ) : null}
+
+      {activeFinanceTab === "overview" ? (
+      <div className="financial-tab-panel">
         <Panel icon={CircleDollarSign} title="Budget and revenue breakdown">
           <CompactTable
             columns={["Segment", "Budget", "Actual", "Variance"]}
@@ -9047,6 +9805,11 @@ function FinancialsPage({
             ]}
           />
         </Panel>
+      </div>
+      ) : null}
+
+      {activeFinanceTab === "scenarios" ? (
+      <div className="financial-tab-panel">
         <Panel icon={Gauge} title="Bid scenario">
           <div className="scenario-form">
             <Range label="Campaign budget" value={budget} suffix="k AED" min={100} max={900} onChange={setBudget} />
@@ -9077,7 +9840,10 @@ function FinancialsPage({
           />
         </Panel>
       </div>
+      ) : null}
 
+      {activeFinanceTab === "overview" ? (
+      <div className="financial-tab-panel">
       <Panel icon={WalletCards} title={t("Rate card overrides")}>
         <CompactTable
           columns={["Package", "Base rate", "Override", "Approver", "Expiry"]}
@@ -9094,7 +9860,11 @@ function FinancialsPage({
           action="Adjust schedule"
         />
       </Panel>
+      </div>
+      ) : null}
 
+      {activeFinanceTab === "settlement" ? (
+      <div className="financial-tab-panel">
       <Panel icon={FileCheck2} title="Proof-of-play settlement controls" action={popLedger.length ? `${popLedger.length} ${t("signed records")}` : undefined}>
         <ActionRow>
           <Button icon={Sparkles} variant="secondary" disabled={!aiAvailable || reportLoading} onClick={summarizeProofAndFinance}>{reportLoading ? t("Summarizing") : t("Summarize report")}</Button>
@@ -9160,6 +9930,8 @@ function FinancialsPage({
           action="Offer make-good"
         />
       </Panel>
+      </div>
+      ) : null}
     </PageBody>
   );
 }
@@ -9890,8 +10662,8 @@ function ChatChart({ chart }: { chart: ChatAnswer["chart"] }) {
   );
 }
 
-function PageBody({ children }: { children: ReactNode }) {
-  return <div className="page-body">{children}</div>;
+function PageBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={["page-body", className].filter(Boolean).join(" ")}>{children}</div>;
 }
 
 function MetricGrid({ children }: { children: ReactNode }) {

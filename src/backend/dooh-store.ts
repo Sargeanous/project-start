@@ -368,6 +368,10 @@ export interface RadiusBroadcast {
   actionKind?: "display" | "schedule";
   scheduleWindow?: string;
   conflictCount?: number;
+  overlapPolicy?: "exclude" | "override";
+  creativeId?: string;
+  creativeUrl?: string;
+  visualSource?: string;
 }
 
 export interface BriefPayload {
@@ -2447,7 +2451,20 @@ export function computeSelectionScreens(assetIds: string[], opts: { category?: s
 }
 
 export async function queueSelectionAction(
-  payload: { assetIds: string[]; campaign: string; messageEn: string; messageAr?: string; actionKind?: "display" | "schedule"; scheduleWindow?: string; category?: string; daypart?: string },
+  payload: {
+    assetIds: string[];
+    campaign: string;
+    messageEn: string;
+    messageAr?: string;
+    actionKind?: "display" | "schedule";
+    scheduleWindow?: string;
+    category?: string;
+    daypart?: string;
+    overlapPolicy?: "exclude" | "override";
+    creativeId?: string;
+    creativeUrl?: string;
+    visualSource?: string;
+  },
   actor: string,
 ): Promise<{ state: DoohState; broadcast: RadiusBroadcast }> {
   if (!payload.assetIds?.length) throw new Error("Select at least one screen");
@@ -2455,7 +2472,10 @@ export async function queueSelectionAction(
   if (!payload.messageEn?.trim()) throw new Error("A message is required");
   const screens = computeSelectionScreens(payload.assetIds, { category: payload.category, daypart: payload.daypart });
   if (!screens.length) throw new Error("None of the selected screens were found");
-  const flaggedCount = screens.filter((s) => s.status === "flagged").length;
+  const overlapPolicy = payload.overlapPolicy === "exclude" ? "exclude" : "override";
+  const hardConflicts = screens.filter((s) => s.conflictLevel === "hard");
+  const ruleFlaggedCount = screens.filter((s) => s.status === "flagged" && !s.conflict).length;
+  const flaggedCount = ruleFlaggedCount + (overlapPolicy === "exclude" ? hardConflicts.length : 0);
   const conflictCount = screens.filter((s) => s.conflict).length;
   const zones = [...new Set(screens.map((s) => s.zone))];
   const kind = payload.actionKind ?? "display";
@@ -2474,6 +2494,10 @@ export async function queueSelectionAction(
     clearCount: screens.length - flaggedCount,
     flaggedCount,
     conflictCount,
+    overlapPolicy,
+    creativeId: payload.creativeId,
+    creativeUrl: payload.creativeUrl,
+    visualSource: payload.visualSource,
     status: "Pending approval",
     createdBy: actor,
     createdAt: formatNow(),
@@ -2482,7 +2506,7 @@ export async function queueSelectionAction(
     draft.radiusBroadcasts = [broadcast, ...draft.radiusBroadcasts];
     addNotification(draft, {
       title: kind === "schedule" ? "Bulk schedule awaiting approval" : "Bulk display awaiting approval",
-      body: `${broadcast.campaign}: ${screens.length} selected screen(s)${payload.scheduleWindow ? `, ${payload.scheduleWindow}` : ""}${conflictCount ? `, ${conflictCount} with existing commitments` : ""}${flaggedCount ? `, ${flaggedCount} flagged by rules` : ""}. Proposed by ${actor}.`,
+      body: `${broadcast.campaign}: ${screens.length} selected screen(s)${payload.scheduleWindow ? `, ${payload.scheduleWindow}` : ""}${conflictCount ? `, ${conflictCount} with existing commitments (${overlapPolicy})` : ""}${flaggedCount ? `, ${flaggedCount} held for review` : ""}. Proposed by ${actor}.`,
       subject: broadcast.id,
       recipients: ["control-room", "admin"],
       page: "radius",

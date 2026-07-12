@@ -24,7 +24,7 @@ const ASSET_ID = "AD-HWY-001";
 const HERO_PREFIX = "Cabinet_05_01_"; // the cabinet the explode animation opens up
 
 export type BillboardTwinProps = {
-  variant?: "embedded" | "fullscreen";
+  variant?: "embedded" | "fullscreen" | "stage";
 };
 
 const BOARD_TECH_STACK = [
@@ -411,17 +411,21 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
           <Kick />
         </Canvas>
 
-        <div className="twin-legend">
-          <span><i style={{ background: HEALTH_COLORS.healthy }} />Healthy</span>
-          <span><i style={{ background: HEALTH_COLORS.degrading }} />Degrading</span>
-          <span><i style={{ background: HEALTH_COLORS.fault }} />Fault</span>
-        </div>
+        {variant !== "stage" ? (
+          <div className="twin-legend">
+            <span><i style={{ background: HEALTH_COLORS.healthy }} />Healthy</span>
+            <span><i style={{ background: HEALTH_COLORS.degrading }} />Degrading</span>
+            <span><i style={{ background: HEALTH_COLORS.fault }} />Fault</span>
+          </div>
+        ) : null}
 
-        <button type="button" className="twin-spec-trigger" onClick={() => setShowSpec(true)}>
-          Board specification
-        </button>
+        {variant !== "stage" ? (
+          <button type="button" className="twin-spec-trigger" onClick={() => setShowSpec(true)}>
+            Board specification
+          </button>
+        ) : null}
 
-        {showSpec ? (
+        {showSpec && variant !== "stage" ? (
           <div className="twin-spec-window" role="dialog" aria-label="Board specification">
             <div className="twin-spec-head">
               <strong>Technical stack</strong>
@@ -461,6 +465,7 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
         ) : null}
       </div>
 
+      {variant === "stage" ? null : (
       <aside className="twin-controls">
         <header>
           <strong>Asset digital twin</strong>
@@ -498,6 +503,7 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
           })}
         </div>
       </aside>
+      )}
     </div>
   );
 }
