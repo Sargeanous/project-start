@@ -8490,3 +8490,164 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
   grid-template-columns: minmax(320px, 0.45fr) minmax(0, 1.55fr);
 }
 .asset-registry-pane .asset-registry strong { font-size: 13px; }
+
+/* ================================================================
+   AUDIT FIXES - "one container level max", from the multi-agent
+   UX audit (2026-07-12). Panels are the ONLY bordered cards; every
+   inner region is a flat well, a hairline row, or a definition list.
+   ================================================================ */
+
+/* --- Theme 4: KPI header = flat stat band, no per-metric box --- */
+.metric, .metric.tone-good, .metric.tone-warn, .metric.tone-danger,
+.metric.tone-info, .metric.tone-neutral {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 2px 24px 2px 0;
+  box-shadow: none;
+}
+.metric strong { font-size: 26px; line-height: 34px; }
+.metric-grid { gap: 8px 32px; }
+
+/* --- Theme 1: detail wells become a flat definition grid --- */
+.detail-cards > div {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 10px 0;
+  border-top: 1px solid var(--ctrl-border-dim);
+}
+.detail-cards { gap: 0 32px; }
+
+/* --- Theme 1: table inside a panel keeps only ONE border --- */
+.panel > .table-card,
+.panel .table-card,
+.asset-supply-table {
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+}
+.permission-matrix { border: 0; border-radius: 0; }
+
+/* --- Theme 1: component cards flatten to fill-only wells --- */
+.integration-card, .role-grid article, .media-card, .agent-card {
+  border: 1px solid transparent !important;
+  border-radius: 8px;
+  background: var(--surface-input) !important;
+  box-shadow: none !important;
+}
+.integration-card:hover, .media-card:hover {
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface-input)) !important;
+}
+.kanban section { background: transparent; border: 0; padding: 0; }
+.kanban article {
+  border: 0; box-shadow: none;
+  border-radius: 6px;
+  background: var(--surface-input);
+  border-top: 1px solid var(--ctrl-border-dim);
+}
+
+/* --- Theme 3 + 5: selection = green fill-tint only, no bar/glow --- */
+.role-grid article.selected {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-input)) !important;
+}
+.role-grid article.selected > span { color: var(--primary); }
+
+/* --- Theme 1 + 9: Access role cards - inline-edit fields go flat --- */
+.role-grid article > span {
+  text-transform: none; letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 500; color: var(--muted);
+}
+.role-grid article input,
+.role-grid article textarea {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px;
+  padding: 2px 4px;
+  color: var(--ink);
+  min-height: 0;
+  resize: none;
+}
+.role-grid article input { font-size: 16px; line-height: 24px; font-weight: 600; }
+.role-grid article textarea { font-size: 14px; line-height: 20px; color: var(--muted); }
+.role-grid article input:hover, .role-grid article textarea:hover {
+  border-color: var(--ctrl-border-dim) !important;
+}
+.role-grid article input:focus, .role-grid article textarea:focus {
+  background: var(--surface-2) !important; border-color: var(--primary) !important;
+}
+.role-grid article small { font-weight: 500; font-size: 12px; }
+.role-grid article > button { border: 0; background: transparent; color: var(--muted); border-radius: 4px; }
+.role-grid article > button:hover { color: var(--danger, #f53f3f); background: var(--surface-2); }
+
+/* --- Theme 9: section-header icons = bare muted glyph, no square --- */
+.family-icon {
+  width: auto; height: auto; border-radius: 0;
+  background: transparent !important;
+  color: var(--primary);
+}
+
+/* --- Theme 9: nav active = subtle fill + green text, not a loud pill --- */
+.nav-groups button.active, .nav-group button.active {
+  background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+  color: var(--primary) !important;
+}
+.nav-groups button.active svg, .nav-group button.active svg { color: var(--primary); }
+
+/* --- Theme 9: kickers + group labels sentence-case, no tracking --- */
+.topbar p, .page-kicker, .nav-group p, .nav-group > p {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 500; color: var(--muted);
+}
+
+/* --- Theme 5: off-palette blue slider -> primary green --- */
+input[type="range"] { accent-color: var(--primary); }
+
+/* --- Theme 6: MediaGPT FAB - corner-safe, no glow, never overlaps --- */
+.chat-fab {
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.5) !important;
+  filter: none;
+}
+.app:not(:has(.workspace.map-canvas)) .chat-fab {
+  right: 20px; bottom: 20px;
+}
+[dir="rtl"] .app:not(:has(.workspace.map-canvas)) .chat-fab { right: auto; left: 20px; }
+/* keep page content clear of the launcher */
+.workspace:not(.map-canvas) .page-body { padding-bottom: 84px; }
+
+/* --- Theme 7: never clip a data table flush to the panel edge --- */
+.table-card, .model-registry, .members-table {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* --- Theme 2: quiet the notification empty + drawer chrome already done;
+   demote non-interactive twin fault counters to inline dot+text --- */
+.twin-badge { padding: 2px 8px; }
+
+/* --- Theme 8: Arabic field is RTL --- */
+textarea[dir="rtl"], input[dir="rtl"] { text-align: right; }
+
+/* --- Theme 7: Access permission + members stack full-width (no clip) --- */
+.technical-grid.access-people-grid { grid-template-columns: minmax(0, 1fr); }
+
+/* --- Theme 2: integration "Sync now" = compact quiet action, not a
+   full-width filled button repeated on every card --- */
+.integration-card .button {
+  width: fit-content;
+  justify-self: start;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 600;
+}
+.integration-card .button:hover:not(:disabled) { background: var(--surface-2); }
+
+/* --- Theme 2: permission matrix - quiet 'granted' marks, not neon fills --- */
+.permission-matrix input[type="checkbox"] { accent-color: color-mix(in srgb, var(--primary) 70%, transparent); opacity: 0.85; }

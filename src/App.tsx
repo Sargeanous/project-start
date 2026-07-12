@@ -2202,8 +2202,11 @@ const translations: Record<string, string> = {
   "Optimize": "التحسين",
   "Safeguard": "الحراسة",
   "Natural-language search across campaigns, assets, and archives.": "بحث بلغة طبيعية عبر الحملات والأصول والأرشيف.",
+  "Deep search across the historical play and proof-of-play archive.": "بحث معمّق في أرشيف العرض وإثبات التشغيل التاريخي.",
   "Compose workflows across scheduling, targeting, and distribution.": "بناء تدفقات العمل عبر الجدولة والاستهداف والتوزيع.",
+  "Recommends zones and dayparts to match a campaign goal.": "يوصي بالمناطق والفترات الزمنية بما يناسب هدف الحملة.",
   "Generative studio for civic messaging in Arabic and English.": "استوديو توليدي للرسائل المدنية بالعربية والإنجليزية.",
+  "Adapts one approved creative into per-screen dynamic variants.": "يحوّل إعلانًا معتمدًا إلى نسخ ديناميكية لكل شاشة.",
   "Content moderation, deepfake detection, and rights checks.": "الإشراف على المحتوى، الكشف عن التزييف العميق، وفحص الحقوق.",
   "Yield, slot allocation, and dynamic pricing recommendations.": "توصيات العائد وتوزيع الفترات والتسعير الديناميكي.",
   "Edge, CMS and network anomaly detection with audit trails.": "كشف الشذوذ في الحافة وإدارة المحتوى والشبكة مع سجلات التدقيق.",
@@ -5364,7 +5367,7 @@ function AlertsPage({
           <label>{t("Headline")}<input value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} placeholder={t("Severe dust storm - reduce speed")} /></label>
           <div className="cap-bilingual">
             <label>{t("Body (English)")}<textarea value={draft.bodyEn} onChange={(e) => setDraft({ ...draft, bodyEn: e.target.value })} /></label>
-            <label dir="rtl">{t("Body (Arabic)")}<textarea value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
+            <label dir="rtl">{t("Body (Arabic)")}<textarea dir="rtl" value={draft.bodyAr} onChange={(e) => setDraft({ ...draft, bodyAr: e.target.value })} /></label>
           </div>
           <ActionRow>
             <Button type="submit" icon={ShieldAlert}>{t("Ingest alert")}</Button>
@@ -6111,7 +6114,7 @@ const mediaGptAgents: AgentSpec[] = [
     family: "Discover",
     name: "MediaGPT Archive",
     icon: Search,
-    tagline: "Natural-language search across campaigns, assets, and archives.",
+    tagline: "Deep search across the historical play and proof-of-play archive.",
     boundary: "Read-only",
     fields: [
       { key: "q", kind: "text", label: "Query", placeholder: "e.g. Coca-Cola placements on Yas Island last year", defaultValue: "Coca-Cola placements on Yas Island last year" },
@@ -6169,7 +6172,7 @@ const mediaGptAgents: AgentSpec[] = [
     family: "Command",
     name: "MediaGPT Targeting Assistant",
     icon: Terminal,
-    tagline: "Compose workflows across scheduling, targeting, and distribution.",
+    tagline: "Recommends zones and dayparts to match a campaign goal.",
     boundary: "Execute with approval",
     fields: [
       { key: "zone", kind: "select", label: "Zone", options: zoneOptions, defaultValue: "Airport route" },
@@ -6229,7 +6232,7 @@ const mediaGptAgents: AgentSpec[] = [
     family: "Create",
     name: "MediaGPT DCO Adapter",
     icon: PenTool,
-    tagline: "Generative studio for civic messaging in Arabic and English.",
+    tagline: "Adapts one approved creative into per-screen dynamic variants.",
     boundary: "Recommend",
     fields: [
       { key: "brief", kind: "textarea", label: "Brief", placeholder: "e.g. Make-it-in-the-Emirates, desert sunrise, civic tone", defaultValue: "Make-it-in-the-Emirates, desert sunrise, civic tone" },
@@ -7969,7 +7972,7 @@ function AccessRolesPage({ t }: { t: (value: string) => string }) {
           ))}
         </div>
       </Panel>
-      <div className="technical-grid wide">
+      <div className="technical-grid wide access-people-grid">
         <Panel icon={ShieldCheck} title="Permission matrix" action={<StatusPill label={active.name} tone="info" />}>
           <div className="permission-matrix">
             <table>
