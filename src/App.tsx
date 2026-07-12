@@ -1200,7 +1200,6 @@ const translations: Record<string, string> = {
   "Run MediaGPT checks": "تشغيل فحوصات MediaGPT",
   "Reports & BI": "التقارير وذكاء الأعمال",
   "Regulatory and operational reports": "تقارير تنظيمية وتشغيلية",
-  "Export for CSC, ADMO, MRO, NCEMA": "تصدير لـ CSC وADMO وMRO وNCEMA",
   "Report": "التقرير",
   "Rows": "الصفوف",
   "Export": "تصدير",
@@ -1710,7 +1709,6 @@ const translations: Record<string, string> = {
   "Live AI": "ذكاء اصطناعي مباشر",
   "Offline fallback": "إجابة احتياطية دون اتصال",
   "Auction desk": "مكتب المزادات",
-  "First-price, deterministic, audited": "بالسعر الأول، حتمي، مدقق",
   "Close auction": "إغلاق المزاد",
   "Confirm payment": "تأكيد الدفع",
   "Simulate failure": "محاكاة فشل الدفع",
@@ -1740,7 +1738,6 @@ const translations: Record<string, string> = {
   "Slot returned to auction": "أعيدت الفترة إلى المزاد",
   "Creative in governed review as": "التصميم قيد المراجعة المحوكمة برقم",
   "My bookings and invoices": "حجوزاتي وفواتيري",
-  "Booked to Paid, reconciled against proof-of-play": "من الحجز إلى الدفع، مطابقة مع إثبات العرض",
   "Pay the invoice to unlock scheduling": "ادفع الفاتورة لفتح الجدولة",
   "Awaiting playout": "بانتظار العرض",
   "Lot": "الفترة المعروضة",
@@ -1752,7 +1749,6 @@ const translations: Record<string, string> = {
   "In bidding": "قيد المزايدة",
   "Under maintenance": "قيد الصيانة",
   "Allocation register": "سجل التخصيصات",
-  "Long-term contracts per RFP FIN-101": "عقود طويلة الأجل وفق متطلب FIN-101",
   "Contracted value": "القيمة المتعاقد عليها",
   "Allocated assets": "الأصول المخصصة",
   "Available now": "متاح الآن",
@@ -1796,7 +1792,6 @@ const translations: Record<string, string> = {
   "Long-term operator contracts": "عقود المشغلين طويلة الأجل",
   "Live auction lots on assets": "فترات مزاد مباشرة على الأصول",
   "Rules engine simulator": "محاكي محرك القواعد",
-  "Server-enforced, deterministic": "مُطبّق على الخادم، حتمي",
   "Content category": "فئة المحتوى",
   "Requester tier": "مستوى مقدّم الطلب",
   "Evaluate booking": "تقييم الحجز",
@@ -7228,7 +7223,7 @@ function RulesEnforcementPanel({ enforcementEvents, t }: { enforcementEvents: En
 
   return (
     <div className="split-grid wide-left">
-      <Panel icon={ShieldCheck} title={t("Rules engine simulator")} action={t("Server-enforced, deterministic")}>
+      <Panel icon={ShieldCheck} title={t("Rules engine simulator")}>
         <div className="rules-sim-form">
           <label>{t("Zone")}
             <select value={zone} onChange={(e) => setZone(e.target.value)}>{RULE_ZONES.map((z) => <option key={z} value={z}>{t(z)}</option>)}</select>
@@ -8524,7 +8519,7 @@ function ReportsPage({
         {kpis.slice(4).map((k) => <Metric key={k.label} label={k.label} value={k.value} helper={k.helper} tone={k.tone} />)}
       </MetricGrid>
 
-      <Panel icon={BarChart3} title={t("Regulatory and operational reports")} action={t("Export for CSC, ADMO, MRO, NCEMA")}>
+      <Panel icon={BarChart3} title={t("Regulatory and operational reports")}>
         <div className="table-card">
           <table>
             <thead>
@@ -8683,7 +8678,7 @@ function CommercialMapPage({
         </div>
       </section>
 
-      <Panel icon={FileText} title={t("Allocation register")} action={t("Long-term contracts per RFP FIN-101")}>
+      <Panel icon={FileText} title={t("Allocation register")}>
         <div className="table-card">
           <table>
             <thead>
@@ -8747,7 +8742,7 @@ function AuctionDesk({
 }) {
   const money = (value: number, currency: string) => `${currency} ${value.toLocaleString("en-US")}`;
   return (
-    <Panel icon={ShoppingBag} title={t("Auction desk")} action={t("First-price, deterministic, audited")}>
+    <Panel icon={ShoppingBag} title={t("Auction desk")}>
       <div className="table-card">
         <table>
           <thead>
@@ -9369,7 +9364,7 @@ function MarketplacePage({
           </div>
         </Panel>
         {bookings.length ? (
-          <Panel icon={FileText} title={t("My bookings and invoices")} action={t("Booked to Paid, reconciled against proof-of-play")}>
+          <Panel icon={FileText} title={t("My bookings and invoices")}>
             <div className="table-card">
               <table>
                 <thead>
