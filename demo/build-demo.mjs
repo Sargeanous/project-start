@@ -50,21 +50,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SCENES = [
   {
     id: "s1",
-    title: "Seven a.m. The network wakes up",
+    tone: "Calm, welcoming, quietly proud. Unhurried, like opening a story you care about.",
     beats: [
       {
-        say: "Abu Dhabi, seven a.m. Fourteen digital displays across five zones wake up under one system.",
+        say: "This is the platform that runs Abu Dhabi's public screens. Everything begins right here, with who you are. You sign in, and the whole system arranges itself around your role.",
         async do(h) {
-          await h.card("Unified DOOH Platform", "Abu Dhabi Media Office · one day on the network");
+          // Open straight on the landing screen. Let it breathe, then drift onto
+          // the role the operator is about to choose. No title card.
+          await h.pace(1400);
+          await h.hover(h.page.locator("button", { hasText: "ADMO Control Room" }).first());
+          await h.pace(1200);
         },
       },
       {
-        say: "In the control room, the map is the workplace: every screen, its health, and what it is playing, breathing live across the city.",
+        say: "The control room opens straight onto the map. And that is the whole idea. Not a wall of numbers, the actual city, with every screen alive on it.",
         async do(h) {
-          await h.card(null);
           await h.click(h.page.locator("button", { hasText: "ADMO Control Room" }).first(), { settle: 1400 });
           await h.page.locator(".hex-pin").first().waitFor({ timeout: 20000 });
-          await h.pace(2000);
+          await h.pace(1800);
           // Zone filter: open the pill, focus one zone, come back to the city.
           await h.click(h.page.locator(".cc-zone-pill").first(), { settle: 700 });
           await h.click(h.page.locator(".cc-zone-menu button").nth(2), { settle: 1300 });
@@ -73,7 +76,7 @@ const SCENES = [
         },
       },
       {
-        say: "And any display is one click away: what is on it now, how long it has left, and what plays next, exactly as it looks on the street.",
+        say: "Tap any screen, and you see what it is showing this second, how long is left on it, and what comes next. Exactly as it looks out on the street.",
         async do(h) {
           // Click a pin -> asset popover -> live view fullscreen.
           await h.page.evaluate(() => {
@@ -98,10 +101,10 @@ const SCENES = [
 
   {
     id: "s2",
-    title: "The request: an advertiser brings a campaign",
+    tone: "Conversational and matter of fact, like walking a colleague through how it really works.",
     beats: [
       {
-        say: "Across town, an advertiser wants premium airtime for a summer campaign.",
+        say: "So here is a real request. An advertiser wants premium airtime for a summer campaign, so they come into the marketplace and pick a package.",
         async do(h) {
           await h.switchProfile("Advertiser");
           await h.nav("Marketplace");
@@ -110,7 +113,7 @@ const SCENES = [
         },
       },
       {
-        say: "The advertiser brings their own creative. The platform never invents an advertiser's artwork, so they upload the visual they designed themselves.",
+        say: "And this part we are strict about. The platform never invents an advertiser's artwork. They bring their own, so they upload the visual they designed.",
         async do(h) {
           const name = h.page.locator(".stack-form label", { hasText: "Campaign name" }).locator("input").first();
           if (await h.has(name, "s2: campaign name")) await h.typeInto(name, "Corniche Summer Nights");
@@ -123,7 +126,7 @@ const SCENES = [
         },
       },
       {
-        say: "They submit, and it enters ADMO's governed review, exactly like every other creative.",
+        say: "They submit, and it drops into exactly the same governed review as everything else. No shortcuts, no side doors.",
         async do(h) {
           await h.click(h.page.locator(".stack-form button", { hasText: "Submit campaign" }).first(), { settle: 1400 });
         },
@@ -133,34 +136,39 @@ const SCENES = [
 
   {
     id: "s3",
-    title: "The award: money clears before delivery",
+    tone: "Measured and businesslike, a touch of confidence about the money side.",
     beats: [
       {
-        say: "At noon, finance closes the round.",
+        say: "By noon, finance closes the round.",
         async do(h) {
           await h.switchProfile("ADMO Finance");
+          await h.nav("Financials");
+          await h.click(h.page.locator(".financial-tabs button", { hasText: "Commercial desk" }).first(), { settle: 900 });
           const closeBtn = h.page.locator("button", { hasText: "Close auction" }).first();
           if (await h.has(closeBtn, "s3: close auction")) await h.click(closeBtn, { settle: 1400 });
         },
       },
       {
-        say: "The platform awards at first price, raises the invoice with VAT, and holds delivery until the money clears. Payment confirmed.",
+        say: "The platform awards at first price, raises the invoice with VAT, and holds delivery until the money actually clears. And there it is, payment confirmed.",
         async do(h) {
           const pay = h.page.locator("button", { hasText: "Confirm payment" }).first();
           if (await h.has(pay, "s3: confirm payment")) await h.click(pay, { settle: 1500 });
         },
       },
       {
-        say: "And the Commercial Map already knows who holds that screen, on what contract, and until when.",
+        say: "And the commercial map already knows the whole story of that screen. Who holds it, on what contract, and right up to when.",
         async do(h) {
           await h.nav("Commercial Map");
-          await h.page.locator(".leaflet-marker-icon").first().waitFor({ timeout: 20000 });
-          // Show the map still, then a single slow pan down to the
-          // allocation detail beneath it. No marker click (leaflet's own
-          // recentering was the up-and-down jump).
-          await h.page.evaluate(() => window.scrollTo(0, 0));
-          await h.pace(2400);
-          await h.panToElement(".linked-detail", { headroom: 130, ms: 4200 });
+          await h.page.locator(".hex-pin").first().waitFor({ timeout: 20000 });
+          await h.pace(1600);
+          // Click an allocated screen (marker index 6 = AD-ARP-006) so the
+          // popover shows operator, contract and window.
+          await h.page.evaluate(() => {
+            const markers = document.querySelectorAll(".leaflet-marker-icon.hex-pin-icon");
+            (markers[6] || markers[markers.length - 1]).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          });
+          await h.page.locator(".commercial-popover").waitFor({ timeout: 8000 }).catch(() => h.issues.push("s3: commercial popover did not open"));
+          await h.pace(3200);
         },
       },
     ],
@@ -168,10 +176,10 @@ const SCENES = [
 
   {
     id: "s3b",
-    title: "The creative desk: ADMO makes its own campaign with AI",
+    tone: "Curious and a little excited, like showing off something genuinely clever.",
     beats: [
       {
-        say: "Not every campaign comes from an advertiser. For National Day, Abu Dhabi's own creative officer briefs MediaGPT.",
+        say: "Now, not every campaign comes from outside. For National Day, Abu Dhabi's own creative officer briefs MediaGPT.",
         async do(h) {
           await h.switchProfile("ADMO Content Reviewer");
           await h.click(h.page.locator("button").filter({ hasText: "Create with AI" }).first(), { settle: 1000 });
@@ -179,7 +187,7 @@ const SCENES = [
         },
       },
       {
-        say: "The officer sets the official wording in Arabic and English, and MediaGPT paints a background to match. It works from the national brand book and the flag palette, and it locks the wording as its own layer, so the Arabic reads exactly right on every screen.",
+        say: "The officer writes the official wording, in Arabic and English. MediaGPT paints a background to match, straight from the national brand book and the flag palette. And it keeps that wording as its own locked layer, so the Arabic reads perfectly on every single screen.",
         async do(h) {
           const gen = h.page.locator(".studio-controls button", { hasText: "Generate with MediaGPT" }).first();
           if (await h.has(gen, "s3b: generate")) {
@@ -192,12 +200,12 @@ const SCENES = [
         },
       },
       {
-        say: "The officer sends it straight into the same governed review as every other creative.",
+        say: "One click, and it goes into the very same review queue as every other creative.",
         async do(h) {
           const send = h.page.locator("button", { hasText: "Send to CMS review" }).first();
           if (await h.has(send, "s3b: send to CMS")) {
-            await h.click(send, { settle: 1200 });
-            await h.page.locator(".radius-result.good").first().waitFor({ timeout: 12000 }).catch(() => {});
+            await h.click(send, { settle: 1400 });
+            await h.pace(1000);
           }
         },
       },
@@ -206,22 +214,24 @@ const SCENES = [
 
   {
     id: "s4",
-    title: "The gate: AI reviews, humans decide",
+    tone: "Deliberate and trustworthy. This is the serious, governance heart of the story.",
     beats: [
       {
-        say: "Now the gate. On the advertiser's own artwork, MediaGPT scores brand safety, cultural fit, Arabic accuracy and legibility at highway distance.",
+        say: "This is the gate, and it is where the AI really earns its keep. On the advertiser's own artwork, MediaGPT scores brand safety, cultural fit, Arabic accuracy, and whether the text can even be read from a car at highway speed.",
         async do(h) {
           await h.click(h.page.locator("button").filter({ hasText: "Submissions" }).first(), { settle: 900 });
           await h.click(h.page.locator(".submission-list button", { hasText: "Corniche Summer Nights" }).first(), { settle: 1000 });
           const start = h.page.locator("button", { hasText: "Start review" }).first();
           if (await h.has(start, "s4: start review (advertiser)")) await h.click(start, { settle: 1000 });
+          // The AI checks live under the MediaGPT section of the review.
+          await h.click(h.page.locator(".review-section-tabs button", { hasText: "MediaGPT" }).first(), { settle: 800 });
           await h.page.locator(".ai-review-card").first().scrollIntoViewIfNeeded().catch(() => {});
           const aiCheck = h.page.locator("button", { hasText: "Run MediaGPT check" }).first();
           if (await h.has(aiCheck, "s4: run MediaGPT check")) await h.click(aiCheck, { settle: 1200 });
         },
       },
       {
-        say: "It clears brand safety and copyright, but flags the call to action as too small for highway screens, and cites the creative-standards rule behind it. AI only proposes, so the officer decides whether to accept it or send it back to the advertiser to fix.",
+        say: "It clears brand safety and copyright, but it flags the call to action as too small for a highway screen, and it cites the exact standard behind that call. The AI proposes. It never decides. The officer does, accept it, or send it back to fix.",
         async do(h) {
           const details = h.page.locator("button", { hasText: "Show AI details" }).first();
           if (await h.has(details, "s4: show AI details")) {
@@ -232,11 +242,13 @@ const SCENES = [
         },
       },
       {
-        say: "The National Day campaign is different. Because it takes over the whole civic estate it is high impact, and high impact needs two named approvers, each with a one-time code, and neither owner nor bidder may sign their own work.",
+        say: "National Day is a heavier decision. It takes over the whole civic estate, so it counts as high impact. And high impact needs two named people, each with their own one time code, and nobody may ever sign off their own work.",
         async do(h) {
           await h.click(h.page.locator(".submission-list button", { hasText: "National Day tribute" }).first(), { settle: 1000 });
           const start = h.page.locator("button", { hasText: "Start review" }).first();
           if (await h.has(start, "s4: start review (civic)")) await h.click(start, { settle: 1000 });
+          // Dual-control approvals live under the Governance section.
+          await h.click(h.page.locator(".review-section-tabs button", { hasText: "Governance" }).first(), { settle: 800 });
           const panel = h.page.locator(".approvals-panel").first();
           await panel.scrollIntoViewIfNeeded().catch(() => {});
           const select = panel.locator("select").first();
@@ -250,7 +262,7 @@ const SCENES = [
         },
       },
       {
-        say: "Two signatures later it is approved, and the whole decision, AI findings and human sign off, sits in the journal, permanently.",
+        say: "Two signatures, and it is approved. And every AI finding, every human sign off, is written into the journal for good.",
         async do(h) {
           const select = h.page.locator(".approvals-panel select").first();
           if (await h.has(select, "s4: second approver select")) {
@@ -270,10 +282,10 @@ const SCENES = [
 
   {
     id: "s5",
-    title: "The copilot: ask the platform anything",
+    tone: "Warm and curious, a bit of quiet delight at how helpful it is.",
     beats: [
       {
-        say: "Everyone on the platform has the same copilot. Ask it anything about the live estate.",
+        say: "Everyone here shares the same copilot. So go ahead, ask it anything about the live estate.",
         async do(h) {
           await h.switchProfile("ADMO Control Room");
           await h.click(h.page.locator(".chat-fab").first(), { settle: 800 });
@@ -281,19 +293,19 @@ const SCENES = [
         },
       },
       {
-        say: "It reads every screen, every controller and every telemetry feed, then answers grounded in the live data, and it shows the sources behind every claim.",
+        say: "It reads every screen, every controller, every telemetry feed, and answers straight from the live data. And it shows you the sources, so you can always check its work.",
         async do(h) {
           await h.awaitChat("Which assets are offline or need attention right now?");
         },
       },
       {
-        say: "Ask it to act, and it drafts the action but never executes it. Every write waits for a human decision.",
+        say: "Now ask it to actually do something, and watch. It drafts the action, and then it stops. Nothing gets written until a person says yes.",
         async do(h) {
           await h.askChat("Draft a maintenance ticket for AD-HWY-009 with high severity.");
         },
       },
       {
-        say: "Here, the operator approves the maintenance ticket it drafted. Intelligence, with a leash.",
+        say: "The operator approves the ticket it drafted. And that is the deal with this AI. It is genuinely capable, and it is always on a leash.",
         async do(h) {
           const approve = h.page.locator(".chat-panel .agent-action-card button", { hasText: "Approve" }).first();
           if (await h.has(approve, "s5: approve proposal")) await h.click(approve, { settle: 1200 });
@@ -305,16 +317,22 @@ const SCENES = [
 
   {
     id: "s5b",
-    title: "The twin: every screen has a digital double",
+    tone: "Engaged and a little proud, showing off the depth behind each screen.",
     beats: [
       {
-        say: "The copilot flagged a screen offline. Before a crew rolls, the technical team opens that asset as a live 3D twin.",
+        say: "The copilot just flagged a screen down. So this is where the technical team lives. Every asset, its schedule, its vitals, and its open faults, all in one view.",
         async do(h) {
           await h.nav("Network and Devices");
-          const asset = h.page.locator(".asset-registry button", { hasText: "Al Ain Gateway" }).first();
-          if (await h.has(asset, "twin: AD-HWY-009 row")) await h.click(asset, { settle: 900 });
-          const fs = h.page.locator(".asset-twin-pane button", { hasText: "Full screen" }).first();
-          if (await h.has(fs, "twin: Full screen")) {
+          const asset = h.page.locator(".nd-asset", { hasText: "Al Ain Gateway" }).first();
+          if (await h.has(asset, "twin: Al Ain Gateway card")) await h.click(asset, { settle: 1000 });
+          await h.pace(2600); // hold on the vitals + active issues
+        },
+      },
+      {
+        say: "And every physical screen has a digital double. They open the one that is down, as a live 3D twin.",
+        async do(h) {
+          const fs = h.page.locator(".nd-viewer-fs").first();
+          if (await h.has(fs, "twin: full screen button")) {
             await h.click(fs, { settle: 1000 });
             await h.page.locator(".twin-fullscreen").first().waitFor({ timeout: 12000 }).catch(() => h.issues.push("twin: fullscreen did not open"));
             await h.pace(1500);
@@ -322,19 +340,19 @@ const SCENES = [
         },
       },
       {
-        say: "They spin the full model around to inspect the back of the structure,",
+        say: "They spin the whole structure around to check the back of it,",
         async do(h) {
           await h.dragRotate(".twin-fullscreen canvas");
         },
       },
       {
-        say: "explode it into its stack of panels, controllers and power units,",
+        say: "pull it apart into its panels, its controllers, its power units,",
         async do(h) {
           await h.slide(".twin-fullscreen .twin-explode input[type=range]", [0.15, 0.3, 0.45, 0.6, 0.72]);
         },
       },
       {
-        say: "and open any faulty part to read exactly what is wrong and what to do about it.",
+        say: "and open the faulty part to read exactly what is wrong, and what to do about it.",
         async do(h) {
           const issue = h.page.locator(".twin-fullscreen .twin-issue.tone-fault").first();
           if (await h.has(issue, "twin: faulty issue row")) {
@@ -352,10 +370,10 @@ const SCENES = [
 
   {
     id: "s6",
-    title: "It plays, and proves it",
+    tone: "Matter of fact and confident, the quiet satisfaction of proof.",
     beats: [
       {
-        say: "At the scheduled minute, the creative goes live, and the screen answers back with a cryptographic receipt, hash chained to every play before it, all the way to genesis.",
+        say: "At the scheduled minute, the creative goes live. And the screen answers back, with a signed receipt, hash chained to every play before it, all the way back to the very first one.",
         async do(h) {
           await h.switchProfile("ADMO Content Reviewer");
           await h.click(h.page.locator("button", { hasText: "Scheduling" }).first(), { settle: 900 });
@@ -364,9 +382,11 @@ const SCENES = [
         },
       },
       {
-        say: "Finance verifies the chain and settles the booking. Billing rests on evidence, not estimates.",
+        say: "Finance checks that chain, and settles. The bill rests on proof, not on estimates.",
         async do(h) {
           await h.switchProfile("ADMO Finance");
+          await h.nav("Financials");
+          await h.click(h.page.locator(".financial-tabs button", { hasText: "Settlement" }).first(), { settle: 900 });
           const verify = h.page.locator("button", { hasText: "Verify hash chain" }).first();
           await verify.scrollIntoViewIfNeeded().catch(() => {});
           await h.click(verify, { settle: 1400 });
@@ -383,19 +403,19 @@ const SCENES = [
 
   {
     id: "s7",
-    title: "The interruption: an alert outranks everything",
+    tone: "Lower and serious. Urgent but composed, the tone shifts here.",
     beats: [
       {
-        say: "Then the day changes. NCEMA issues a weather alert.",
+        say: "And then the day turns. NCEMA issues a weather alert.",
         async do(h) {
           await h.switchProfile("ADMO Control Room");
           await h.nav("Alerts");
-          const row = h.page.locator("tbody tr", { hasText: "Weather alert broadcast" }).first();
+          const row = h.page.locator(".alerts-list button", { hasText: "Weather alert broadcast" }).first();
           if (await h.has(row, "s7: weather alert row")) await h.click(row, { settle: 1000 });
         },
       },
       {
-        say: "MediaGPT assists but never touches the message: it checks Arabic and English parity and proposes routing, read only by design.",
+        say: "The AI helps, but it does not touch the message. It checks the Arabic and the English match, and it suggests where to route it. Read only, on purpose.",
         async do(h) {
           const checks = h.page.locator("button", { hasText: "Run MediaGPT checks" }).first();
           if (await h.has(checks, "s7: run checks")) { await h.click(checks, { settle: 1400 }); await h.pace(1200); }
@@ -407,7 +427,7 @@ const SCENES = [
         },
       },
       {
-        say: "The duty officer approves with a one-time code and broadcasts. Within seconds the network drops commercial content for the warning. Emergencies outrank everything.",
+        say: "The duty officer signs with a one time code, and broadcasts. And within seconds, the network drops its commercial content for the warning. In an emergency, nothing outranks safety.",
         async do(h) {
           const select = h.page.locator(".approvals-action select").first();
           if (await h.has(select, "s7: approver select")) {
@@ -430,10 +450,10 @@ const SCENES = [
 
   {
     id: "s8",
-    title: "The response: crews out, screens dark on command",
+    tone: "Serious and decisive, calm authority under pressure.",
     beats: [
       {
-        say: "A screen struggles in the storm. From the More menu, dispatch shows exactly which sites get a crew before anyone commits.",
+        say: "One screen is struggling in the storm. Straight from the map, dispatch shows exactly which sites get a crew, before anyone commits a thing.",
         async do(h) {
           await h.nav("Control Centre");
           await h.page.locator(".hex-pin").first().waitFor({ timeout: 20000 });
@@ -444,7 +464,7 @@ const SCENES = [
         },
       },
       {
-        say: "And when a display must go dark right now, the kill switch sits one press away on the map. Password confirmed, fully audited, it blanks the screen in seconds and restores it just as fast.",
+        say: "And if a display has to go dark this instant, the kill switch is right there on the map. Password, fully logged, and it blanks in seconds. Then it comes back just as fast.",
         async do(h) {
           await h.click(h.page.locator(".cc-kill button").first(), { settle: 900 });
           const modal = h.page.locator(".kill-modal");
@@ -462,10 +482,10 @@ const SCENES = [
 
   {
     id: "s9",
-    title: "The close: the day on the books",
+    tone: "Warm, confident, conclusive. A proud, genuine close.",
     beats: [
       {
-        say: "By evening, the day is already on the books: what sold, what played, what was proven, what was interrupted.",
+        say: "By evening, the day has already closed itself. What sold, what played, what was proven, and what was interrupted. All of it, on the record.",
         async do(h) {
           await h.switchProfile("ADMO Finance");
           await h.nav("Reports & BI");
@@ -474,10 +494,9 @@ const SCENES = [
         },
       },
       {
-        say: "One platform. One closed loop. From dirham, to display, to proof.",
+        say: "One platform. One loop. From the first dirham, to the screen on the street, to the proof it ran.",
         async do(h) {
-          await h.lowerThird(null);
-          await h.card("One platform. One closed loop.", "From dirham · to display · to proof");
+          await h.card("One platform. One loop.", "From dirham · to display · to proof");
         },
       },
     ],
@@ -503,28 +522,32 @@ function wavDurationSeconds(buf) {
   throw new Error("wav data chunk not found");
 }
 
-async function tts(text, file) {
-  const hash = createHash("sha256").update(`nova|${text}`).digest("hex").slice(0, 16);
+// Warm, natural female voice. "coral" reads far more human than the older
+// voices; delivery is steered per scene through the instructions field.
+const VOICE = "coral";
+const BASE_STYLE =
+  "You are a real person giving a live walkthrough of a product you know inside out, speaking to a small room of senior colleagues. Sound human and natural, never like a synthetic corporate voiceover. Warm, genuine, a little understated. Vary your pace and pitch, let the important phrases land, and take a natural breath between sentences. Use light, easy phrasing and do not over-enunciate. Never rush.";
+
+async function tts(text, file, tone = "") {
+  const instructions = tone ? `${BASE_STYLE} For this moment: ${tone}` : BASE_STYLE;
+  const hash = createHash("sha256").update(`${VOICE}|${instructions}|${text}`).digest("hex").slice(0, 16);
   const metaFile = `${file}.json`;
   if (existsSync(file) && existsSync(metaFile)) {
     const meta = JSON.parse(readFileSync(metaFile, "utf8"));
     if (meta.hash === hash) return wavDurationSeconds(readFileSync(file));
   }
   console.log(`  tts -> ${file}`);
-  async function request(model, withInstructions) {
-    const body = { model, voice: "nova", input: text, response_format: "wav" };
-    if (withInstructions) {
-      body.instructions =
-        "Professional corporate product-demo narrator. Female, warm, confident. Slow, deliberate, unhurried pace with clear pauses. No rush.";
-    }
+  async function request(model, voice, withInstructions) {
+    const body = { model, voice, input: text, response_format: "wav" };
+    if (withInstructions) body.instructions = instructions;
     return fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   }
-  let res = await request("gpt-4o-mini-tts", true);
-  if (!res.ok) res = await request("tts-1", false);
+  let res = await request("gpt-4o-mini-tts", VOICE, true);
+  if (!res.ok) res = await request("tts-1", "nova", false); // fallback: tts-1 has no "coral"
   if (!res.ok) throw new Error(`TTS failed: ${res.status} ${await res.text()}`);
   const buf = Buffer.from(await res.arrayBuffer());
   writeFileSync(file, buf);
@@ -619,13 +642,14 @@ async function injectOverlays(page) {
       el.id = "__card";
       Object.assign(el.style, {
         position: "fixed", inset: "0", zIndex: "2147483645", display: "flex",
-        flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "20px",
-        background: "linear-gradient(135deg,#0d1f19 0%,#1f4a3d 100%)", color: "#fff",
-        opacity: "1", transition: "opacity .8s ease", fontFamily: "Georgia, serif", textAlign: "center",
+        flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "22px",
+        background: "radial-gradient(130% 130% at 50% 0%, #1a1e1c 0%, #0d0f0e 68%)", color: "#fff",
+        opacity: "1", transition: "opacity .8s ease",
+        fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", textAlign: "center",
       });
       el.innerHTML =
-        `<div style="font-size:58px;font-weight:700;letter-spacing:-0.01em;max-width:1200px">${title}</div>` +
-        `<div style="font-family:Segoe UI,sans-serif;font-size:19px;opacity:.72;letter-spacing:.16em;text-transform:uppercase">${subtitle || ""}</div>`;
+        `<div style="font-size:52px;font-weight:600;letter-spacing:-0.01em;max-width:1200px">${title}</div>` +
+        `<div style="font-size:16px;opacity:.55;letter-spacing:.18em;text-transform:uppercase;color:#5fd39a">${subtitle || ""}</div>`;
       layer.appendChild(el);
     };
   });
@@ -674,9 +698,27 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     }
     throw new Error("element never became visible");
   }
+  let lastCur = { x: 960, y: 700 };
   async function cursorTo(x, y) {
-    await page.evaluate(([cx, cy]) => window.__cursorTo(cx, cy), [x, y]);
-    await pace(650);
+    const dist = Math.hypot(x - lastCur.x, y - lastCur.y);
+    lastCur = { x, y };
+    // Human-ish: longer travels take a touch longer, and the cursor lands with a
+    // few pixels of jitter so it never parks pixel-perfectly on centre.
+    const dur = Math.min(0.9, Math.max(0.3, dist / 1500));
+    const jx = x + (Math.random() - 0.5) * 9;
+    const jy = y + (Math.random() - 0.5) * 7;
+    await page.evaluate(([cx, cy, d]) => {
+      const el = document.getElementById("__cur");
+      if (el) el.style.transitionDuration = `${d}s, ${d}s, 0.4s`;
+      window.__cursorTo(cx, cy);
+    }, [jx, jy, dur]);
+    await pace(fast ? 200 : Math.min(820, Math.round(dur * 1000) + 130 + Math.random() * 150));
+  }
+  async function hover(locator) {
+    await healIfCrashed();
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    const box = await boxOf(locator);
+    await cursorTo(box.x + box.width / 2, box.y + Math.min(box.height / 2, 40));
   }
   async function click(locator, { settle = 600, noScroll = false } = {}) {
     await healIfCrashed();
@@ -687,7 +729,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     const y = box.y + Math.min(box.height / 2, 40);
     await cursorTo(x, y);
     await page.evaluate(([cx, cy]) => window.__ripple(cx, cy), [x, y]);
-    await pace(140);
+    await pace(fast ? 80 : 150 + Math.random() * 170); // brief, slightly varied pre-click dwell
     await locator.click({ timeout: 6000 }).catch(() => page.mouse.click(x, y));
     await pace(settle);
   }
@@ -805,7 +847,7 @@ function makeHelpers(page, { fast = false, issues = [] } = {}) {
     }
     await pace(500);
   }
-  return { pace, has, click, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, slowPan, panToElement, mfa, askChat, sendChat, awaitChat, dragRotate, slide, healIfCrashed, page, issues };
+  return { pace, has, click, hover, typeInto, nav, switchProfile, lowerThird, card, smoothScroll, slowPan, panToElement, mfa, askChat, sendChat, awaitChat, dragRotate, slide, healIfCrashed, page, issues };
 }
 
 /* ------------------------------------------------------------------ *\
@@ -836,7 +878,6 @@ async function preflight(browser) {
   await injectOverlays(page);
   const h = makeHelpers(page, { fast: true, issues });
   for (const scene of SCENES) {
-    await h.lowerThird(scene.title);
     for (const beat of scene.beats) {
       const started = Date.now();
       try {
@@ -874,7 +915,6 @@ async function record(browser) {
 
   try {
     for (const scene of SCENES) {
-      await h.lowerThird(scene.title);
       for (const beat of scene.beats) {
         const offsetMs = Date.now() - t0;
         timeline.push({ audioFile: beat.audioFile, offsetMs });
@@ -948,7 +988,7 @@ async function main() {
     for (let i = 0; i < scene.beats.length; i += 1) {
       const beat = scene.beats[i];
       beat.audioFile = join(AUDIO_DIR, `${scene.id}-${i}.wav`);
-      beat.duration = await tts(beat.say, beat.audioFile);
+      beat.duration = await tts(beat.say, beat.audioFile, beat.tone || scene.tone || "");
     }
   }
   const total = allBeats().reduce((s, b) => s + b.beat.duration + BEAT_PAD_MS / 1000, 0);
