@@ -8651,3 +8651,13 @@ textarea[dir="rtl"], input[dir="rtl"] { text-align: right; }
 
 /* --- Theme 2: permission matrix - quiet 'granted' marks, not neon fills --- */
 .permission-matrix input[type="checkbox"] { accent-color: color-mix(in srgb, var(--primary) 70%, transparent); opacity: 0.85; }
+
+/* --- Theme 2: media tiles - neutral type overlay, left-aligned status,
+   no full-width solid bar --- */
+.media-card .creative-frame .status-pill {
+  background: rgba(0, 0, 0, 0.55) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  backdrop-filter: blur(2px);
+}
+.media-card > .status-pill { align-self: flex-start; }
