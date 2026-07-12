@@ -3384,7 +3384,7 @@ function Topbar({
             aria-label={t("Notifications")}
             aria-expanded={notificationOpen}
           >
-            <Bell size={18} />
+            <span className="cc-toast-glyph-box" aria-hidden="true"><img src="/icons/alert-bell.png" alt="" /></span>
             {unreadCount ? <span className="notification-badge">{unreadCount}</span> : null}
           </button>
           {notificationOpen ? (

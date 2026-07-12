@@ -6275,9 +6275,9 @@ html[dir="rtl"] .network-tabs button.active {
 .asset-supply-table .ai-recommendation {
   max-width: 430px;
   padding: 10px 12px;
-  border-color: color-mix(in srgb, var(--primary) 30%, transparent) !important;
-  border-inline-start: 3px solid var(--primary) !important;
-  background: color-mix(in srgb, var(--primary) 7%, var(--surface)) !important;
+  border: 0 !important;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface)) !important;
   box-shadow: none;
   font-size: 12px;
 }
@@ -8361,3 +8361,132 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
 
 /* ---- KPI strip flows: 5 metrics share one row instead of orphaning ---- */
 .metric-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+/* ================================================================
+   DE-BOXING PASS - retire the "AI-made" frame language.
+   One container level max: panels are the only bordered cards.
+   List items are rows or fill-only wells - no per-item outlines,
+   no colored left accent bars, no filled-button spam inside rows.
+   ================================================================ */
+
+/* Topbar bell: free-standing CC-toast bell glyph, no frame */
+.notification-trigger, .notification-trigger.has-unread {
+  width: 40px; height: 40px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
+  border-radius: 8px;
+  color: var(--ink);
+}
+.notification-trigger:hover { background: var(--surface-2) !important; }
+.notification-trigger .cc-toast-glyph-box { pointer-events: none; }
+.notification-badge {
+  top: 1px; inset-inline-end: 1px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border: 2px solid var(--bg, #181b1a);
+  background: #e54d2e;
+  font-size: 10px; font-weight: 600;
+}
+
+/* Notification drawer: hairline rows + quiet text actions */
+.notification-drawer { border-radius: 8px; }
+.notification-list { gap: 0; padding: 4px 0; }
+.notification-card, .notification-card.unread {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 12px 16px;
+  border-top: 1px solid var(--ctrl-border-dim);
+}
+.notification-list .notification-card:first-child { border-top: 0; }
+.notification-card:hover { background: var(--surface-input); }
+.notification-actions button,
+.notification-actions button:first-child {
+  min-height: 24px; padding: 2px 6px;
+  border: 0; border-radius: 2px;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.02em;
+}
+.notification-actions button + button { color: var(--muted); font-weight: 400; }
+.notification-actions button:hover:not(:disabled) { background: var(--surface-2); }
+.notification-actions button:disabled { color: var(--disabled-ink); background: transparent; }
+.notification-drawer header button {
+  border-radius: 2px;
+  border: 1px solid var(--ctrl-border);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px; font-weight: 400; letter-spacing: 0.02em;
+}
+.notification-drawer header span {
+  text-transform: none; letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 500;
+}
+
+/* Knowledge bases: fill-only wells, selection = tint + green title */
+.knowledge-list button {
+  border: 1px solid transparent !important;
+  border-radius: 4px;
+  background: var(--surface-input);
+  box-shadow: none !important;
+}
+.knowledge-list button:hover {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-input));
+  border-color: transparent !important;
+}
+.knowledge-list button.selected {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-input));
+  box-shadow: none !important;
+}
+.knowledge-list button.selected strong { color: var(--primary); }
+
+/* Submission / registry / zone / object lists: same well language */
+.submission-list button, .asset-registry button, .zone-list button, .object-list article {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--surface-input);
+  box-shadow: none;
+}
+.submission-list button:hover, .asset-registry button:hover, .zone-list button:hover {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-input));
+  border-color: transparent;
+}
+.submission-list button.selected, .asset-registry button.selected, .zone-list button.selected,
+.object-list article.selected {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-input));
+  box-shadow: none;
+}
+.submission-list button.selected strong, .asset-registry button.selected strong,
+.zone-list button.selected strong { color: var(--primary); }
+
+/* Left accent bars retired everywhere */
+.notes, .mediagpt-prompt p {
+  border-inline-start: 0;
+  background: var(--surface-input);
+  border-radius: 4px;
+}
+.service-order-card { border-inline-start: 1px solid var(--line); }
+.agent-rail-item.active { box-shadow: none; }
+[dir="rtl"] .agent-rail-item.active { box-shadow: none; }
+
+/* Collapsed sidebar: a clean icon rail, nothing clipped */
+.app { transition: grid-template-columns 0.18s ease; }
+.app.sidebar-collapsed .sidebar { overflow: hidden; }
+.app.sidebar-collapsed .sidebar-brand .brand-mark {
+  display: block; width: 32px; height: 32px; margin-inline: auto;
+}
+.app.sidebar-collapsed .sidebar-profile {
+  width: 40px; padding: 0; margin-inline: auto;
+  justify-content: center;
+  background: transparent; border: 0; box-shadow: none;
+}
+.app.sidebar-collapsed .sidebar-profile-text,
+.app.sidebar-collapsed .sidebar-profile-arrows { display: none; }
+
+/* Network registry: room to breathe, names on one line */
+.asset-operations-workspace {
+  grid-template-columns: minmax(320px, 0.45fr) minmax(0, 1.55fr);
+}
+.asset-registry-pane .asset-registry strong { font-size: 13px; }
