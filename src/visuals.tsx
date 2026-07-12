@@ -515,6 +515,12 @@ interface LiveMapProps {
   /* Origen canvas mode: full-bleed map with hexagonal status pins. */
   variant?: "panel" | "canvas";
   pinKindFor?: (assetId: string) => PinKind;
+  /* Multi-select: Ctrl/Cmd-click toggles a pin; marquee-drag (in select
+     mode) rubber-bands a rectangle. The parent owns the selection set. */
+  multiSelectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
+  marqueeMode?: boolean;
+  onMarquee?: (ids: string[], additive: boolean) => void;
 }
 
 // Origen hexagonal pin (Figma components frame): hexagon fill = status tone,
@@ -528,14 +534,15 @@ const HEX_GLYPHS: Record<PinKind, string> = {
     '<path d="M9 3.2a4.2 4.2 0 0 1 4.2 4.2c0 2.9 1 3.7 1.5 4.2H3.3c.5-.5 1.5-1.3 1.5-4.2A4.2 4.2 0 0 1 9 3.2Z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.6 14.4a1.5 1.5 0 0 0 2.8 0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
 };
 
-function hexPinHtml(asset: LiveMapAsset, selected: boolean, kind: PinKind): string {
+function hexPinHtml(asset: LiveMapAsset, selected: boolean, kind: PinKind, multi = false): string {
   const color = statusColor[asset.status] ?? "#009b5d";
-  return `<div class="hex-pin ${selected ? "selected" : ""}" style="--pin:${color}">
+  return `<div class="hex-pin ${selected ? "selected" : ""} ${multi ? "multi-selected" : ""}" style="--pin:${color}">
     <svg viewBox="0 0 36 46" width="36" height="46" aria-hidden="true">
       <path d="M18 1.5 L33.5 10 V27 L18 35.5 L2.5 27 V10 Z" fill="var(--pin)" stroke="rgba(0,0,0,0.28)" stroke-width="1"/>
       <path d="M14 36 L18 42 L22 36 Z" fill="var(--pin)"/>
       <g transform="translate(9,9.4)">${HEX_GLYPHS[kind]}</g>
     </svg>
+    ${multi ? '<span class="hex-pin-check" aria-hidden="true">✓</span>' : ""}
   </div>`;
 }
 
@@ -548,7 +555,7 @@ function pinHtml(asset: LiveMapAsset, selected: boolean): string {
   </div>`;
 }
 
-export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAssetIds, t, variant = "panel", pinKindFor }: LiveMapProps) {
+export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAssetIds, t, variant = "panel", pinKindFor, multiSelectedIds, onToggleSelect, marqueeMode, onMarquee }: LiveMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<Record<string, unknown>>({});
@@ -559,15 +566,24 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
   alarmsRef.current = openAlarmAssetIds;
   const kindRef = useRef(pinKindFor);
   kindRef.current = pinKindFor;
+  const multiRef = useRef(multiSelectedIds);
+  multiRef.current = multiSelectedIds;
+  const toggleRef = useRef(onToggleSelect);
+  toggleRef.current = onToggleSelect;
+  const marqueeModeRef = useRef(marqueeMode);
+  marqueeModeRef.current = marqueeMode;
+  const marqueeCbRef = useRef(onMarquee);
+  marqueeCbRef.current = onMarquee;
   const [failed, setFailed] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function iconFor(L: any, asset: LiveMapAsset, selected: boolean) {
+    const multi = !!multiRef.current?.includes(asset.id);
     if (variant === "canvas") {
       const alarmed = alarmsRef.current.includes(asset.id);
       const kind: PinKind = kindRef.current?.(asset.id) ?? (alarmed ? "alert" : "asset");
       const drawn = alarmed && asset.status !== "Offline" ? { ...asset, status: "Fault" } : asset;
-      return L.divIcon({ className: "hex-pin-icon", html: hexPinHtml(drawn, selected, kind), iconSize: [36, 46], iconAnchor: [18, 44] });
+      return L.divIcon({ className: "hex-pin-icon", html: hexPinHtml(drawn, selected, kind, multi), iconSize: [36, 46], iconAnchor: [18, 44] });
     }
     return L.divIcon({ className: "map-pin-icon", html: pinHtml(asset, selected), iconSize: [30, 38], iconAnchor: [15, 38] });
   }
@@ -598,7 +614,16 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
         assets.forEach((asset) => {
           const icon = iconFor(L, asset, asset.id === selectedAssetId);
           const marker = L.marker([asset.lat, asset.lng], { icon, title: asset.name }).addTo(map);
-          marker.on("click", () => clickRef.current(asset.id));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          marker.on("click", (ev: any) => {
+            const oe = ev?.originalEvent;
+            if ((oe?.ctrlKey || oe?.metaKey) && toggleRef.current) {
+              oe.preventDefault();
+              toggleRef.current(asset.id);
+            } else {
+              clickRef.current(asset.id);
+            }
+          });
           markersRef.current[asset.id] = marker;
         });
         if (variant === "canvas") {
@@ -646,6 +671,82 @@ export function LiveMap({ assets, selectedAssetId, onMarkerClick, openAlarmAsset
     if (selected) map.panTo([selected.lat, selected.lng]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAssetId]);
+
+  // Repaint pins when the multi-selection set changes.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    if (!L || !mapRef.current) return;
+    assets.forEach((asset) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const marker = markersRef.current[asset.id] as any;
+      if (marker) marker.setIcon(iconFor(L, asset, asset.id === selectedAssetId));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiSelectedIds]);
+
+  // Marquee rubber-band selection (PPT-style). Active only in marquee mode.
+  useEffect(() => {
+    const container = containerRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const map = mapRef.current as any;
+    if (!container || !map || !marqueeMode) return;
+    if (map.dragging) map.dragging.disable();
+    if (map.boxZoom) map.boxZoom.disable();
+    container.classList.add("marquee-active");
+
+    let startX = 0, startY = 0, rect: HTMLDivElement | null = null, dragging = false;
+    const rel = (e: MouseEvent) => { const b = container.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
+
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      const p = rel(e); startX = p.x; startY = p.y;
+      rect = document.createElement("div");
+      rect.className = "map-marquee-rect";
+      rect.style.left = `${startX}px`; rect.style.top = `${startY}px`;
+      container.appendChild(rect);
+      e.preventDefault();
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!dragging || !rect) return;
+      const p = rel(e);
+      rect.style.left = `${Math.min(startX, p.x)}px`;
+      rect.style.top = `${Math.min(startY, p.y)}px`;
+      rect.style.width = `${Math.abs(p.x - startX)}px`;
+      rect.style.height = `${Math.abs(p.y - startY)}px`;
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      const p = rel(e);
+      const x1 = Math.min(startX, p.x), x2 = Math.max(startX, p.x);
+      const y1 = Math.min(startY, p.y), y2 = Math.max(startY, p.y);
+      if (rect) { rect.remove(); rect = null; }
+      // A tiny drag is a click, not a marquee — ignore it.
+      if (Math.abs(x2 - x1) < 6 && Math.abs(y2 - y1) < 6) return;
+      const ids: string[] = [];
+      assets.forEach((asset) => {
+        const pt = map.latLngToContainerPoint([asset.lat, asset.lng]);
+        if (pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2) ids.push(asset.id);
+      });
+      marqueeCbRef.current?.(ids, e.shiftKey);
+    };
+
+    container.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      container.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      container.classList.remove("marquee-active");
+      if (rect) rect.remove();
+      if (map.dragging) map.dragging.enable();
+      if (map.boxZoom) map.boxZoom.enable();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marqueeMode, assets]);
 
   if (failed) {
     return (

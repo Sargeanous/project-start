@@ -343,6 +343,9 @@ export interface RadiusBroadcastScreen {
   status: "clear" | "flagged";
   flagLabel?: string;
   flagDetail?: string;
+  /* Selection overlap: an existing commitment on this screen. */
+  conflict?: string;
+  conflictLevel?: "hard" | "soft";
 }
 
 export interface RadiusBroadcast {
@@ -360,6 +363,11 @@ export interface RadiusBroadcast {
   createdBy: string;
   createdAt: string;
   approvedBy?: string;
+  /* Marquee/Ctrl multi-select action reuses this record + approval flow. */
+  mode?: "radius" | "selection";
+  actionKind?: "display" | "schedule";
+  scheduleWindow?: string;
+  conflictCount?: number;
 }
 
 export interface BriefPayload {
@@ -2397,6 +2405,92 @@ export async function approveRadiusBroadcast(id: string, approver: string): Prom
     addActivity(draft, approver, `Approved radius broadcast to ${broadcast.clearCount} screens`, broadcast.campaign);
   });
   return { state, broadcast: updated! };
+}
+
+// ---- Map multi-select (marquee / Ctrl-click) bulk action ----
+// Overlap is read from the commercial allocation state: an Allocated screen
+// or one Under maintenance is a hard conflict; In bidding is a soft conflict.
+const allocationById = new Map(assetAllocations.map((a) => [a.assetId, a]));
+
+function selectionConflict(assetId: string): { conflict?: string; conflictLevel?: "hard" | "soft" } {
+  const alloc = allocationById.get(assetId);
+  if (!alloc) return {};
+  if (alloc.status === "Allocated") {
+    const until = alloc.expiryDate ? ` until ${alloc.expiryDate}` : "";
+    return { conflict: `Committed to ${alloc.operator ?? "an operator"}${until} (${alloc.contractRef ?? "contract"})`, conflictLevel: "hard" };
+  }
+  if (alloc.status === "Under maintenance") return { conflict: "Screen is under maintenance", conflictLevel: "hard" };
+  if (alloc.status === "In bidding") return { conflict: `Live auction in progress${alloc.lotId ? ` (${alloc.lotId})` : ""}`, conflictLevel: "soft" };
+  return {};
+}
+
+export function computeSelectionScreens(assetIds: string[], opts: { category?: string; daypart?: string } = {}): RadiusBroadcastScreen[] {
+  const ids = new Set(assetIds);
+  return dataAssets
+    .filter((asset) => ids.has(asset.id))
+    .map((asset) => {
+      const verdict = evaluateRules({ kind: "scheduling", assetIds: [asset.id], category: opts.category, daypart: opts.daypart });
+      const flag = verdict.hits[0] ?? verdict.warnings[0];
+      const overlap = selectionConflict(asset.id);
+      return {
+        assetId: asset.id,
+        name: asset.name,
+        zone: asset.zone,
+        distanceM: 0,
+        status: flag || overlap.conflictLevel === "hard" ? "flagged" : "clear",
+        flagLabel: flag?.label,
+        flagDetail: flag?.detail,
+        conflict: overlap.conflict,
+        conflictLevel: overlap.conflictLevel,
+      } as RadiusBroadcastScreen;
+    });
+}
+
+export async function queueSelectionAction(
+  payload: { assetIds: string[]; campaign: string; messageEn: string; messageAr?: string; actionKind?: "display" | "schedule"; scheduleWindow?: string; category?: string; daypart?: string },
+  actor: string,
+): Promise<{ state: DoohState; broadcast: RadiusBroadcast }> {
+  if (!payload.assetIds?.length) throw new Error("Select at least one screen");
+  if (!payload.campaign?.trim()) throw new Error("A campaign or message name is required");
+  if (!payload.messageEn?.trim()) throw new Error("A message is required");
+  const screens = computeSelectionScreens(payload.assetIds, { category: payload.category, daypart: payload.daypart });
+  if (!screens.length) throw new Error("None of the selected screens were found");
+  const flaggedCount = screens.filter((s) => s.status === "flagged").length;
+  const conflictCount = screens.filter((s) => s.conflict).length;
+  const zones = [...new Set(screens.map((s) => s.zone))];
+  const kind = payload.actionKind ?? "display";
+  const broadcast: RadiusBroadcast = {
+    id: `SEL-${Date.now().toString().slice(-6)}`,
+    center: { lat: 0, lng: 0 },
+    centerLabel: `${screens.length} selected screen(s) · ${zones.slice(0, 3).join(", ")}${zones.length > 3 ? "…" : ""}`,
+    radiusM: 0,
+    mode: "selection",
+    actionKind: kind,
+    scheduleWindow: payload.scheduleWindow,
+    campaign: payload.campaign.trim(),
+    messageEn: payload.messageEn.trim(),
+    messageAr: (payload.messageAr ?? "").trim(),
+    screens,
+    clearCount: screens.length - flaggedCount,
+    flaggedCount,
+    conflictCount,
+    status: "Pending approval",
+    createdBy: actor,
+    createdAt: formatNow(),
+  };
+  const state = await commit((draft) => {
+    draft.radiusBroadcasts = [broadcast, ...draft.radiusBroadcasts];
+    addNotification(draft, {
+      title: kind === "schedule" ? "Bulk schedule awaiting approval" : "Bulk display awaiting approval",
+      body: `${broadcast.campaign}: ${screens.length} selected screen(s)${payload.scheduleWindow ? `, ${payload.scheduleWindow}` : ""}${conflictCount ? `, ${conflictCount} with existing commitments` : ""}${flaggedCount ? `, ${flaggedCount} flagged by rules` : ""}. Proposed by ${actor}.`,
+      subject: broadcast.id,
+      recipients: ["control-room", "admin"],
+      page: "radius",
+      tone: flaggedCount || conflictCount ? "warning" : "info",
+    });
+    addActivity(draft, actor, `Proposed ${kind} to ${screens.length} selected screens`, broadcast.campaign);
+  });
+  return { state, broadcast };
 }
 
 // Yield / where-to-spend advisor. Deterministic ranking from audience,

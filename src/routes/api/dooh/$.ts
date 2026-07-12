@@ -34,6 +34,8 @@ import {
   computeRadiusScreens,
   queueRadiusBroadcast,
   approveRadiusBroadcast,
+  computeSelectionScreens,
+  queueSelectionAction,
   yieldRecommendation,
   decideFinanceApproval,
   getState,
@@ -243,6 +245,32 @@ export const Route = createFileRoute("/api/dooh/$")({
 
           if (segments[0] === "mediagpt" && segments[1] === "radius" && segments[3] === "approve") {
             return Response.json(await approveRadiusBroadcast(segments[2], actor));
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "selection" && segments[2] === "preview") {
+            const assetIds = Array.isArray(body.assetIds) ? (body.assetIds as string[]) : [];
+            if (!assetIds.length) return jsonError("assetIds are required", 422);
+            return Response.json({
+              screens: computeSelectionScreens(assetIds, {
+                category: typeof body.category === "string" ? body.category : undefined,
+                daypart: typeof body.daypart === "string" ? body.daypart : undefined,
+              }),
+            });
+          }
+
+          if (segments[0] === "mediagpt" && segments[1] === "selection" && segments[2] === "queue") {
+            const assetIds = Array.isArray(body.assetIds) ? (body.assetIds as string[]) : [];
+            if (!assetIds.length) return jsonError("assetIds are required", 422);
+            return Response.json(await queueSelectionAction({
+              assetIds,
+              campaign: stringValue(body.campaign, ""),
+              messageEn: stringValue(body.messageEn, ""),
+              messageAr: stringValue(body.messageAr, ""),
+              actionKind: body.actionKind === "schedule" ? "schedule" : "display",
+              scheduleWindow: typeof body.scheduleWindow === "string" ? body.scheduleWindow : undefined,
+              category: typeof body.category === "string" ? body.category : undefined,
+              daypart: typeof body.daypart === "string" ? body.daypart : undefined,
+            }, actor));
           }
 
           if (segments[0] === "mediagpt" && segments[1] === "yield") {

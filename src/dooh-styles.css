@@ -8661,3 +8661,115 @@ textarea[dir="rtl"], input[dir="rtl"] { text-align: right; }
   backdrop-filter: blur(2px);
 }
 .media-card > .status-pill { align-self: flex-start; }
+
+/* ================================================================
+   MAP MULTI-SELECT - marquee rubber-band + Ctrl-click, action bar,
+   overlap-aware bulk dialog. Sits in the Control Centre map band.
+   ================================================================ */
+
+/* Marquee rectangle drawn over the map while dragging */
+.live-map.canvas.marquee-active, .marquee-active .leaflet-container { cursor: crosshair; }
+.map-marquee-rect {
+  position: absolute;
+  z-index: 1200;
+  border: 1px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Multi-selected pin: green ring + check badge */
+.hex-pin.multi-selected svg path:first-child { stroke: var(--primary); stroke-width: 2.5; }
+.hex-pin-check {
+  position: absolute; top: -4px; inset-inline-end: -4px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  font-size: 10px; line-height: 15px; text-align: center; font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg, #181b1a);
+}
+.hex-pin { position: relative; }
+
+/* Select-mode toggle button in the right rail (matches zoom/kill buttons) */
+.cc-select-tool {
+  position: absolute; z-index: 1003;
+  inset-inline-end: 16px; top: calc(50dvh - 66px);
+}
+.cc-select-tool button {
+  position: relative;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 10px; border: 0;
+  background: var(--surface-2); color: var(--ink);
+  box-shadow: var(--shadow-lg); cursor: pointer;
+}
+.cc-select-tool button.active { background: var(--primary); color: #fff; }
+.cc-select-tool button em {
+  position: absolute; top: -6px; inset-inline-end: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 600; font-style: normal; line-height: 18px;
+  border: 2px solid var(--bg, #181b1a);
+}
+.cc-select-tool button.active em { background: #fff; color: var(--primary); }
+
+/* Hint shown when select mode is armed but nothing is chosen yet */
+.cc-select-hint {
+  position: absolute; z-index: 1003; top: 76px; left: 50%; transform: translateX(-50%);
+  max-width: 460px; text-align: center;
+  padding: 8px 14px; border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--secondary); font-size: 12px; line-height: 16px; letter-spacing: 0.02em;
+}
+
+/* Floating selection action bar (bottom-centre, above the filmstrip) */
+.cc-selection-bar {
+  position: absolute; z-index: 1005; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 10px 10px 18px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(70, 73, 72, 0.9), rgba(47, 48, 48, 0.9));
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="light"] .cc-selection-bar {
+  background: color-mix(in srgb, #ffffff 92%, transparent); border: 1px solid var(--line);
+}
+.cc-selection-count { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); }
+.cc-selection-actions { display: flex; align-items: center; gap: 8px; }
+.cc-selection-actions .button { min-height: 34px; }
+.cc-selection-clear {
+  width: 34px; height: 34px; border-radius: 8px; border: 0;
+  background: transparent; color: var(--muted); font-size: 20px; cursor: pointer;
+}
+.cc-selection-clear:hover { background: var(--surface-2); color: var(--ink); }
+
+/* Overlap-aware bulk dialog */
+.selection-dialog { width: min(560px, calc(100vw - 32px)); max-height: 86dvh; overflow-y: auto; }
+.selection-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 4px 0 12px; font-size: 13px; color: var(--muted); }
+.selection-summary strong { color: var(--ink); font-weight: 600; }
+.selection-summary .good strong { color: var(--tag-good-bd); }
+.selection-summary .warn strong { color: var(--tag-warn-bd); }
+.selection-summary .danger strong { color: var(--tag-danger-bd); }
+.selection-overlap {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 8px;
+  background: var(--tag-danger-bg); border: 1px solid var(--tag-danger-bd); color: var(--tag-danger-ink);
+}
+.selection-overlap strong { display: block; font-size: 13px; }
+.selection-overlap small { color: var(--secondary); }
+.selection-screens { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; margin-bottom: 14px; }
+.selection-screen-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 8px 0; border-top: 1px solid var(--ctrl-border-dim);
+}
+.selection-screen-row:first-child { border-top: 0; }
+.selection-screen-row .dot { width: 8px; height: 8px; border-radius: 50%; }
+.selection-screen-row .dot.good { background: var(--tag-good-bd); }
+.selection-screen-row .dot.warn { background: var(--tag-warn-bd); }
+.selection-screen-row .dot.danger { background: var(--tag-danger-bd); }
+.selection-screen-main strong { font-size: 13px; font-weight: 600; }
+.selection-screen-main small { display: block; font-size: 12px; color: var(--muted); }
+.selection-screen-note { font-size: 12px; color: var(--muted); text-align: end; max-width: 200px; }
+.selection-screen-row.conflict .selection-screen-note { color: var(--tag-danger-ink); }
+.selection-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.selection-form label { display: flex; flex-direction: column; gap: 6px; }
+[dir="rtl"] .cc-select-tool { inset-inline-end: auto; inset-inline-start: 16px; }

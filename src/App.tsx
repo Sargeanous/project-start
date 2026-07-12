@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   Bot,
+  BoxSelect,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -885,6 +886,35 @@ const marketplacePackages = [
 type Translator = (value: string) => string;
 
 const translations: Record<string, string> = {
+  // Map multi-select
+  "Select screens": "تحديد الشاشات",
+  "Selected screens": "الشاشات المحددة",
+  "Drag a box over the map to select screens, or Ctrl-click pins. Shift-drag adds to the selection.": "اسحب مربعًا على الخريطة لتحديد الشاشات، أو انقر مع Ctrl على الدبابيس. اسحب مع Shift للإضافة إلى التحديد.",
+  "screens selected": "شاشات محددة",
+  "screen selected": "شاشة محددة",
+  "Display message": "عرض رسالة",
+  "Clear selection": "مسح التحديد",
+  "Sent for approval. The control room has been notified.": "أُرسل للموافقة. تم إخطار غرفة التحكم.",
+  "Bulk action": "إجراء جماعي",
+  "Schedule on selected screens": "جدولة على الشاشات المحددة",
+  "Display on selected screens": "عرض على الشاشات المحددة",
+  "clear": "خالية",
+  "with existing commitments": "بالتزامات قائمة",
+  "Overlapping commitments": "التزامات متداخلة",
+  "These screens are already committed. They will be held out and routed for review before anything overrides them.": "هذه الشاشات ملتزمة بالفعل. سيتم استبعادها وتحويلها للمراجعة قبل تجاوز أي التزام.",
+  "Checking rules and overlaps…": "جارٍ فحص القواعد والتداخلات…",
+  "Campaign or message name": "اسم الحملة أو الرسالة",
+  "e.g. Summer road-safety push": "مثال: حملة السلامة المرورية الصيفية",
+  "Message": "الرسالة",
+  "What plays on these screens": "ما يُعرض على هذه الشاشات",
+  "Schedule window": "نافذة الجدولة",
+  "AI proposes, humans approve. This goes to the approval queue.": "الذكاء الاصطناعي يقترح والبشر يوافقون. يذهب هذا إلى قائمة الموافقات.",
+  "Queue schedule": "إضافة الجدولة للطابور",
+  "Queue display": "إضافة العرض للطابور",
+  "Name the campaign or message first": "سمِّ الحملة أو الرسالة أولًا",
+  "Enter a message first": "أدخل رسالة أولًا",
+  "Could not queue the action": "تعذّر إضافة الإجراء للطابور",
+  "Sending": "جارٍ الإرسال",
   // Yield advisor page
   "Screens in estate": "الشاشات في الأسطول",
   "live now": "مباشر الآن",
@@ -3786,6 +3816,156 @@ const BOARD_PHOTOS: Record<string, string> = {
 };
 const boardPhoto = (type?: string) => `/billboards/${BOARD_PHOTOS[type ?? ""] ?? "highway-billboard"}.jpg`;
 
+interface SelectionScreen {
+  assetId: string;
+  name: string;
+  zone: string;
+  status: "clear" | "flagged";
+  flagLabel?: string;
+  flagDetail?: string;
+  conflict?: string;
+  conflictLevel?: "hard" | "soft";
+}
+
+// Bulk action for a marquee/Ctrl selection: previews per-screen rule checks
+// and existing-commitment overlaps, then queues a governed pending action.
+function SelectionActionDialog({
+  assetIds,
+  actionKind,
+  onClose,
+  onDone,
+  notify,
+  t,
+}: {
+  assetIds: string[];
+  actionKind: "display" | "schedule";
+  onClose: () => void;
+  onDone: () => void;
+  notify: (message: string) => void;
+  t: (value: string) => string;
+}) {
+  const [screens, setScreens] = useState<SelectionScreen[] | null>(null);
+  const [campaign, setCampaign] = useState("");
+  const [messageEn, setMessageEn] = useState("");
+  const [scheduleWindow, setScheduleWindow] = useState("Tomorrow 06:00 - 10:00");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/dooh/mediagpt/selection/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assetIds }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok && data) setScreens(data.screens);
+      } catch { /* offline: leave preview empty */ }
+    })();
+    return () => { cancelled = true; };
+  }, [assetIds]);
+
+  const conflicts = (screens ?? []).filter((s) => s.conflict);
+  const hardConflicts = conflicts.filter((s) => s.conflictLevel === "hard");
+  const flagged = (screens ?? []).filter((s) => s.status === "flagged");
+  const clearCount = (screens?.length ?? 0) - flagged.length;
+
+  async function submit() {
+    if (!campaign.trim()) { notify(t("Name the campaign or message first")); return; }
+    if (!messageEn.trim()) { notify(t("Enter a message first")); return; }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/dooh/mediagpt/selection/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assetIds,
+          campaign,
+          messageEn,
+          actionKind,
+          scheduleWindow: actionKind === "schedule" ? scheduleWindow : undefined,
+          actor: "Control Room",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) onDone();
+      else notify(data?.error ?? t("Could not queue the action"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onClose}>
+      <section className="revision-dialog panel selection-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <header className="revision-header">
+          <span>{t("Bulk action")}</span>
+          <strong>{actionKind === "schedule" ? t("Schedule on selected screens") : t("Display on selected screens")}</strong>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}>×</button>
+        </header>
+
+        <div className="selection-summary">
+          <span><strong>{assetIds.length}</strong> {assetIds.length === 1 ? t("screen selected") : t("screens selected")}</span>
+          <span className="good"><strong>{clearCount}</strong> {t("clear")}</span>
+          {flagged.length ? <span className="warn"><strong>{flagged.length}</strong> {t("flagged by rules")}</span> : null}
+          {conflicts.length ? <span className="danger"><strong>{conflicts.length}</strong> {t("with existing commitments")}</span> : null}
+        </div>
+
+        {hardConflicts.length ? (
+          <div className="selection-overlap" role="alert">
+            <AlertTriangle size={15} />
+            <div>
+              <strong>{t("Overlapping commitments")}</strong>
+              <small>{t("These screens are already committed. They will be held out and routed for review before anything overrides them.")}</small>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="selection-screens">
+          {(screens ?? []).map((s) => (
+            <div key={s.assetId} className={`selection-screen-row ${s.conflictLevel === "hard" ? "conflict" : ""}`}>
+              <span className={`dot ${s.conflictLevel === "hard" ? "danger" : s.status === "flagged" || s.conflict ? "warn" : "good"}`} />
+              <span className="selection-screen-main">
+                <strong>{s.assetId}</strong>
+                <small>{t(s.name)} · {t(s.zone)}</small>
+              </span>
+              <span className="selection-screen-note">
+                {s.conflict ? t(s.conflict) : s.flagLabel ? t(s.flagLabel) : t("Clear")}
+              </span>
+            </div>
+          ))}
+          {screens === null ? <p className="cell-note">{t("Checking rules and overlaps…")}</p> : null}
+        </div>
+
+        <div className="selection-form">
+          <label>{t("Campaign or message name")}
+            <input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder={t("e.g. Summer road-safety push")} />
+          </label>
+          <label>{t("Message")}
+            <textarea value={messageEn} onChange={(e) => setMessageEn(e.target.value)} placeholder={t("What plays on these screens")} />
+          </label>
+          {actionKind === "schedule" ? (
+            <label>{t("Schedule window")}
+              <input value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)} />
+            </label>
+          ) : null}
+        </div>
+
+        <footer className="revision-footer">
+          <span className="cell-note">{t("AI proposes, humans approve. This goes to the approval queue.")}</span>
+          <div>
+            <button type="button" className="button secondary" onClick={onClose}>{t("Cancel")}</button>
+            <button type="button" className="button primary" disabled={submitting} onClick={submit}>
+              {submitting ? t("Sending") : actionKind === "schedule" ? t("Queue schedule") : t("Queue display")}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function ControlCentre({
   submissions,
   published,
@@ -3820,6 +4000,18 @@ function ControlCentre({
   const [digestLoading, setDigestLoading] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
   const [killOpen, setKillOpen] = useState(false);
+  const [marqueeMode, setMarqueeMode] = useState(false);
+  const [multiSelected, setMultiSelected] = useState<string[]>([]);
+  const [selectionAction, setSelectionAction] = useState<null | "display" | "schedule">(null);
+
+  const toggleSelect = (id: string) =>
+    setMultiSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const onMarquee = (ids: string[], additive: boolean) =>
+    setMultiSelected((prev) => {
+      const base = additive ? prev : [];
+      return [...new Set([...base, ...ids])];
+    });
+  const clearSelection = () => { setMultiSelected([]); setMarqueeMode(false); };
 
   const zoneStats = useMemo(() => summarizeZones(estateAssets), []);
   const visibleAssets = useMemo(
@@ -3906,6 +4098,10 @@ function ControlCentre({
         openAlarmAssetIds={openAlarmAssetIds}
         variant="canvas"
         pinKindFor={pinKindFor}
+        multiSelectedIds={multiSelected}
+        onToggleSelect={toggleSelect}
+        marqueeMode={marqueeMode}
+        onMarquee={onMarquee}
         t={t}
       />
 
@@ -3980,6 +4176,20 @@ function ControlCentre({
         ) : null}
       </div>
 
+      <div className="cc-select-tool">
+        <button
+          type="button"
+          className={marqueeMode ? "active" : ""}
+          onClick={() => setMarqueeMode((on) => !on)}
+          title={t("Select screens")}
+          aria-label={t("Select screens")}
+          aria-pressed={marqueeMode}
+        >
+          <BoxSelect size={17} />
+          {multiSelected.length ? <em>{multiSelected.length}</em> : null}
+        </button>
+      </div>
+
       <div className="cc-kill">
         <button
           type="button"
@@ -3991,6 +4201,38 @@ function ControlCentre({
           {killedAssetIds.length ? <em>{killedAssetIds.length}</em> : null}
         </button>
       </div>
+
+      {marqueeMode && !multiSelected.length ? (
+        <div className="cc-select-hint" role="status">
+          {t("Drag a box over the map to select screens, or Ctrl-click pins. Shift-drag adds to the selection.")}
+        </div>
+      ) : null}
+
+      {multiSelected.length ? (
+        <div className="cc-selection-bar" role="group" aria-label={t("Selected screens")}>
+          <span className="cc-selection-count">{multiSelected.length} {multiSelected.length === 1 ? t("screen selected") : t("screens selected")}</span>
+          <div className="cc-selection-actions">
+            <button type="button" className="button primary" onClick={() => setSelectionAction("display")}>
+              <MonitorPlay size={15} /> {t("Display message")}
+            </button>
+            <button type="button" className="button secondary" onClick={() => setSelectionAction("schedule")}>
+              <CalendarClock size={15} /> {t("Schedule")}
+            </button>
+            <button type="button" className="cc-selection-clear" onClick={clearSelection} aria-label={t("Clear selection")}>×</button>
+          </div>
+        </div>
+      ) : null}
+
+      {selectionAction ? (
+        <SelectionActionDialog
+          assetIds={multiSelected}
+          actionKind={selectionAction}
+          onClose={() => setSelectionAction(null)}
+          onDone={() => { setSelectionAction(null); clearSelection(); notify(t("Sent for approval. The control room has been notified.")); }}
+          notify={notify}
+          t={t}
+        />
+      ) : null}
 
       {selectedAsset ? (
         <section className="cc-popover" role="dialog" aria-label={selectedAsset.id}>
