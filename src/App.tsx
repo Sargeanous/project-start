@@ -6288,18 +6288,13 @@ function assetIssues(asset: Asset): NdIssue[] {
   return [];
 }
 
-function NdWave({ seed }: { seed: string }) {
-  const h = ndHash(seed);
-  const bars = Array.from({ length: 30 }, (_, i) => {
-    const v = Math.sin((i + 1) * 12.9898 + h) * 43758.5453;
-    const frac = v - Math.floor(v);
-    return 22 + Math.round(frac * 74);
-  });
+// Progress bar showing how far the currently-scheduled spot has run
+// (deterministic per asset so the demo is stable).
+function NdSchedBar({ seed }: { seed: string }) {
+  const pct = 16 + (ndHash(seed) % 66);
   return (
-    <span className="nd-wave" aria-hidden="true">
-      {bars.map((height, i) => (
-        <span key={i} style={{ height: `${height}%` }} />
-      ))}
+    <span className="nd-sched-bar" aria-hidden="true">
+      <span className="nd-sched-bar-fill" style={{ width: `${pct}%` }} />
     </span>
   );
 }
@@ -6524,7 +6519,7 @@ function NetworkPage({
                             <span>{t("Start time")}</span>
                             <strong>{sched.start}</strong>
                           </div>
-                          <NdWave seed={asset.id} />
+                          <NdSchedBar seed={asset.id} />
                           <div className="nd-sched-col end">
                             <span>{t("End time")}</span>
                             <strong>{sched.end}</strong>
@@ -6551,28 +6546,6 @@ function NetworkPage({
                 {registryCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               </button>
 
-              <div className="nd-search">
-                <div className="nd-search-pill">
-                  <span className={`nd-search-orb ${estateFiltering ? "busy" : ""}`} aria-hidden="true" />
-                  <input
-                    value={estateQuery}
-                    onChange={(event) => setEstateQuery(event.target.value)}
-                    onKeyDown={(event) => event.key === "Enter" && askEstateFilter()}
-                    placeholder={t("Ask Dooh anything")}
-                    aria-label={t("Ask Dooh anything")}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="nd-search-filter"
-                  onClick={askEstateFilter}
-                  disabled={estateFiltering}
-                  aria-label={t("Filter assets")}
-                >
-                  <SlidersHorizontal size={16} />
-                </button>
-              </div>
-
               <div className="nd-stage-clip">
                 <div className="nd-stage-scale" style={{ transform: `scale(${twinZoom})` }}>
                   <ClientOnlyBillboardTwin variant="stage" />
@@ -6597,13 +6570,6 @@ function NetworkPage({
                 <button type="button" onClick={() => setTwinZoom((z) => Math.max(0.7, Number((z - 0.1).toFixed(2))))} aria-label={t("Zoom out")}><Minus size={16} /></button>
               </div>
               <button type="button" className="nd-viewer-fs" onClick={() => setTwinFullscreen(true)} aria-label={t("Full screen")}><Maximize2 size={16} /></button>
-
-              {estateFilter ? (
-                <div className="nd-filter-note">
-                  <span>{visibleAssets.length} {t("match")}</span>
-                  <button type="button" onClick={() => { setEstateFilter(null); setEstateQuery(""); }}>{t("Clear")}</button>
-                </div>
-              ) : null}
             </section>
 
             <section className="nd-detail" aria-label={t("Asset detail")}>
@@ -6635,7 +6601,7 @@ function NetworkPage({
                   </div>
                 ) : (
                   selectedIssues.map((issue, index) => (
-                    <article key={`${issue.code}-${index}`} className={`nd-issue ${issue.state}`}>
+                    <article key={`${issue.code}-${index}`} className={`nd-issue ${issue.state} ${index === 0 ? "featured" : ""}`}>
                       <div className="nd-issue-head">
                         <span className="nd-issue-icon"><Zap size={14} /></span>
                         <div className="nd-issue-title">
