@@ -11825,3 +11825,99 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 @media (max-width: 620px) {
   .nd-kpis { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================
+   UNIFIED SUB-TABS — every page's secondary tab strip matches the
+   Network & Devices tabs (separate pills; active = raised surface pill).
+   Last word in the cascade, so it supersedes the earlier per-page and
+   ORIGEN REFIT tab treatments. (The Control Centre Now/Queue toggle,
+   .cc-board-tabs, is a compact toggle inside a surface panel and keeps
+   its own segmented styling.)
+   ===================================================================== */
+.segmented,
+.segmented-tabs,
+.network-tabs,
+.financial-tabs,
+.review-section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  grid-template-columns: none;
+}
+
+.segmented button,
+.segmented-tabs button,
+.network-tabs button,
+.financial-tabs button,
+.review-section-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-align: center;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.segmented button:hover,
+.segmented-tabs button:hover,
+.network-tabs button:hover,
+.financial-tabs button:hover,
+.review-section-tabs button:hover {
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-color: transparent;
+}
+
+.segmented button.active,
+.segmented button[aria-selected="true"],
+.segmented button[aria-pressed="true"],
+.segmented-tabs button.active,
+.segmented-tabs button[aria-selected="true"],
+.network-tabs button.active,
+.network-tabs button[aria-selected="true"],
+.financial-tabs button.active,
+.financial-tabs button[aria-selected="true"],
+.review-section-tabs button.active,
+.review-section-tabs button.ai-tab.active {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 400;
+  box-shadow: none;
+}
+
+/* CMS section tabs render as single-line label pills like the rest:
+   drop the helper subtitle and the heavy weight, neutralise the ai-tab well. */
+.review-section-tabs button strong {
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  color: inherit;
+}
+.review-section-tabs button.active strong { color: var(--ink); }
+.review-section-tabs button span { display: none; }
+.review-section-tabs button.ai-tab { background: transparent; border-color: transparent; }
