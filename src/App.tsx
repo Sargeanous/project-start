@@ -3300,7 +3300,6 @@ function LoginScreen({
             );
           })}
         </div>
-        <p className="login-note">{t("Secure role-based access. Every action is scoped and audited.")}</p>
       </section>
       <div className="powered-by powered-by--login">
         <span>{t("Powered by")}</span>

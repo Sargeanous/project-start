@@ -159,7 +159,7 @@ button:disabled {
   background: var(--primary-soft);
 }
 
-.profile-card span:nth-child(2) {
+.profile-card > span:nth-child(2) {
   display: grid;
   gap: 5px;
   flex: 1;
@@ -2507,20 +2507,18 @@ html[dir="rtl"] .profile-card strong { font-family: "Amiri", serif; font-weight:
   color: var(--primary);
 }
 .profile-card-cue {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+  display: inline-flex; flex-direction: row; flex-wrap: nowrap;
+  align-items: center; gap: 4px; white-space: nowrap;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.02em; line-height: 1;
   color: var(--muted); opacity: 0; transform: translateX(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
+.profile-card-cue svg { flex: none; }
 .profile-card:hover .profile-card-cue, .profile-card:focus-visible .profile-card-cue {
   color: var(--primary); opacity: 1; transform: translateX(0);
 }
 [dir="rtl"] .profile-card-cue { transform: translateX(4px); }
 [dir="rtl"] .profile-card:hover .profile-card-cue { transform: translateX(0); }
-.login-note {
-  margin: 22px 0 0; text-align: center;
-  color: var(--muted); font-size: 12px; letter-spacing: 0.02em;
-}
 /* Deeper, place-making backdrop behind the panel (subtle dotted field) */
 .login-screen::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
