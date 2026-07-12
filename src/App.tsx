@@ -1347,6 +1347,12 @@ const translations: Record<string, string> = {
   "Unified Platform": "المنصة الموحدة",
   "Access profile": "ملف الدخول",
   "Choose who is using the platform. The sidebar and workflow are permissioned from this point.": "اختر ملف المستخدم. ستظهر القوائم وسير العمل حسب الصلاحيات من هذه النقطة.",
+  "Total domain awareness. One unified view.": "وعيٌ شامل بالمجال. عرضٌ موحّد واحد.",
+  "Secure role-based access. Every action is scoped and audited.": "وصول آمن قائم على الأدوار. كل إجراء محدّد النطاق ومُدقّق.",
+  "Enter": "دخول",
+  "Full governance": "حوكمة كاملة",
+  "Technical": "التقني",
+  "External": "خارجي",
   "Switch profile": "تغيير الملف",
   "Powered by": "مشغّل بواسطة",
   "Control Centre": "مركز التحكم",
@@ -3237,6 +3243,15 @@ function App() {
 }
 
 
+const PROFILE_META: Record<string, { icon: LucideIcon; scope: string; privileged?: boolean }> = {
+  "control-room": { icon: RadioTower, scope: "Operations" },
+  reviewer: { icon: ClipboardCheck, scope: "Content" },
+  finance: { icon: WalletCards, scope: "Commercial" },
+  admin: { icon: ShieldCheck, scope: "Full governance", privileged: true },
+  technical: { icon: Cpu, scope: "Technical" },
+  bidder: { icon: Megaphone, scope: "External" },
+};
+
 function LoginScreen({
   lang,
   setLang,
@@ -3255,8 +3270,9 @@ function LoginScreen({
       <section className="login-panel">
         <div className="login-brand">
           <img className="brand-mark" src={admoLogo} alt="ADMO" />
-          <div>
+          <div className="login-brand-text">
             <h1>{t("Unified DOOH Platform")}</h1>
+            <p>{t("Total domain awareness. One unified view.")}</p>
           </div>
           <button className="icon-button" type="button" onClick={() => setLang(lang === "en" ? "ar" : "en")}>
             <Globe2 size={18} />
@@ -3265,18 +3281,26 @@ function LoginScreen({
         </div>
         <p className="login-intro">{t("Choose who is using the platform. The sidebar and workflow are permissioned from this point.")}</p>
         <div className="profile-grid">
-          {profiles.map((item) => (
-            <button key={item.id} className="profile-card" type="button" onClick={() => onChoose(item)}>
-              <span className="profile-icon"><UserRound size={20} /></span>
-              <span>
-                <strong>{t(item.name)}</strong>
-                <small>{t(item.role)}</small>
-                <em>{t(item.organization)}</em>
-              </span>
-              <ChevronRight size={18} />
-            </button>
-          ))}
+          {profiles.map((item) => {
+            const meta = PROFILE_META[item.id] ?? { icon: UserRound, scope: "" };
+            const Icon = meta.icon;
+            return (
+              <button key={item.id} className="profile-card" type="button" onClick={() => onChoose(item)}>
+                <span className="profile-icon"><Icon size={20} /></span>
+                <span className="profile-card-body">
+                  <strong>{t(item.name)}</strong>
+                  <small>{t(item.role)}</small>
+                  <em>{t(item.organization)}</em>
+                </span>
+                <span className="profile-card-aside">
+                  {meta.scope ? <span className={`profile-scope ${meta.privileged ? "is-privileged" : ""}`}>{t(meta.scope)}</span> : null}
+                  <span className="profile-card-cue">{t("Enter")} <ChevronRight size={15} /></span>
+                </span>
+              </button>
+            );
+          })}
         </div>
+        <p className="login-note">{t("Secure role-based access. Every action is scoped and audited.")}</p>
       </section>
       <div className="powered-by powered-by--login">
         <span>{t("Powered by")}</span>

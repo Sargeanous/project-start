@@ -2462,11 +2462,75 @@ html[dir="rtl"] .panel-header h2 {
 .profile-card strong { font-family: var(--font-serif); font-weight: 500; font-size: 18px; letter-spacing: -0.01em; }
 html[dir="rtl"] .profile-card strong { font-family: "Amiri", serif; font-weight: 700; }
 .profile-icon {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  background: var(--sage-soft);
-  color: var(--primary-dark);
+  width: 44px; height: 44px; flex: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary);
+  display: grid; place-items: center;
 }
+
+/* ---- Login screen refit: role identity + scope + calm depth ---- */
+.login-brand-text { display: flex; flex-direction: column; gap: 3px; }
+.login-brand-text p {
+  margin: 0; color: var(--muted);
+  font-size: 13px; line-height: 18px; letter-spacing: 0.02em;
+  text-transform: none;
+}
+.profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.profile-card:hover .profile-icon {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.profile-card:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+.profile-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.profile-card-body small { color: var(--secondary); }
+.profile-card-body em { color: var(--muted); font-style: normal; font-size: 11.5px; letter-spacing: 0.02em; }
+.profile-card-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.profile-scope {
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.02em; white-space: nowrap;
+  background: var(--surface-2); border: 1px solid var(--ctrl-border-dim); color: var(--secondary);
+}
+.profile-scope.is-privileged {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary);
+}
+.profile-card-cue {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+  color: var(--muted); opacity: 0; transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.profile-card:hover .profile-card-cue, .profile-card:focus-visible .profile-card-cue {
+  color: var(--primary); opacity: 1; transform: translateX(0);
+}
+[dir="rtl"] .profile-card-cue { transform: translateX(4px); }
+[dir="rtl"] .profile-card:hover .profile-card-cue { transform: translateX(0); }
+.login-note {
+  margin: 22px 0 0; text-align: center;
+  color: var(--muted); font-size: 12px; letter-spacing: 0.02em;
+}
+/* Deeper, place-making backdrop behind the panel (subtle dotted field) */
+.login-screen::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(color-mix(in srgb, var(--primary) 14%, transparent) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 42%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 42%, #000 0%, transparent 78%);
+  opacity: 0.5;
+}
+.login-panel { position: relative; z-index: 1; }
 
 /* ---- BACKGROUND ---- */
 .workspace { background: var(--bg); }
@@ -8000,6 +8064,9 @@ html[data-theme="light"] .sidebar-profile { background: var(--surface-2); }
   --disabled-ink: rgba(235, 253, 246, 0.39);
   --ctrl-border: rgba(241, 251, 250, 0.19);
   --ctrl-border-dim: rgba(243, 245, 244, 0.13);
+  /* secondary text = one step dimmer than ink; themed via --ink-2 so it
+     stays legible in both themes (was previously undefined -> invisible). */
+  --secondary: var(--ink-2);
   /* node-exact from kit Tag page: tinted fill + semantic border + semantic text */
   --tag-good-bg: rgba(112, 254, 140, 0.11); --tag-good-bd: #46a758;  --tag-good-ink: #46a758;
   --tag-warn-bg: rgba(255, 97, 0, 0.29);    --tag-warn-bd: #f77e15;  --tag-warn-ink: #f77e15;
