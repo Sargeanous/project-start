@@ -8369,23 +8369,23 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
    no colored left accent bars, no filled-button spam inside rows.
    ================================================================ */
 
-/* Topbar bell: free-standing CC-toast bell glyph, no frame */
+/* Topbar bell: plain line icon, unframed, calm (not an alert red) */
 .notification-trigger, .notification-trigger.has-unread {
-  width: 40px; height: 40px;
+  width: 36px; height: 36px;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none;
   border-radius: 8px;
-  color: var(--ink);
+  color: var(--secondary, var(--muted));
 }
-.notification-trigger:hover { background: var(--surface-2) !important; }
-.notification-trigger .cc-toast-glyph-box { pointer-events: none; }
+.notification-trigger.has-unread { color: #0090ff; }
+.notification-trigger:hover { background: var(--surface-2) !important; color: var(--ink); }
 .notification-badge {
-  top: 1px; inset-inline-end: 1px;
-  min-width: 16px; height: 16px; padding: 0 4px;
+  top: 0; inset-inline-end: 0;
+  min-width: 13px; height: 13px; padding: 0 3px;
   border: 2px solid var(--bg, #181b1a);
-  background: #e54d2e;
-  font-size: 10px; font-weight: 600;
+  background: #0090ff;
+  font-size: 9px; font-weight: 600; line-height: 1;
 }
 
 /* Notification drawer: hairline rows + quiet text actions */
@@ -8773,3 +8773,45 @@ html[data-theme="light"] .cc-selection-bar {
 .selection-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 .selection-form label { display: flex; flex-direction: column; gap: 6px; }
 [dir="rtl"] .cc-select-tool { inset-inline-end: auto; inset-inline-start: 16px; }
+
+/* ================================================================
+   COMMERCIAL MAP - canvas hex-pin map + Control-Centre-style popover
+   (replaces the ugly dot map + detail-block-under-the-map).
+   ================================================================ */
+.commercial-map-panel { padding: 20px 24px; }
+.commercial-map-wrap {
+  position: relative;
+  height: min(620px, calc(100dvh - 320px));
+  min-height: 460px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--canvas, #181b1a);
+}
+.commercial-map-wrap .live-map { position: absolute; inset: 0; height: 100%; border-radius: 0; }
+/* Legend floats bottom-left over the map, glassy */
+.cc-legend-float {
+  position: absolute; z-index: 1002; bottom: 14px; inset-inline-start: 14px;
+  display: flex; flex-wrap: wrap; gap: 8px 14px;
+  padding: 8px 12px; border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  backdrop-filter: blur(10px);
+  font-size: 12px; color: var(--secondary);
+}
+.cc-legend-float i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-inline-end: 5px; }
+/* The popover reuses .cc-popover; anchor it to the map's top-right corner */
+.commercial-popover {
+  top: 16px; inset-inline-start: auto; inset-inline-end: 16px;
+  width: 360px; max-height: calc(100% - 32px);
+}
+.commercial-popover-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.commercial-popover-auction {
+  border-radius: 8px; padding: 10px 12px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+}
+.commercial-popover-auction strong { display: block; font-size: 13px; }
+.commercial-popover-auction p { margin: 4px 0 0; font-size: 12px; color: var(--secondary); }
+@media (max-width: 900px) {
+  .commercial-popover { inset-inline: 12px; width: auto; top: auto; bottom: 12px; max-height: 50%; }
+}

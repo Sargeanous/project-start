@@ -3417,7 +3417,7 @@ function Topbar({
             aria-label={t("Notifications")}
             aria-expanded={notificationOpen}
           >
-            <span className="cc-toast-glyph-box" aria-hidden="true"><img src="/icons/alert-bell.png" alt="" /></span>
+            <Bell size={18} />
             {unreadCount ? <span className="notification-badge">{unreadCount}</span> : null}
           </button>
           {notificationOpen ? (
@@ -3815,6 +3815,21 @@ const BOARD_PHOTOS: Record<string, string> = {
   "Street unipole": "street-unipole",
 };
 const boardPhoto = (type?: string) => `/billboards/${BOARD_PHOTOS[type ?? ""] ?? "highway-billboard"}.jpg`;
+
+// A diverse creative per screen so every pin's popover shows a distinct
+// visual (real demo images), not the same fallback. A real playing creative
+// still wins when one exists.
+const DIVERSE_CREATIVES = [
+  "road-safety", "yas-tourism", "etihad-retail", "mall-footfall", "live-slate",
+  "industrial-notice", "holiday-notice", "eid-family-retail", "royal-safari",
+  "experience-abu-dhabi", "ramadan-kareem", "coca-cola-national-day", "saadiyat-beach",
+  "brand-guidelines",
+];
+function assetCreativeId(assetId: string): string {
+  let h = 0;
+  for (let i = 0; i < assetId.length; i++) h = (h * 31 + assetId.charCodeAt(i)) >>> 0;
+  return DIVERSE_CREATIVES[h % DIVERSE_CREATIVES.length];
+}
 
 interface SelectionScreen {
   assetId: string;
@@ -4246,7 +4261,7 @@ function ControlCentre({
           <button
             type="button"
             className="cc-popover-media"
-            style={{ backgroundImage: `url("${creativeBackground(selectedPublished?.creativeId ?? published[0]?.creativeId ?? "etihad-retail")}")` }}
+            style={{ backgroundImage: `url("${creativeBackground(selectedPublished?.creativeId ?? assetCreativeId(selectedAsset.id))}")` }}
             onClick={() => setLiveViewFullscreen(true)}
             aria-label={t("Open live view")}
           />
@@ -8541,7 +8556,7 @@ function CommercialMapPage({
   schedule: ScheduleItem[];
   t: (value: string) => string;
 }) {
-  const [selectedAssetId, setSelectedAssetId] = useState(estateAssets[0].id);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
 
   const records = useMemo(
     () =>
@@ -8566,17 +8581,13 @@ function CommercialMapPage({
       })),
     [records],
   );
-  const selected = records.find((record) => record.asset.id === selectedAssetId) ?? records[0];
-  const { asset, allocation, lot } = selected;
+  const selected = records.find((record) => record.asset.id === selectedAssetId) ?? null;
   const money = (value: number) => `AED ${value.toLocaleString("en-US")}`;
 
   const contractedValue = records.reduce((sum, r) => sum + (r.allocation?.annualValueAed ?? 0), 0);
   const allocatedCount = records.filter((r) => r.allocation?.status === "Allocated" || r.allocation?.status === "Under maintenance").length;
   const inBidding = records.filter((r) => r.allocation?.status === "In bidding").length;
   const available = records.filter((r) => (r.allocation?.status ?? "Available") === "Available").length;
-
-  const assetSchedule = schedule.filter((slot) => slot.asset === asset.id);
-  const openTickets = tickets.filter((ticket) => ticket.asset === asset.id && ticket.status !== "Resolved").length;
 
   return (
     <PageBody>
@@ -8587,66 +8598,67 @@ function CommercialMapPage({
         <Metric label="Available now" value={String(available)} helper="Sellable at rate card" tone={available ? "warn" : "good"} />
       </MetricGrid>
 
-      <Panel icon={MapPinned} title={t("Commercial operations map")} action={t("Allocation status by asset")}>
-        <LiveMap assets={mapAssets} selectedAssetId={selectedAssetId} onMarkerClick={setSelectedAssetId} openAlarmAssetIds={[]} t={t} />
-        <div className="alloc-legend">
-          {(Object.keys(ALLOCATION_PIN) as Array<AssetAllocation["status"]>).map((status) => (
-            <span key={status}><i style={{ background: ALLOCATION_PIN[status] }} />{t(status)}</span>
-          ))}
+      <section className="panel commercial-map-panel">
+        <header className="panel-header">
+          <div><span className="panel-icon"><MapPinned size={18} /></span><h2>{t("Commercial operations map")}</h2></div>
+          <div className="panel-action">{t("Click a screen for its allocation")}</div>
+        </header>
+        <div className="commercial-map-wrap">
+          <LiveMap
+            assets={mapAssets}
+            selectedAssetId={selectedAssetId}
+            onMarkerClick={(id) => setSelectedAssetId(id === selectedAssetId ? "" : id)}
+            openAlarmAssetIds={[]}
+            variant="canvas"
+            pinKindFor={() => "asset"}
+            t={t}
+          />
+          <div className="alloc-legend cc-legend-float">
+            {(Object.keys(ALLOCATION_PIN) as Array<AssetAllocation["status"]>).map((status) => (
+              <span key={status}><i style={{ background: ALLOCATION_PIN[status] }} />{t(status)}</span>
+            ))}
+          </div>
+
+          {selected ? (() => {
+            const { asset, allocation, lot } = selected;
+            const assetSchedule = schedule.filter((slot) => slot.asset === asset.id);
+            const openTickets = tickets.filter((ticket) => ticket.asset === asset.id && ticket.status !== "Resolved").length;
+            return (
+              <section className="cc-popover commercial-popover" role="dialog" aria-label={asset.id}>
+                <header>
+                  <div>
+                    <strong>{asset.id}</strong>
+                    <small><MapPinned size={13} /> {t(asset.name)}</small>
+                  </div>
+                  <button type="button" className="icon-btn" onClick={() => setSelectedAssetId("")} aria-label={t("Close")}>×</button>
+                </header>
+                <div className="cc-popover-media" style={{ backgroundImage: `url("${creativeBackground(assetCreativeId(asset.id))}")` }} />
+                <div className="commercial-popover-status">
+                  <StatusPill label={allocation?.status ?? "Available"} tone={ALLOCATION_TONE[allocation?.status ?? "Available"]} />
+                  <span className="cell-note">{t(asset.type)} · {t(asset.zone)}</span>
+                </div>
+                <div className="detail-cards compact">
+                  {allocation?.operator ? <Detail label="Operator" value={t(allocation.operator)} /> : null}
+                  {allocation?.contractRef ? <Detail label="Contract" value={allocation.contractRef} /> : null}
+                  {allocation?.expiryDate ? <Detail label="Window" value={`${allocation.effectiveDate ?? "-"} → ${allocation.expiryDate}`} /> : null}
+                  <Detail label="Rate card / week" value={allocation?.rateCardWeekAed ? money(allocation.rateCardWeekAed) : "-"} />
+                  {allocation?.annualValueAed ? <Detail label="Annual value" value={money(allocation.annualValueAed)} /> : null}
+                  <Detail label="Audience" value={t(asset.audience)} />
+                  <Detail label="Open faults" value={String(openTickets)} />
+                </div>
+                {lot ? (
+                  <div className="commercial-popover-auction">
+                    <strong>{t("Live auction")}: {t(lot.lotName)}</strong>
+                    <p>{lot.status === "Open" ? `${t("Leading bid")} ${lot.currency} ${lot.currentBid.toLocaleString("en-US")} · ${t("floor")} ${lot.currency} ${lot.floorPrice.toLocaleString("en-US")}` : t(lot.closeNote ?? lot.status)}</p>
+                  </div>
+                ) : (
+                  <p className="cell-note">{t("Next slot")}: {t(asset.nextSlot)}</p>
+                )}
+              </section>
+            );
+          })() : null}
         </div>
-
-        <div className="linked-detail">
-          <div className="linked-detail-head">
-            <span className="panel-icon"><HardDrive size={18} /></span>
-            <strong>{t(asset.name)}</strong>
-            <StatusPill label={allocation?.status ?? "Available"} tone={ALLOCATION_TONE[allocation?.status ?? "Available"]} />
-          </div>
-          <div className="detail-cards compact">
-            <Detail label="Type" value={t(asset.type)} />
-            <Detail label="Size" value={asset.size} />
-            <Detail label="Resolution" value={asset.resolution} />
-            <Detail label="Installed" value={asset.installed} />
-            <Detail label="Uptime" value={asset.uptime} />
-            <Detail label="Open faults" value={String(openTickets)} />
-          </div>
-
-          {allocation?.operator ? (
-            <div className="detail-cards compact">
-              <Detail label="Operator" value={t(allocation.operator)} />
-              <Detail label="Contract" value={allocation.contractRef ?? "-"} />
-              <Detail label="Model" value={t(allocation.model ?? "-")} />
-              <Detail label="Window" value={`${allocation.effectiveDate ?? "-"} → ${allocation.expiryDate ?? "-"}`} />
-              <Detail label="Annual value" value={allocation.annualValueAed ? money(allocation.annualValueAed) : "-"} />
-              <Detail label="Revenue to date" value={allocation.revenueToDateAed ? money(allocation.revenueToDateAed) : "-"} />
-            </div>
-          ) : null}
-
-          <div className="detail-cards compact">
-            <Detail label="Rate card / week" value={allocation?.rateCardWeekAed ? money(allocation.rateCardWeekAed) : "-"} />
-            <Detail label="Share of voice" value={t(allocation?.shareOfVoice ?? "-")} />
-            <Detail label="Public split target" value={allocation?.publicSplitTarget ?? "-"} />
-            <Detail label="Public split actual" value={allocation?.publicSplitActual ?? "-"} />
-            <Detail label="Audience" value={t(asset.audience)} />
-            <Detail label="Proof-of-play" value={asset.pop} />
-          </div>
-
-          {lot ? (
-            <div className={`twin-detail tone-${lot.status === "Open" ? "degrading" : "fault"}`}>
-              <strong>{t("Live auction")}: {t(lot.lotName)}</strong>
-              <p>{lot.status === "Open" ? `${t("Leading bid")} ${lot.currency} ${lot.currentBid.toLocaleString("en-US")} (${t(lot.leadingBidder)}) · ${t("floor")} ${lot.currency} ${lot.floorPrice.toLocaleString("en-US")}` : t(lot.closeNote ?? lot.status)}</p>
-            </div>
-          ) : null}
-
-          {assetSchedule.length ? (
-            <CompactTable
-              columns={["Time", "Campaign", "State"]}
-              rows={assetSchedule.slice(0, 4).map((slot) => [slot.time, slot.campaign, slot.state])}
-            />
-          ) : (
-            <p className="notes">{t("Next slot")}: {t(asset.nextSlot)}</p>
-          )}
-        </div>
-      </Panel>
+      </section>
 
       <Panel icon={FileText} title={t("Allocation register")} action={t("Long-term contracts per RFP FIN-101")}>
         <div className="table-card">
