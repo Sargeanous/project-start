@@ -3192,7 +3192,7 @@ html[dir="rtl"] .detail strong { font-family: "Amiri", serif; font-weight: 700; 
 .cap-bilingual { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .cap-bilingual textarea { min-height: 70px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; }
 .cap-bodies { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
-.cap-bodies blockquote { margin: 0; padding: 10px 12px; border-left: 3px solid #c0392b; background: var(--red-soft); border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.5; color: #2a3a34; }
+.cap-bodies blockquote { margin: 0; padding: 10px 12px; border-left: 3px solid var(--tag-danger-bd); background: color-mix(in srgb, var(--tag-danger-bd) 12%, var(--surface-2)); border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .cap-bodies blockquote[dir="rtl"] { border-left: none; border-right: 3px solid #c0392b; border-radius: 8px 0 0 8px; }
 .cap-bodies small { font-size: 11px; color: var(--muted); font-style: italic; }
 .emg-assist { margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--primary) 7%, var(--surface)); }
@@ -5257,8 +5257,8 @@ html[dir="rtl"] .network-tabs button.active {
 }
 
 .workbench-summary {
-  border: 1px solid color-mix(in oklab, #4f46e5 18%, transparent);
-  background: rgba(238, 242, 255, 0.74);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
 }
 
 .workbench-empty {
@@ -6756,8 +6756,8 @@ html[dir="rtl"] .network-tabs button.active {
   padding: 5px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 10px 26px rgba(11, 26, 23, 0.18);
+  background: var(--surface-elevated);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
   font-family: inherit;
   line-height: 1;
   white-space: nowrap;
@@ -6797,7 +6797,7 @@ html[dir="rtl"] .network-tabs button.active {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--surface-elevated);
   color: var(--ink-2);
   font-size: 13px;
   font-weight: 700;
@@ -7313,8 +7313,8 @@ html[dir="rtl"] .network-tabs button.active {
 
 .agent-action-card {
   align-items: center;
-  background: linear-gradient(135deg, rgba(85, 74, 208, 0.08), rgba(255, 255, 255, 0.92));
-  border: 1px solid rgba(85, 74, 208, 0.24);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   border-radius: 14px;
   display: flex;
   gap: 12px;
