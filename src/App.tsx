@@ -6432,6 +6432,7 @@ function NetworkPage({
   const [ticketLoading, setTicketLoading] = useState(false);
   const [registryCollapsed, setRegistryCollapsed] = useState(false);
   const [twinZoom, setTwinZoom] = useState(1);
+  const [twinExplode, setTwinExplode] = useState(0);
   const [selectedIssueIndex, setSelectedIssueIndex] = useState<number | null>(null);
   const selected = estateAssets.find((asset) => asset.id === selectedId) || estateAssets[0];
   const visibleAssets = useMemo(() => applyEstateFilter(estateAssets, estateFilter), [estateFilter]);
@@ -6621,7 +6622,7 @@ function NetworkPage({
 
               <div className="nd-stage-clip">
                 <div className="nd-stage-scale" style={{ transform: `scale(${twinZoom})` }}>
-                  <ClientOnlyBillboardTwin variant="stage" focusPart={focusPart} />
+                  <ClientOnlyBillboardTwin variant="stage" focusPart={focusPart} explodeOverride={twinExplode} />
                 </div>
               </div>
 
@@ -6648,6 +6649,20 @@ function NetworkPage({
                 <div className="nd-vital-row"><span>{t("Network")}</span><strong>{t(selected.network)}</strong></div>
                 <div className="nd-vital-row"><span>{t("Controller")}</span><strong>{selected.controller}</strong></div>
                 <div className="nd-vital-row"><span>{t("Temperature")}</span><strong>{selected.tempC}</strong></div>
+              </div>
+
+              <div className="nd-section-title">{t("Explode view")}</div>
+              <div className="nd-explode">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={twinExplode}
+                  onChange={(event) => setTwinExplode(Number(event.target.value))}
+                  aria-label={t("Explode view")}
+                />
+                <span className="nd-explode-hint">{t("Slide to pull the cabinet stack apart and reveal internal parts.")}</span>
               </div>
 
               <div className="nd-section-title">

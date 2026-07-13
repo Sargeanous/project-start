@@ -27,6 +27,8 @@ export type BillboardTwinProps = {
   variant?: "embedded" | "fullscreen" | "stage";
   // "CODE:family" (e.g. "C05R01:cooling_fan") to focus/select that part; null clears.
   focusPart?: string | null;
+  // Controlled explode value (0..1) driven from outside (e.g. the panel gauge).
+  explodeOverride?: number | null;
 };
 
 const BOARD_TECH_STACK = [
@@ -335,8 +337,9 @@ function Billboard({
   );
 }
 
-export default function BillboardTwin({ variant = "embedded", focusPart = null }: BillboardTwinProps) {
-  const [explode, setExplode] = useState(0);
+export default function BillboardTwin({ variant = "embedded", focusPart = null, explodeOverride = null }: BillboardTwinProps) {
+  const [explodeState, setExplodeState] = useState(0);
+  const explode = explodeOverride != null ? explodeOverride : explodeState;
   const [hover, setHover] = useState<Hover | null>(null);
   const [sel, setSel] = useState<{ info: PartInfo; obj: THREE.Object3D } | null>(null);
   const [showSpec, setShowSpec] = useState(false);
@@ -499,7 +502,7 @@ export default function BillboardTwin({ variant = "embedded", focusPart = null }
 
         <label className="twin-explode">
           Explode view
-          <input type="range" min={0} max={1} step={0.01} value={explode} onChange={(e) => setExplode(Number(e.target.value))} />
+          <input type="range" min={0} max={1} step={0.01} value={explode} onChange={(e) => setExplodeState(Number(e.target.value))} />
         </label>
 
         <p className="twin-hint">Hover for a label, click any part for its detail window. Faulty parts are tinted on the model - drag Explode to open the hero cabinet (C05R01) and reveal its internal fan and power supply.</p>
