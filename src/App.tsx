@@ -5798,7 +5798,21 @@ function AlertsPage({
   const [mfaApprover, setMfaApprover] = useState<string | null>(null);
   const [pickApprover, setPickApprover] = useState("");
   const selected = alerts.find((alert) => alert.id === selectedAlertId) ?? alerts[0];
-  const checked = steps.every((step) => step.state === "Checked");
+  // The verification sub-steps follow the SELECTED alert's own phase, so an
+  // alert past the check gate never shows "Check required" beneath it. (The
+  // shared steps list otherwise drifts from the alert it is displayed under.)
+  // Order: [payload, copy] = MediaGPT checks, [authority approval], [edge route].
+  const stepsDoneByState: Record<string, number> = {
+    "Check required": 0,
+    "Checked": 2,
+    "Approval required": 2,
+    "Approved": 3,
+    "Broadcast queued": 4,
+    "Broadcasting": 4,
+    "Live on network": 4,
+  };
+  const stepsDone = stepsDoneByState[selected.state] ?? 0;
+  const viewSteps: VerificationStep[] = steps.map((step, i) => ({ ...step, state: i < stepsDone ? "Checked" : "Check required" }));
 
   useEffect(() => {
     if (alerts.length && !alerts.some((alert) => alert.id === selectedAlertId)) {
@@ -5961,7 +5975,7 @@ function AlertsPage({
                 <strong>{t("MediaGPT checks")}</strong>
               </header>
               <div className="alert-check-list">
-                {steps.map((step, index) => (
+                {viewSteps.map((step, index) => (
                   <article key={step.label}>
                     <span>{String(index + 1).padStart(2, "0")}</span>
                     <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
@@ -6114,7 +6128,7 @@ function AlertsPage({
         </div>
 
         <div className="verification-grid ai-intervention-box">
-          {steps.map((step, index) => (
+          {viewSteps.map((step, index) => (
             <article key={step.label} className="verification-step">
               <span>{String(index + 1).padStart(2, "0")}</span>
               <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
