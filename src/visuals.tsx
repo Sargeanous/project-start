@@ -878,3 +878,254 @@ export function RadiusMap({ assets, center, radiusM, insideIds, flaggedIds, onPi
   if (failed) return <div className="live-map-fallback"><p>{t("Live map tiles are unavailable offline.")}</p></div>;
   return <div className="radius-map" ref={containerRef} role="application" aria-label={t("Radius targeting map")} />;
 }
+
+/* ------------------------------------------------------------------ *\
+   Construction map: under-construction assets rendered as progress
+   pins (ring encodes % complete, colour encodes delay risk). Click a
+   pin to open the build dossier popup (owned by the parent page).
+\* ------------------------------------------------------------------ */
+
+export interface ConstructionMapAsset {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  progress: number; // 0-100
+  level: "Low" | "Medium" | "High";
+}
+
+interface ConstructionMapProps {
+  assets: ConstructionMapAsset[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  t: (value: string) => string;
+}
+
+const RISK_COLOR: Record<ConstructionMapAsset["level"], string> = {
+  Low: "#46a758",
+  Medium: "#f77e15",
+  High: "#e54d2e",
+};
+
+function buildPinHtml(asset: ConstructionMapAsset, selected: boolean): string {
+  const color = RISK_COLOR[asset.level];
+  const circumference = 2 * Math.PI * 11;
+  const dash = Math.max(0, Math.min(100, asset.progress)) / 100 * circumference;
+  return `<div class="cx-pin ${selected ? "selected" : ""}" style="--c:${color}">
+    <svg viewBox="0 0 30 30" width="30" height="30" aria-hidden="true">
+      <circle cx="15" cy="15" r="11" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="3.4"/>
+      <circle cx="15" cy="15" r="11" fill="none" stroke="var(--c)" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${circumference.toFixed(1)}" transform="rotate(-90 15 15)"/>
+    </svg>
+    <span class="cx-pin-pct">${asset.progress}</span>
+  </div>`;
+}
+
+export function ConstructionMap({ assets, selectedId, onSelect, t }: ConstructionMapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersRef = useRef<Record<string, any>>({});
+  const disposeTilesRef = useRef<(() => void) | null>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+  const [failed, setFailed] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function iconFor(L: any, asset: ConstructionMapAsset, selected: boolean) {
+    return L.divIcon({ className: "cx-pin-icon", html: buildPinHtml(asset, selected), iconSize: [34, 34], iconAnchor: [17, 17] });
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let map: any = null;
+    const init = () => {
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (window as any).L;
+      if (!L || !containerRef.current) {
+        if (tries++ < 25) setTimeout(init, 150); else setFailed(true);
+        return;
+      }
+      try {
+        map = L.map(containerRef.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([24.45, 54.45], 10);
+        disposeTilesRef.current = addThemedTiles(L, map);
+        mapRef.current = map;
+        markersRef.current = {};
+        assets.forEach((asset) => {
+          const marker = L.marker([asset.lat, asset.lng], { icon: iconFor(L, asset, asset.id === selectedId), title: asset.name }).addTo(map);
+          marker.on("click", () => selectRef.current(asset.id));
+          markersRef.current[asset.id] = marker;
+        });
+        if (assets.length) {
+          const bounds = L.latLngBounds(assets.map((a) => [a.lat, a.lng]));
+          map.fitBounds(bounds, { padding: [70, 70], maxZoom: 12 });
+        }
+        setTimeout(() => map && map.invalidateSize(), 220);
+      } catch {
+        setFailed(true);
+      }
+    };
+    init();
+    return () => {
+      cancelled = true;
+      disposeTilesRef.current?.();
+      disposeTilesRef.current = null;
+      if (map) map.remove();
+      mapRef.current = null;
+      markersRef.current = {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets]);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    const map = mapRef.current as { panTo: (c: [number, number]) => void } | null;
+    if (!L || !map) return;
+    assets.forEach((asset) => {
+      const marker = markersRef.current[asset.id];
+      if (marker) marker.setIcon(iconFor(L, asset, asset.id === selectedId));
+    });
+    const sel = assets.find((a) => a.id === selectedId);
+    if (sel) map.panTo([sel.lat, sel.lng]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  if (failed) return <div className="live-map-fallback"><p>{t("Live map tiles are unavailable offline.")}</p></div>;
+  return <div className="cx-map" ref={containerRef} role="application" aria-label={t("Construction site map")} />;
+}
+
+/* ------------------------------------------------------------------ *\
+   Planning zone map: demand zones drawn as opportunity-scored polygons.
+   Hover raises a zone and reports it up (parent shows the intel card);
+   click selects the zone for the detail panel.
+\* ------------------------------------------------------------------ */
+
+export interface PlanningZoneShape {
+  id: string;
+  name: string;
+  score: number; // 0-100 opportunity score
+  center: { lat: number; lng: number };
+  polygon: Array<{ lat: number; lng: number }>;
+}
+
+interface PlanningZoneMapProps {
+  zones: PlanningZoneShape[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onHover: (id: string | null) => void;
+  t: (value: string) => string;
+}
+
+function zoneColor(score: number): string {
+  if (score >= 68) return "#12b76a";
+  if (score >= 56) return "#7cb342";
+  if (score >= 44) return "#f2a413";
+  return "#8a94a6";
+}
+
+export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: PlanningZoneMapProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shapesRef = useRef<Record<string, any>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const labelsRef = useRef<Record<string, any>>({});
+  const disposeTilesRef = useRef<(() => void) | null>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+  const hoverRef = useRef(onHover);
+  hoverRef.current = onHover;
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
+  const [failed, setFailed] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function styleFor(zone: PlanningZoneShape, active: boolean) {
+    const color = zoneColor(zone.score);
+    return { color, weight: active ? 2.6 : 1.4, opacity: active ? 0.95 : 0.6, fillColor: color, fillOpacity: active ? 0.34 : 0.16 };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let map: any = null;
+    const init = () => {
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const L = (window as any).L;
+      if (!L || !containerRef.current) {
+        if (tries++ < 25) setTimeout(init, 150); else setFailed(true);
+        return;
+      }
+      try {
+        map = L.map(containerRef.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([24.47, 54.45], 10);
+        disposeTilesRef.current = addThemedTiles(L, map);
+        mapRef.current = map;
+        shapesRef.current = {};
+        labelsRef.current = {};
+        const allPoints: Array<[number, number]> = [];
+        zones.forEach((zone) => {
+          const latlngs = zone.polygon.map((p) => [p.lat, p.lng] as [number, number]);
+          latlngs.forEach((pt) => allPoints.push(pt));
+          const active = zone.id === selectedRef.current;
+          const poly = L.polygon(latlngs, styleFor(zone, active)).addTo(map);
+          poly.on("mouseover", () => {
+            poly.setStyle({ weight: 2.6, fillOpacity: 0.34, opacity: 0.95 });
+            hoverRef.current(zone.id);
+          });
+          poly.on("mouseout", () => {
+            if (zone.id !== selectedRef.current) poly.setStyle(styleFor(zone, false));
+            hoverRef.current(null);
+          });
+          poly.on("click", () => selectRef.current(zone.id));
+          shapesRef.current[zone.id] = poly;
+          const label = L.marker([zone.center.lat, zone.center.lng], {
+            interactive: false,
+            icon: L.divIcon({
+              className: "pz-label-icon",
+              html: `<span class="pz-label"><b>${zone.name}</b><i>${zone.score}</i></span>`,
+              iconSize: [140, 26],
+              iconAnchor: [70, 13],
+            }),
+          }).addTo(map);
+          labelsRef.current[zone.id] = label;
+        });
+        if (allPoints.length) {
+          map.fitBounds(L.latLngBounds(allPoints), { padding: [46, 46], maxZoom: 12 });
+        }
+        setTimeout(() => map && map.invalidateSize(), 220);
+      } catch {
+        setFailed(true);
+      }
+    };
+    init();
+    return () => {
+      cancelled = true;
+      disposeTilesRef.current?.();
+      disposeTilesRef.current = null;
+      if (map) map.remove();
+      mapRef.current = null;
+      shapesRef.current = {};
+      labelsRef.current = {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    zones.forEach((zone) => {
+      const poly = shapesRef.current[zone.id];
+      if (poly) poly.setStyle(styleFor(zone, zone.id === selectedId));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  if (failed) return <div className="live-map-fallback"><p>{t("Live map tiles are unavailable offline.")}</p></div>;
+  return <div className="pz-map" ref={containerRef} role="application" aria-label={t("Planning zone map")} />;
+}

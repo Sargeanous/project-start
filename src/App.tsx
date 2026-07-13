@@ -75,6 +75,15 @@ import {
   GitBranch,
   SlidersHorizontal,
   Thermometer,
+  HardHat,
+  Construction,
+  Truck,
+  PackageCheck,
+  Clock,
+  Compass,
+  Users,
+  TrendingUp,
+  Footprints,
   type LucideIcon,
 } from "lucide-react";
 import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -91,7 +100,20 @@ import {
   type AssetAllocation,
   type MediaAsset,
 } from "./data";
-import { creativeBackground, feedBackground, LiveMap, RadiusMap } from "./visuals";
+import { creativeBackground, feedBackground, LiveMap, RadiusMap, ConstructionMap, PlanningZoneMap } from "./visuals";
+import {
+  BUILD_PHASES,
+  constructionRecords,
+  constructionSummary,
+  coverageGaps,
+  delayRisk,
+  openPurchaseOrders as openConstructionPOs,
+  planningZones,
+  zoneMetrics,
+  zoneSuggestion,
+  type ConstructionRecord,
+  type PlanningZone,
+} from "./lifecycle-data";
 import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
 import { distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
 import {
@@ -170,7 +192,9 @@ type Page =
   | "allocations"
   | "reports"
   | "campaigns"
-  | "marketplace";
+  | "marketplace"
+  | "planning"
+  | "construction";
 
 type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
 type Lang = "en" | "ar";
@@ -519,7 +543,7 @@ const profiles: Profile[] = [
     name: "ADMO Control Room",
     role: "Operations operator",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "alerts", "network", "mediagpt", "radiusBroadcast", "yieldAdvisor"],
+    pages: ["control", "alerts", "network", "planning", "construction", "mediagpt", "radiusBroadcast", "yieldAdvisor"],
   },
   {
     id: "reviewer",
@@ -540,7 +564,7 @@ const profiles: Profile[] = [
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "planning", "construction", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
@@ -581,6 +605,8 @@ const navItems: Record<Page, NavItem> = {
   edgeCompute: { id: "edgeCompute", label: "Edge & Compute", icon: HardDrive },
   campaigns: { id: "campaigns", label: "Campaigns", icon: Megaphone },
   marketplace: { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+  planning: { id: "planning", label: "Planning", icon: Compass },
+  construction: { id: "construction", label: "Construction", icon: HardHat },
 };
 
 const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; label: string; helper: string }> = [
@@ -599,6 +625,8 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
   { key: "campaigns", label: "Campaigns", helper: "Bidder campaign status and ADMO messages" },
   { key: "marketplace", label: "Marketplace", helper: "Bid lots, bids, and auction changes" },
+  { key: "planning", label: "Planning", helper: "Zone demand, site opportunities, and placement recommendations" },
+  { key: "construction", label: "Construction", helper: "Build progress, work orders, procurement, and delays" },
   { key: "skillsCatalogue", label: "Skills Catalogue", helper: "MediaGPT skill coverage changes" },
   { key: "skillWorkflows", label: "Skill Workflows", helper: "Workflow design and approval updates" },
   { key: "skillRuns", label: "Skill Runs", helper: "Agent run completion and failures" },
@@ -616,6 +644,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 
 const navGroups: NavGroup[] = [
   { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports"] },
+  { label: "Project lifecycle", pages: ["planning", "construction"] },
   { label: "Intelligence / Agentic", pages: ["mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
@@ -3292,6 +3321,8 @@ function App() {
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "planning" && <PlanningPage t={t} />}
+          {page === "construction" && <ConstructionPage t={t} />}
         </main>
         <MediaGptChatbot profile={profile} t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
@@ -6378,6 +6409,556 @@ function NdRing({ value, state }: { value: number; state: NdIssue["state"] }) {
     >
       <span className="nd-ring-hole">{pct}</span>
     </span>
+  );
+}
+
+/* ============================================================= *\
+   PROJECT LIFECYCLE: Planning + Construction pages.
+   Planning = where to place assets (zone demand, opportunity scoring,
+   AI site-planner suggestions, candidate sites). Construction = tracking
+   the build of the estate (phase pipeline, work orders, purchase orders,
+   BOM/parts, milestones, delays, AI delay-risk). Together they extend
+   the platform into a Plan -> Build -> Operate lifecycle under DMT PoP.
+\* ============================================================= */
+
+function lcScoreColor(v: number): string {
+  if (v >= 68) return "var(--tag-good-bd)";
+  if (v >= 56) return "#7cb342";
+  if (v >= 44) return "var(--tag-warn-bd)";
+  return "var(--muted)";
+}
+function scoreTagTone(v: number): string {
+  if (v >= 56) return "good";
+  if (v >= 44) return "warn";
+  return "neutral";
+}
+function riskTone(level: string): string {
+  return level === "High" ? "danger" : level === "Medium" ? "warn" : "good";
+}
+function candStatusTone(s: string): string {
+  if (s === "Board approved" || s === "Promoted to build") return "good";
+  if (s === "Shortlisted") return "info";
+  return "warn";
+}
+function woTone(s: string): string {
+  if (s === "Complete") return "good";
+  if (s === "On hold") return "danger";
+  if (s === "In progress") return "info";
+  return "neutral";
+}
+function poTone(s: string): string {
+  if (s === "Received") return "good";
+  if (s === "Dispatched") return "info";
+  if (s === "Approved") return "warn";
+  return "neutral";
+}
+function bomTone(s: string): string {
+  if (s === "Installed" || s === "On site") return "good";
+  if (s === "In transit") return "info";
+  if (s === "Ordered") return "warn";
+  return "neutral";
+}
+function milesTone(s: string): string {
+  if (s === "Complete") return "good";
+  if (s === "In progress") return "info";
+  if (s === "At risk") return "danger";
+  return "neutral";
+}
+
+function LcRing({ value, size = 56, color }: { value: number; size?: number; color: string }) {
+  const hole = Math.round(size * 0.72);
+  return (
+    <span className="lc-ring" style={{ width: size, height: size, background: `conic-gradient(${color} ${value * 3.6}deg, var(--ctrl-border-dim) 0deg)` }}>
+      <span className="lc-ring-hole" style={{ width: hole, height: hole, color }}>{value}</span>
+    </span>
+  );
+}
+
+function LcBar({ label, value, max = 100, suffix = "", tone = "neutral" }: { label: string; value: number; max?: number; suffix?: string; tone?: string }) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100));
+  return (
+    <div className="lc-bar">
+      <span className="lc-bar-label">{label}</span>
+      <span className="lc-bar-track"><span className={`lc-bar-fill ${tone}`} style={{ width: `${pct}%` }} /></span>
+      <span className="lc-bar-val">{value}{suffix}</span>
+    </div>
+  );
+}
+
+function PlanningPage({ t }: { t: (value: string) => string }) {
+  const [planTab, setPlanTab] = useState<"zones" | "candidates" | "coverage">("zones");
+  const [selectedZoneId, setSelectedZoneId] = useState(planningZones[0].id);
+  const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
+  const [promoted, setPromoted] = useState<string[]>([]);
+
+  const selectedZone: PlanningZone = planningZones.find((z) => z.id === selectedZoneId) ?? planningZones[0];
+  const metrics = zoneMetrics(selectedZone);
+  const suggestion = zoneSuggestion(selectedZone);
+  const hoverZone = hoveredZoneId ? planningZones.find((z) => z.id === hoveredZoneId) : null;
+
+  const candidateCount = planningZones.reduce((s, z) => s + z.candidateSites.length, 0);
+  const netNewReach = planningZones.reduce((s, z) => s + z.candidateSites.reduce((a, c) => a + c.projectedReachWeekly, 0), 0);
+  const avgScore = Math.round(planningZones.reduce((s, z) => s + zoneMetrics(z).score, 0) / planningZones.length);
+
+  const kpis = [
+    { icon: Compass, value: String(planningZones.length), label: "Demand zones mapped" },
+    { icon: Target, value: String(candidateCount), label: "Candidate sites" },
+    { icon: TrendingUp, value: `${(netNewReach / 1_000_000).toFixed(1)}M`, label: "Projected net-new weekly reach" },
+    { icon: Gauge, value: String(avgScore), label: "Avg opportunity score" },
+  ];
+  const tabs = [
+    { id: "zones", label: "Zone intelligence", icon: Compass },
+    { id: "candidates", label: "Candidate sites", icon: Target },
+    { id: "coverage", label: "Demand & coverage", icon: Layers3 },
+  ] as const;
+
+  const zoneShapes = planningZones.map((z) => ({ id: z.id, name: t(z.name), score: zoneMetrics(z).score, center: z.center, polygon: z.polygon }));
+  const gaps = coverageGaps();
+  const allCandidates = planningZones
+    .flatMap((z) => z.candidateSites.map((c) => ({ zone: z, c })))
+    .sort((a, b) => b.c.fit - a.c.fit);
+
+  return (
+    <PageBody>
+      <div className="nd-kpis">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} className="nd-kpi">
+              <span className="nd-kpi-icon"><Icon size={30} strokeWidth={1.5} /></span>
+              <div className="nd-kpi-body"><strong>{kpi.value}</strong><span>{t(kpi.label)}</span></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="nd-tabs" role="tablist" aria-label={t("Planning")}>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} type="button" role="tab" aria-selected={planTab === tab.id} className={`nd-tab ${planTab === tab.id ? "active" : ""}`} onClick={() => setPlanTab(tab.id)}>
+              <Icon size={16} strokeWidth={1.7} /><span>{t(tab.label)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {planTab === "zones" ? (
+        <section className="plan-workspace" aria-label={t("Zone intelligence")}>
+          <div className="plan-stage">
+            <PlanningZoneMap zones={zoneShapes} selectedId={selectedZoneId} onSelect={setSelectedZoneId} onHover={setHoveredZoneId} t={t} />
+            {hoverZone ? (() => {
+              const hm = zoneMetrics(hoverZone);
+              return (
+                <div className="plan-hovercard">
+                  <header>
+                    <div><strong>{t(hoverZone.name)}</strong><span>{t(hoverZone.district)}</span></div>
+                    <LcRing value={hm.score} size={46} color={lcScoreColor(hm.score)} />
+                  </header>
+                  <div className="plan-hovercard-grid">
+                    <div><span>{t("Affluence")}</span><strong>{hoverZone.demographics.affluenceIndex}</strong></div>
+                    <div><span>{t("Dwell")}</span><strong>{hoverZone.demographics.dwellSeconds}s</strong></div>
+                    <div><span>{t("Footfall")}</span><strong>{(hoverZone.demographics.dailyFootfall / 1000).toFixed(0)}k</strong></div>
+                    <div><span>{t("Saturation")}</span><strong>{hm.saturationPct}%</strong></div>
+                  </div>
+                  <small><Clock size={11} /> {t(hoverZone.demographics.dominantDaypart)} · {hoverZone.candidateSites.length} {t("candidate sites")}</small>
+                </div>
+              );
+            })() : (
+              <div className="plan-stage-hint">{t("Hover a zone for its audience profile. Click to open the full plan.")}</div>
+            )}
+          </div>
+
+          <aside className="plan-detail">
+            <header className="plan-detail-head">
+              <div><strong>{t(selectedZone.name)}</strong><span>{t(selectedZone.district)} · {selectedZone.areaSqKm} km²</span></div>
+              <span className={`nd-tag ${scoreTagTone(metrics.score)}`}><i />{t("Opportunity")} {metrics.score}</span>
+            </header>
+
+            <div className="plan-score">
+              <LcRing value={metrics.score} size={68} color={lcScoreColor(metrics.score)} />
+              <div className="plan-score-bars">
+                <LcBar label={t("Reach")} value={metrics.reach} tone="good" />
+                <LcBar label={t("Audience match")} value={metrics.match} tone="info" />
+                <LcBar label={t("Availability")} value={metrics.availability} tone="warn" />
+              </div>
+            </div>
+
+            <div className="plan-section">
+              <div className="nd-section-title">{t("Audience")}</div>
+              <div className="plan-deflist">
+                <div><span>{t("Affluence index")}</span><strong>{selectedZone.demographics.affluenceIndex}</strong></div>
+                <div><span><Clock size={12} /> {t("Median dwell")}</span><strong>{selectedZone.demographics.dwellSeconds}s</strong></div>
+                <div><span><Footprints size={12} /> {t("Daily footfall")}</span><strong>{(selectedZone.demographics.dailyFootfall / 1000).toFixed(0)}k</strong></div>
+                <div><span>{t("Peak")}</span><strong>{t(selectedZone.demographics.dominantDaypart)}</strong></div>
+              </div>
+              <div className="plan-ages">
+                {selectedZone.demographics.ageBands.map((b) => (
+                  <LcBar key={b.band} label={b.band} value={b.pct} max={40} suffix="%" tone="neutral" />
+                ))}
+              </div>
+              <div className="plan-segments">
+                {selectedZone.demographics.segments.map((sg) => (
+                  <span key={sg.label} className="plan-seg"><b>{sg.pct}%</b> {t(sg.label)}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="plan-ai">
+              <header>
+                <span className="plan-ai-icon"><Sparkles size={15} /></span>
+                <strong>{t("AI site planner")}</strong>
+                <span className="plan-ai-conf">{suggestion.confidence}% {t("confidence")}</span>
+              </header>
+              <p>{t(suggestion.rationale)}</p>
+              <div className="plan-formats">
+                {suggestion.formats.map((f) => (
+                  <div key={f.label} className="plan-format"><strong>{t(f.label)}</strong><small>{t(f.why)}</small></div>
+                ))}
+              </div>
+              <div className="plan-ai-meta">
+                <div><span>{t("Recommended dayparts")}</span><strong>{suggestion.dayparts.map((d) => t(d)).join(" · ")}</strong></div>
+                <div><span>{t("Creative")}</span><strong>{t(suggestion.creative)}</strong></div>
+                <div><span>{t("Content categories")}</span><strong>{suggestion.categories.map((c) => t(c)).join(", ")}</strong></div>
+              </div>
+            </div>
+
+            <div className="plan-section">
+              <div className="nd-section-title">{t("Network saturation")}</div>
+              <LcBar label={`${selectedZone.liveAssets}/${selectedZone.capacity} ${t("live")}`} value={metrics.saturationPct} suffix="%" tone={metrics.saturationPct > 75 ? "danger" : "good"} />
+              {selectedZone.note ? <small className="plan-note">{t(selectedZone.note)}</small> : null}
+            </div>
+          </aside>
+        </section>
+      ) : null}
+
+      {planTab === "candidates" ? (
+        <section className="plan-candidates" aria-label={t("Candidate sites")}>
+          {allCandidates.map(({ zone, c }) => {
+            const isPromoted = promoted.includes(c.code) || c.status === "Promoted to build";
+            return (
+              <article key={c.code} className="plan-cand">
+                <div className="plan-cand-fit">
+                  <LcRing value={c.fit} size={46} color={lcScoreColor(c.fit)} />
+                  <span>{t("fit")}</span>
+                </div>
+                <div className="plan-cand-main">
+                  <strong>{t(c.name)}</strong>
+                  <small>{c.code} · {t(zone.name)} · {t(c.format)}</small>
+                  <div className="plan-cand-metrics">
+                    <span><Users size={13} />{(c.projectedReachWeekly / 1000).toFixed(0)}k {t("weekly reach")}</span>
+                    <span><TrendingUp size={13} />{(c.projectedImpressions / 1_000_000).toFixed(2)}M {t("impressions")}</span>
+                    <span><CircleDollarSign size={13} />AED {(c.estCapexAed / 1_000_000).toFixed(2)}M {t("capex")}</span>
+                  </div>
+                </div>
+                <div className="plan-cand-side">
+                  <span className={`nd-tag ${candStatusTone(isPromoted ? "Promoted to build" : c.status)}`}><i />{t(isPromoted ? "Promoted to build" : c.status)}</span>
+                  <button type="button" className={`lc-promote ${isPromoted ? "done" : ""}`} disabled={isPromoted} onClick={() => setPromoted((p) => [...p, c.code])}>
+                    {isPromoted ? <><CheckCircle2 size={14} />{t("Queued to construction")}</> : <><HardHat size={14} />{t("Promote to build")}</>}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
+
+      {planTab === "coverage" ? (
+        <section className="plan-coverage" aria-label={t("Demand & coverage")}>
+          <div className="plan-coverage-head">
+            <span className="plan-ai-icon"><Lightbulb size={16} /></span>
+            <p><strong>{gaps.length}</strong> {t("high-value zones flagged as under-served and ready for new inventory.")}</p>
+          </div>
+          <div className="plan-coverage-list">
+            {gaps.map(({ zone, metrics: m, priority }) => (
+              <article key={zone.id} className="plan-gap">
+                <div className="plan-gap-main">
+                  <strong>{t(zone.name)}</strong>
+                  <small>{t(zone.district)} · {zone.liveAssets}/{zone.capacity} {t("live")}</small>
+                </div>
+                <div className="plan-gap-bars">
+                  <LcBar label={t("Score")} value={m.score} tone="good" />
+                  <LcBar label={t("Match")} value={m.match} tone="info" />
+                  <LcBar label={t("Free")} value={m.availability} tone="warn" />
+                </div>
+                <span className={`nd-tag ${priority === "High" ? "danger" : "warn"}`}><i />{t(priority)} {t("priority")}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </PageBody>
+  );
+}
+
+function ConstructionPage({ t }: { t: (value: string) => string }) {
+  const [consTab, setConsTab] = useState<"programme" | "tracker" | "procurement">("programme");
+  const [selectedBuildId, setSelectedBuildId] = useState(constructionRecords[0].id);
+  const [dossierId, setDossierId] = useState<string | null>(null);
+
+  const summary = constructionSummary();
+  const selectedBuild: ConstructionRecord = constructionRecords.find((r) => r.id === selectedBuildId) ?? constructionRecords[0];
+  const selectedRisk = delayRisk(selectedBuild);
+  const dossier = dossierId ? constructionRecords.find((r) => r.id === dossierId) : null;
+
+  const kpis = [
+    { icon: HardHat, value: String(summary.total), label: "Assets in build" },
+    { icon: AlertTriangle, value: String(summary.atRisk), label: "At risk or delayed" },
+    { icon: CircleDollarSign, value: `AED ${(summary.committedAed / 1_000_000).toFixed(1)}M`, label: "Committed in purchase orders" },
+    { icon: Gauge, value: `${summary.avgProgress}%`, label: "Average completion" },
+  ];
+  const tabs = [
+    { id: "programme", label: "Rollout programme", icon: Construction },
+    { id: "tracker", label: "Site tracker", icon: MapPinned },
+    { id: "procurement", label: "Procurement & BOM", icon: Package },
+  ] as const;
+
+  const mapAssets = constructionRecords.map((r) => ({ id: r.id, name: t(r.name), lat: r.lat, lng: r.lng, progress: r.progress, level: delayRisk(r).level }));
+  const atRisk = constructionRecords.map((r) => ({ r, risk: delayRisk(r) })).filter((x) => x.risk.level !== "Low").sort((a, b) => b.risk.score - a.risk.score);
+  const allPOs = constructionRecords.flatMap((r) => r.purchaseOrders.map((po) => ({ r, po })));
+  const awaited = constructionRecords.flatMap((r) => r.bom.filter((l) => l.qtyReceived < l.qtyRequired && l.leadTimeDays >= 21).map((l) => ({ r, l })));
+
+  function openDossier(id: string) { setSelectedBuildId(id); setDossierId(id); }
+
+  return (
+    <PageBody>
+      <div className="nd-kpis">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} className="nd-kpi">
+              <span className="nd-kpi-icon"><Icon size={30} strokeWidth={1.5} /></span>
+              <div className="nd-kpi-body"><strong>{kpi.value}</strong><span>{t(kpi.label)}</span></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="nd-tabs" role="tablist" aria-label={t("Construction")}>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} type="button" role="tab" aria-selected={consTab === tab.id} className={`nd-tab ${consTab === tab.id ? "active" : ""}`} onClick={() => setConsTab(tab.id)}>
+              <Icon size={16} strokeWidth={1.7} /><span>{t(tab.label)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {consTab === "programme" ? (
+        <section className="cons-programme" aria-label={t("Rollout programme")}>
+          <div className="cons-monitor">
+            <span className="cons-monitor-icon"><Sparkles size={16} /></span>
+            <div>
+              <strong>{t("AI build monitor")}</strong>
+              {atRisk.length ? (
+                <p><b>{atRisk.length}</b> {t("builds need attention.")} {t(atRisk[0].r.name)} — {t(atRisk[0].risk.mitigation)}</p>
+              ) : (
+                <p>{t("All active builds are tracking to plan.")}</p>
+              )}
+            </div>
+            <span className={`nd-tag ${atRisk.length ? "warn" : "good"}`}><i />{atRisk.length ? t("Action needed") : t("On plan")}</span>
+          </div>
+
+          <div className="cons-pipeline">
+            {BUILD_PHASES.map((phase, idx) => {
+              const inPhase = constructionRecords.filter((r) => r.phaseIndex === idx);
+              return (
+                <div key={phase.key} className="cons-col">
+                  <header><strong>{t(phase.short)}</strong><span>{inPhase.length}</span></header>
+                  <div className="cons-col-body">
+                    {inPhase.map((r) => {
+                      const risk = delayRisk(r);
+                      return (
+                        <button key={r.id} type="button" className={`cons-card ${r.id === selectedBuildId ? "selected" : ""}`} onClick={() => { setSelectedBuildId(r.id); setConsTab("tracker"); }}>
+                          <div className="cons-card-top"><strong>{t(r.name)}</strong><span className={`lc-dot ${riskTone(risk.level)}`} /></div>
+                          <small>{t(r.type)}</small>
+                          <span className="lc-bar-track slim"><span className="lc-bar-fill good" style={{ width: `${r.progress}%` }} /></span>
+                          <div className="cons-card-foot">
+                            <span>{r.progress}%</span>
+                            <span className={`cons-var ${r.varianceDays < 0 ? "behind" : "ahead"}`}>{r.varianceDays < 0 ? `${Math.abs(r.varianceDays)}d ${t("behind")}` : r.varianceDays > 0 ? `${r.varianceDays}d ${t("ahead")}` : t("on plan")}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {inPhase.length === 0 ? <div className="cons-col-empty">·</div> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {consTab === "tracker" ? (
+        <section className="cons-workspace" aria-label={t("Site tracker")}>
+          <div className="cons-stage">
+            <ConstructionMap assets={mapAssets} selectedId={selectedBuildId} onSelect={openDossier} t={t} />
+            {dossier ? (() => {
+              const risk = delayRisk(dossier);
+              return (
+                <div className="cons-dossier">
+                  <header>
+                    <div><strong>{t(dossier.name)}</strong><small>{dossier.assetId} · {t(dossier.district)}</small></div>
+                    <button type="button" className="icon-btn" onClick={() => setDossierId(null)} aria-label={t("Close")}>×</button>
+                  </header>
+                  <div className="cons-dossier-body">
+                    <LcRing value={dossier.progress} size={64} color="var(--primary)" />
+                    <div className="cons-dossier-facts">
+                      <div><span>{t("Phase")}</span><strong>{t(BUILD_PHASES[dossier.phaseIndex].label)}</strong></div>
+                      <div><span>{t("Planned go-live")}</span><strong>{dossier.plannedGoLive}</strong></div>
+                      <div><span>{t("Projected")}</span><strong>{dossier.projectedGoLive}</strong></div>
+                      <div><span>{t("Delay risk")}</span><strong className={`lc-txt ${riskTone(risk.level)}`}>{t(risk.level)}</strong></div>
+                    </div>
+                  </div>
+                  {dossier.blockers[0] ? <div className="cons-dossier-blocker"><AlertTriangle size={13} /> {t(dossier.blockers[0].title)}</div> : null}
+                  <button type="button" className="lc-link" onClick={() => setDossierId(null)}>{t("Full build detail on the right")} →</button>
+                </div>
+              );
+            })() : (
+              <div className="cons-stage-hint">{t("Click a site pin to open its build dossier.")}</div>
+            )}
+          </div>
+
+          <aside className="cons-detail">
+            <header className="cons-detail-head">
+              <div><strong>{t(selectedBuild.name)}</strong><span>{selectedBuild.assetId} · {t(selectedBuild.type)}</span></div>
+              <span className={`nd-tag ${riskTone(selectedRisk.level)}`}><i />{t(selectedRisk.level)} {t("risk")}</span>
+            </header>
+
+            <div className="lc-steps">
+              {BUILD_PHASES.map((p, i) => (
+                <div key={p.key} className={`lc-step ${i < selectedBuild.phaseIndex ? "done" : i === selectedBuild.phaseIndex ? "current" : ""}`} title={t(p.label)}>
+                  <span /><small>{t(p.short)}</small>
+                </div>
+              ))}
+            </div>
+
+            <div className="cons-progress">
+              <LcBar label={t("Build progress")} value={selectedBuild.progress} suffix="%" tone="good" />
+              <div className="cons-progress-meta">
+                <span>{t("Planned")}: {selectedBuild.plannedStart} → {selectedBuild.plannedGoLive}</span>
+                <span className={selectedBuild.varianceDays < 0 ? "behind" : "ahead"}>{selectedBuild.varianceDays < 0 ? `${Math.abs(selectedBuild.varianceDays)} ${t("days behind")}` : selectedBuild.varianceDays > 0 ? `${selectedBuild.varianceDays} ${t("days ahead")}` : t("on plan")}</span>
+              </div>
+            </div>
+
+            <div className="cons-risk">
+              <header>
+                <span className="cons-risk-icon"><Sparkles size={15} /></span>
+                <strong>{t("Delay-risk analysis")}</strong>
+                <span className={`nd-tag ${riskTone(selectedRisk.level)}`}><i />{selectedRisk.score}</span>
+              </header>
+              {selectedRisk.drivers.length ? (
+                <ul>{selectedRisk.drivers.map((d, i) => <li key={i}>{t(d)}</li>)}</ul>
+              ) : (
+                <p>{t("No risk drivers detected.")}</p>
+              )}
+              <div className="cons-mitigation"><strong>{t("Recommended action")}</strong><p>{t(selectedRisk.mitigation)}</p></div>
+            </div>
+
+            <div className="cons-section">
+              <div className="nd-section-title">{t("Work order")}</div>
+              <div className="cons-wo">
+                <div className="cons-wo-head"><strong>{selectedBuild.workOrder.code}</strong><span className={`nd-tag ${woTone(selectedBuild.workOrder.status)}`}><i />{t(selectedBuild.workOrder.status)}</span></div>
+                <small>{t(selectedBuild.workOrder.scope)}</small>
+                <div className="cons-wo-meta"><span><UserRound size={12} /> {selectedBuild.workOrder.contractor}</span><span><Users size={12} /> {t("Crew")} {selectedBuild.workOrder.crew}</span></div>
+              </div>
+            </div>
+
+            <div className="cons-section">
+              <div className="nd-section-title">{t("Purchase orders")}</div>
+              <div className="cons-po-list">
+                {selectedBuild.purchaseOrders.map((po) => (
+                  <div key={po.code} className="cons-po">
+                    <div className="cons-po-main"><strong>{po.code}</strong><small>{t(po.vendor)} · {t(po.item)}</small></div>
+                    <div className="cons-po-side"><span className="cons-po-amt">AED {po.amountAed.toLocaleString()}</span><span className={`nd-tag ${poTone(po.status)}`}><i />{t(po.status)}</span></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="cons-section">
+              <div className="nd-section-title">{t("Bill of materials")}</div>
+              <div className="cons-bom">
+                <div className="cons-bom-row head"><span>{t("Part")}</span><span>{t("Recv/Req")}</span><span>{t("Lead")}</span><span>{t("Status")}</span></div>
+                {selectedBuild.bom.map((l) => (
+                  <div key={l.sku} className="cons-bom-row">
+                    <span className="cons-bom-part"><b>{t(l.part)}</b><i>{l.sku}</i></span>
+                    <span>{l.qtyReceived}/{l.qtyRequired}</span>
+                    <span>{l.leadTimeDays}d</span>
+                    <span className={`lc-txt ${bomTone(l.status)}`}>{t(l.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="cons-section">
+              <div className="nd-section-title">{t("Milestones")}</div>
+              <div className="cons-miles">
+                {selectedBuild.milestones.map((m) => (
+                  <div key={m.phaseKey} className={`cons-mile ${milesTone(m.status)}`}>
+                    <span className="cons-mile-dot" />
+                    <div><strong>{t(m.label)}</strong><small>{m.status === "Complete" && m.actualDate ? `${t("Done")} · ${m.actualDate}` : m.targetDate}</small></div>
+                    <span className="cons-mile-status">{t(m.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {selectedBuild.blockers.length ? (
+              <div className="cons-section">
+                <div className="nd-section-title">{t("Blockers & delays")}</div>
+                {selectedBuild.blockers.map((b, i) => (
+                  <div key={i} className={`cons-blocker ${riskTone(b.severity)}`}>
+                    <div className="cons-blocker-head"><strong>{t(b.title)}</strong><span className={`nd-tag ${b.severity === "High" ? "danger" : b.severity === "Medium" ? "warn" : "neutral"}`}><i />{t(b.severity)}</span></div>
+                    <small>{t(b.note)}</small>
+                    <div className="cons-blocker-meta"><span>{t(b.owner)}</span><span>{t("since")} {b.since}</span></div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </aside>
+        </section>
+      ) : null}
+
+      {consTab === "procurement" ? (
+        <section className="cons-procurement" aria-label={t("Procurement & BOM")}>
+          <div className="cons-proc-strip">
+            <div><span><Package size={14} /> {t("Open purchase orders")}</span><strong>{openConstructionPOs()}</strong></div>
+            <div><span><CircleDollarSign size={14} /> {t("Committed value")}</span><strong>AED {(summary.committedAed / 1_000_000).toFixed(1)}M</strong></div>
+            <div><span><PackageCheck size={14} /> {t("Long-lead parts awaited")}</span><strong>{awaited.length}</strong></div>
+          </div>
+          <div className="cons-proc-grid">
+            <section className="cons-proc-panel">
+              <div className="nd-section-title">{t("Purchase orders across the programme")}</div>
+              <div className="cons-po-table">
+                <div className="cons-po-trow head"><span>{t("PO")}</span><span>{t("Build")}</span><span>{t("Vendor")}</span><span>{t("Amount")}</span><span>{t("Status")}</span></div>
+                {allPOs.map(({ r, po }) => (
+                  <div key={r.id + po.code} className="cons-po-trow">
+                    <span>{po.code}</span>
+                    <span>{t(r.name)}</span>
+                    <span>{t(po.vendor)}</span>
+                    <span>AED {po.amountAed.toLocaleString()}</span>
+                    <span className={`lc-txt ${poTone(po.status)}`}>{t(po.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="cons-proc-panel">
+              <div className="nd-section-title"><Truck size={14} /> {t("Long-lead parts to expedite")}</div>
+              <div className="cons-parts">
+                {awaited.length ? awaited.map(({ r, l }) => (
+                  <div key={r.id + l.sku} className="cons-part">
+                    <div><strong>{t(l.part)}</strong><small>{t(r.name)} · {l.sku}</small></div>
+                    <div className="cons-part-side"><span>{l.leadTimeDays}d {t("lead")}</span><span className={`nd-tag ${bomTone(l.status)}`}><i />{t(l.status)}</span></div>
+                  </div>
+                )) : <p className="cons-parts-empty">{t("No long-lead parts outstanding.")}</p>}
+              </div>
+            </section>
+          </div>
+        </section>
+      ) : null}
+    </PageBody>
   );
 }
 
