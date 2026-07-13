@@ -3843,6 +3843,7 @@ html[dir="rtl"] .lifecycle-strip { direction: rtl; }
 .revision-field textarea{min-height:230px;border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--surface-3);color:var(--ink);font:inherit;font-size:14px;line-height:1.55;resize:vertical}
 .revision-impact{background:var(--amber-soft);border:1px solid color-mix(in srgb, var(--amber) 35%, transparent);color:var(--ink);border-radius:10px;padding:12px 14px;font-size:13px;margin:0}
 .revision-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--surface-3)}
+.revision-footer>div{display:flex;align-items:center;gap:12px}
 @media(max-width:760px){
   .revision-dialog{max-height:96vh;border-radius:14px}
   .revision-meta{grid-template-columns:1fr}
@@ -9287,8 +9288,8 @@ html[data-theme="light"] .cc-selection-bar {
 
 /* Bulk selection composer: large enough for a real visual + overlap decision. */
 .selection-dialog {
-  width: min(1180px, calc(100vw - 48px));
-  max-height: min(92dvh, 900px);
+  width: min(1320px, calc(100vw - 48px));
+  max-height: min(94dvh, 940px);
   overflow: hidden;
 }
 
@@ -9298,10 +9299,10 @@ html[data-theme="light"] .cc-selection-bar {
 
 .selection-modal-grid {
   display: grid;
-  grid-template-columns: minmax(250px, 0.78fr) minmax(360px, 1.2fr) minmax(320px, 0.95fr);
-  gap: 18px;
+  grid-template-columns: minmax(270px, 0.8fr) minmax(380px, 1.2fr) minmax(340px, 1fr);
+  gap: 26px;
   min-height: 590px;
-  padding: 18px;
+  padding: 24px 26px;
   overflow: auto;
 }
 
@@ -9486,7 +9487,7 @@ html[data-theme="light"] .cc-selection-bar {
 .selection-library-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .selection-library-grid button {
@@ -9516,22 +9517,18 @@ html[data-theme="light"] .cc-selection-bar {
 }
 
 .selection-library-grid strong {
-  overflow: hidden;
   color: var(--ink);
   font-size: 12.5px;
   font-weight: 800;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .selection-library-grid small {
-  overflow: hidden;
   color: var(--muted);
   font-size: 11px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .selection-ai-generate {
@@ -9573,7 +9570,7 @@ html[data-theme="light"] .cc-selection-bar {
 .selection-creative-preview,
 .selection-creative-empty {
   position: relative;
-  min-height: 330px;
+  min-height: 360px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -9593,12 +9590,14 @@ html[data-theme="light"] .cc-selection-bar {
 
 .selection-creative-preview > div {
   position: absolute;
-  inset: auto 0 0;
+  inset: 0;
   z-index: 1;
   display: grid;
+  align-content: end;
   gap: 7px;
   padding: 22px;
   color: #fff;
+  overflow: hidden;
 }
 
 .selection-creative-preview small {
@@ -9611,17 +9610,17 @@ html[data-theme="light"] .cc-selection-bar {
 
 .selection-creative-preview strong {
   color: #fff;
-  font-size: clamp(25px, 2.6vw, 42px);
+  font-size: clamp(19px, 1.9vw, 28px);
   font-weight: 900;
-  line-height: 0.98;
+  line-height: 1.05;
 }
 
 .selection-creative-preview em {
   color: #fff;
-  font-size: clamp(21px, 2vw, 34px);
+  font-size: clamp(15px, 1.5vw, 21px);
   font-style: normal;
   font-weight: 850;
-  line-height: 1.05;
+  line-height: 1.15;
 }
 
 .selection-creative-empty {
@@ -9636,7 +9635,7 @@ html[data-theme="light"] .cc-selection-bar {
 .selection-review-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .selection-review-cards > div {
