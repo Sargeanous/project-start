@@ -11454,12 +11454,13 @@ html[data-theme="light"] .cc-selection-bar {
   display: grid;
   place-items: center;
 }
-/* Solid, filled tone tiles (per the kit) - opaque, not a see-through tint. */
-.nd-asset-icon.tone-good { background: color-mix(in srgb, var(--tag-good-bd) 42%, var(--surface-2)); color: var(--tag-good-ink); }
-.nd-asset-icon.tone-warn { background: color-mix(in srgb, var(--tag-warn-bd) 42%, var(--surface-2)); color: var(--tag-warn-ink); }
-.nd-asset-icon.tone-danger { background: color-mix(in srgb, var(--tag-danger-bd) 42%, var(--surface-2)); color: var(--tag-danger-ink); }
+/* Solid, saturated tone tiles with a white glyph (per the Figma kit). */
+.nd-asset-icon { color: #fff; }
+.nd-asset-icon.tone-good { background: var(--tag-good-bd); }
+.nd-asset-icon.tone-warn { background: var(--tag-warn-bd); }
+.nd-asset-icon.tone-danger { background: var(--tag-danger-bd); }
 .nd-asset-icon.tone-info,
-.nd-asset-icon.tone-neutral { background: color-mix(in srgb, var(--ink) 15%, var(--surface-2)); color: var(--ink); }
+.nd-asset-icon.tone-neutral { background: color-mix(in srgb, var(--ink) 30%, var(--surface-2)); color: var(--ink); }
 .nd-asset-name { flex: 1; min-width: 0; }
 .nd-asset-name strong {
   display: block;
