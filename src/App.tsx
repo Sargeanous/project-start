@@ -6313,18 +6313,20 @@ function ndCabinetCode(seed: number, n: number): string {
   return `C${String(col).padStart(2, "0")}R${String(row).padStart(2, "0")}`;
 }
 
-type NdIssue = { title: string; code: string; detail: string; state: "fault" | "degrading"; ring: number };
+// `health` is the component's live health score (0..1) shown in the ring gauge;
+// `family` maps the issue to a part in the 3D twin so selecting it focuses that mesh.
+type NdIssue = { title: string; code: string; family?: string; detail: string; state: "fault" | "degrading"; health: number };
 
 // Live component-level issues for the selected asset. The featured bridge screen
 // carries the real digital-twin faults; other screens derive plausible issues from status.
 function assetIssues(asset: Asset): NdIssue[] {
   if (asset.id === "AD-BRG-014") {
     return [
-      { title: "Cooling fan stalled", code: "C05R01", state: "fault", ring: 0.24,
+      { title: "Cooling fan stalled", code: "C05R01", family: "cooling_fan", state: "fault", health: 0.16,
         detail: "The cabinet fan is reading 0 RPM while the internal sensor holds 71°C, above the 65°C safe ceiling. Left unattended, the surrounding modules will auto-dim to shed heat." },
-      { title: "Service door unlatched", code: "C02R00", state: "fault", ring: 0.9,
+      { title: "Service door unlatched", code: "C02R00", family: "rear_door", state: "fault", health: 0.34,
         detail: "The rear maintenance door is reading open with both quarter-turn locks disengaged, exposing the electronics to dust and rain on the E10 gantry." },
-      { title: "Power supply ageing", code: "C05R01", state: "degrading", ring: 0.6,
+      { title: "Power supply ageing", code: "C05R01", family: "power_supply", state: "degrading", health: 0.62,
         detail: "Ripple on the 5V rail is trending up and efficiency has slipped about 6%. The redundant supply is carrying the load, so the screen is unaffected for now." },
     ];
   }
@@ -6333,17 +6335,17 @@ function assetIssues(asset: Asset): NdIssue[] {
   const c2 = ndCabinetCode(seed, 2);
   if (asset.status === "Offline") {
     return [
-      { title: "Controller unreachable", code: asset.controller, state: "fault", ring: 0.12,
+      { title: "Controller unreachable", code: asset.controller, family: "rear_door", state: "fault", health: 0.09,
         detail: `${asset.controller} has not checked in for 42 minutes. The screen is dark and the last proof-of-play was logged before the dropout.` },
-      { title: "Power feed interrupted", code: c1, state: "fault", ring: 0.08,
+      { title: "Power feed interrupted", code: c1, family: "casing", state: "fault", health: 0.05,
         detail: "Mains telemetry flatlined at the cabinet distribution board. A field team is required to confirm supply on site." },
     ];
   }
   if (asset.status === "Warning" || asset.status === "Maintenance") {
     return [
-      { title: "Cabinet running hot", code: c1, state: "degrading", ring: 0.52,
+      { title: "Cabinet running hot", code: c1, family: "casing", state: "degrading", health: 0.58,
         detail: "This cabinet is averaging 8°C above its neighbours across the day, likely a partly blocked vent. No throttling yet, but it is trending toward the limit." },
-      { title: "Brightness sensor drift", code: c2, state: "degrading", ring: 0.68,
+      { title: "Brightness sensor drift", code: c2, family: "rear_door", state: "degrading", health: 0.66,
         detail: "The ambient light sensor is reading low, so the wall is running brighter than the daypart schedule intends." },
     ];
   }
@@ -6361,16 +6363,20 @@ function NdSchedBar({ seed }: { seed: string }) {
   );
 }
 
+// Component-health gauge: the arc + number show the part's health (0-100%),
+// coloured by severity. Fuller = healthier; faults sit low and red.
 function NdRing({ value, state }: { value: number; state: NdIssue["state"] }) {
-  const deg = Math.round(Math.min(1, Math.max(0, value)) * 360);
+  const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  const deg = pct * 3.6;
   const color = state === "fault" ? "var(--tag-danger-bd)" : "var(--tag-warn-bd)";
   return (
     <span
-      className="nd-ring"
+      className={`nd-ring ${state}`}
       style={{ background: `conic-gradient(${color} ${deg}deg, var(--ctrl-border-dim) ${deg}deg 360deg)` }}
-      aria-hidden="true"
+      title={`Component health ${pct}%`}
+      aria-label={`Component health ${pct} percent`}
     >
-      <span className="nd-ring-hole" />
+      <span className="nd-ring-hole">{pct}</span>
     </span>
   );
 }
@@ -6426,6 +6432,7 @@ function NetworkPage({
   const [ticketLoading, setTicketLoading] = useState(false);
   const [registryCollapsed, setRegistryCollapsed] = useState(false);
   const [twinZoom, setTwinZoom] = useState(1);
+  const [selectedIssueIndex, setSelectedIssueIndex] = useState<number | null>(null);
   const selected = estateAssets.find((asset) => asset.id === selectedId) || estateAssets[0];
   const visibleAssets = useMemo(() => applyEstateFilter(estateAssets, estateFilter), [estateFilter]);
   const live = estateAssets.filter((asset) => asset.status === "Live").length;
@@ -6450,8 +6457,12 @@ function NetworkPage({
   ];
   const selectedIssues = assetIssues(selected);
   const selectedSchedule = assetSchedule(selected);
+  const activeIssue = selectedIssueIndex != null ? selectedIssues[selectedIssueIndex] : null;
+  // Key the 3D twin to the selected issue's part so it focuses that mesh.
+  const focusPart = activeIssue?.family ? `${activeIssue.code}:${activeIssue.family}` : null;
 
   useEffect(() => {
+    setSelectedIssueIndex(null);
     setTicketDraft(null);
   }, [selectedId]);
 
@@ -6610,7 +6621,7 @@ function NetworkPage({
 
               <div className="nd-stage-clip">
                 <div className="nd-stage-scale" style={{ transform: `scale(${twinZoom})` }}>
-                  <ClientOnlyBillboardTwin variant="stage" />
+                  <ClientOnlyBillboardTwin variant="stage" focusPart={focusPart} />
                 </div>
               </div>
 
@@ -6651,15 +6662,28 @@ function NetworkPage({
                   </div>
                 ) : (
                   selectedIssues.map((issue, index) => (
-                    <article key={`${issue.code}-${index}`} className={`nd-issue ${issue.state} ${index === 0 ? "featured" : ""}`}>
+                    <article
+                      key={`${issue.code}-${index}`}
+                      className={`nd-issue ${issue.state} ${selectedIssueIndex === index ? "featured" : ""}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={selectedIssueIndex === index}
+                      onClick={() => setSelectedIssueIndex((cur) => (cur === index ? null : index))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedIssueIndex((cur) => (cur === index ? null : index));
+                        }
+                      }}
+                    >
                       <div className="nd-issue-head">
                         <span className="nd-issue-icon"><Zap size={14} /></span>
                         <div className="nd-issue-title">
                           <strong>{t(issue.title)}</strong>
-                          <small>{issue.code}</small>
+                          <small>{issue.code}{issue.family ? ` · ${t("shown in 3D")}` : ""}</small>
                         </div>
-                        <NdRing value={issue.ring} state={issue.state} />
-                        <button type="button" className="nd-issue-menu" aria-label={t("Issue actions")}><MoreVertical size={15} /></button>
+                        <NdRing value={issue.health} state={issue.state} />
+                        <button type="button" className="nd-issue-menu" aria-label={t("Issue actions")} onClick={(event) => event.stopPropagation()}><MoreVertical size={15} /></button>
                       </div>
                       <p className="nd-issue-desc">{t(issue.detail)}</p>
                     </article>

@@ -25,6 +25,8 @@ const HERO_PREFIX = "Cabinet_05_01_"; // the cabinet the explode animation opens
 
 export type BillboardTwinProps = {
   variant?: "embedded" | "fullscreen" | "stage";
+  // "CODE:family" (e.g. "C05R01:cooling_fan") to focus/select that part; null clears.
+  focusPart?: string | null;
 };
 
 const BOARD_TECH_STACK = [
@@ -333,7 +335,7 @@ function Billboard({
   );
 }
 
-export default function BillboardTwin({ variant = "embedded" }: BillboardTwinProps) {
+export default function BillboardTwin({ variant = "embedded", focusPart = null }: BillboardTwinProps) {
   const [explode, setExplode] = useState(0);
   const [hover, setHover] = useState<Hover | null>(null);
   const [sel, setSel] = useState<{ info: PartInfo; obj: THREE.Object3D } | null>(null);
@@ -373,6 +375,24 @@ export default function BillboardTwin({ variant = "embedded" }: BillboardTwinPro
       if (info) setSel({ info, obj: found });
     }
   }, []);
+
+  // Focus a part when a parent (e.g. the Active issues panel) requests it.
+  // Poll for the scene so it lands even if the model is still loading at click.
+  useEffect(() => {
+    if (!focusPart) return;
+    const idx = focusPart.indexOf(":");
+    if (idx < 0) return;
+    const code = focusPart.slice(0, idx);
+    const family = focusPart.slice(idx + 1);
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = () => {
+      if (sceneRef.current) { selectByKey(code, family); return; }
+      if (tries++ < 24) timer = setTimeout(attempt, 280);
+    };
+    attempt();
+    return () => { if (timer) clearTimeout(timer); };
+  }, [focusPart, selectByKey]);
 
   const info = sel?.info;
 
