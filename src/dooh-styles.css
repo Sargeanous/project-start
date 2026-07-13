@@ -11880,3 +11880,252 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 .review-section-tabs button.active strong { color: var(--ink); }
 .review-section-tabs button span { display: none; }
 .review-section-tabs button.ai-tab { background: transparent; border-color: transparent; }
+
+/* =====================================================================
+   BROADCAST CONSOLE - the bulk-action "Display / Schedule on selected
+   screens" modal. Spacious premium sheet: living street preview (hero),
+   nullable visual-source toggle, commitments as one decision card.
+   Uses theme tokens so both themes work. Committed = slate/info (a fact),
+   red only when Override is chosen.
+   ===================================================================== */
+.revision-backdrop { display: flex; align-items: center; justify-content: center; }
+
+.bc-modal {
+  display: flex;
+  flex-direction: column;
+  width: calc(100vw - 80px);
+  max-width: 1360px;
+  height: min(88vh, 900px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-family: inherit;
+}
+
+/* Header */
+.bc-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 34px;
+  border-bottom: 1px solid var(--line);
+}
+.bc-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bc-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.bc-title strong { font-size: 22px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.bc-sub { font-size: 13px; color: var(--ink-2); }
+.bc-ledger { display: flex; align-items: center; gap: 12px; margin-inline-start: auto; flex-wrap: wrap; }
+.bc-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.bc-tag i { width: 8px; height: 8px; border-radius: 50%; }
+.bc-tag.good i { background: var(--tag-good-bd); }
+.bc-tag.warn i { background: var(--tag-warn-bd); }
+.bc-tag.slate i { background: var(--tag-info-bd); }
+.bc-tag.danger i { background: var(--tag-danger-bd); }
+.bc-close {
+  flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--muted);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.bc-close:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+
+/* Body */
+.bc-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 480px;
+  gap: 36px;
+  padding: 32px 34px;
+  align-items: start;
+}
+
+/* Stage (left): fleet strip + living preview + compose */
+.bc-stage { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.bc-fleet { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-fleet-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+}
+.bc-fleet-chip i { width: 7px; height: 7px; border-radius: 50%; }
+.bc-fleet-chip.clear i { background: var(--tag-good-bd); }
+.bc-fleet-chip.flagged i { background: var(--tag-warn-bd); }
+.bc-fleet-chip.committed i { background: var(--tag-info-bd); }
+
+.bc-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 46vh;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background-color: var(--surface-2);
+  background-position: center;
+  background-size: cover;
+}
+.bc-preview.branded {
+  background-image:
+    radial-gradient(120% 120% at 15% 12%, color-mix(in srgb, var(--primary) 42%, transparent), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 34%, var(--surface-2)), var(--surface-2));
+}
+.bc-preview::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.62));
+}
+.bc-preview-body {
+  position: absolute; inset: auto 0 0; z-index: 1;
+  display: grid; gap: 8px; padding: 30px 32px; color: #fff;
+}
+.bc-preview-body small { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.78); }
+.bc-preview-body strong { font-size: clamp(24px, 2.4vw, 40px); font-weight: 800; line-height: 1.04; color: #fff; }
+.bc-preview-body em { font-size: clamp(18px, 1.8vw, 28px); font-style: normal; font-weight: 700; line-height: 1.2; color: #fff; }
+.bc-preview-hint {
+  position: absolute; z-index: 2; inset-inline-end: 16px; top: 16px;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--ctrl-border); color: var(--ink-2);
+  font-size: 12px; font-weight: 600;
+}
+
+.bc-compose { display: flex; flex-direction: column; gap: 18px; }
+.bc-field { display: grid; gap: 8px; }
+.bc-field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.bc-field input, .bc-field textarea {
+  width: 100%; padding: 13px 15px;
+  border: 1px solid var(--ctrl-border); border-radius: 10px;
+  background: var(--surface-input); color: var(--ink);
+  font-family: inherit; font-size: 15px; line-height: 1.4; outline: none;
+}
+.bc-field input:focus, .bc-field textarea:focus { border-color: var(--primary); }
+.bc-field textarea { min-height: 92px; resize: vertical; }
+.bc-message-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+/* Rail (right): visual source + commitments */
+.bc-rail { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.bc-rail-block { display: flex; flex-direction: column; gap: 14px; }
+.bc-rail-label { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+
+.bc-source-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.bc-source {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 74px; padding: 12px 8px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); color: var(--ink-2);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.bc-source svg { color: currentColor; }
+.bc-source:hover { color: var(--ink); border-color: var(--ctrl-border); }
+.bc-source.active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-2));
+  border-color: var(--primary);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+.bc-library { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.bc-library button {
+  display: grid; gap: 7px; padding: 9px; text-align: start; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); color: var(--ink);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.bc-library button > span { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background-position: center; background-size: cover; }
+.bc-library button strong { font-size: 13px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.bc-library button small { font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.bc-library button.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+
+.bc-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 140px; padding: 22px; cursor: pointer;
+  border: 1.5px dashed var(--ctrl-border); border-radius: 12px;
+  background: var(--surface-2); color: var(--ink-2); font-family: inherit;
+}
+.bc-dropzone:hover { border-color: var(--primary); color: var(--ink); }
+.bc-dropzone strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.bc-dropzone small { font-size: 12px; color: var(--muted); }
+.bc-generate { display: flex; flex-direction: column; gap: 12px; }
+
+/* Commitments decision card */
+.bc-commit { display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.bc-commit-head { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.bc-commit-head strong { color: var(--ink); font-weight: 700; }
+.bc-readiness { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--ctrl-border-dim); }
+.bc-readiness .seg { min-width: 8%; }
+.seg.good { background: var(--tag-good-bd); }
+.seg.warn { background: var(--tag-warn-bd); }
+.seg.slate { background: var(--tag-info-bd); }
+.seg.danger { background: var(--tag-danger-bd); }
+.bc-readiness-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ink-2); }
+.bc-readiness-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bc-readiness-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.bc-readiness-legend i.good { background: var(--tag-good-bd); }
+.bc-readiness-legend i.warn { background: var(--tag-warn-bd); }
+.bc-readiness-legend i.slate { background: var(--tag-info-bd); }
+.bc-readiness-legend i.danger { background: var(--tag-danger-bd); }
+
+.bc-policy { display: flex; flex-direction: column; gap: 12px; }
+.bc-policy-opt {
+  display: grid; gap: 4px; padding: 14px 16px; text-align: start; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.bc-policy-opt strong { font-size: 14px; font-weight: 600; }
+.bc-policy-opt span { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.bc-policy-opt:hover { border-color: var(--ctrl-border); }
+.bc-policy-opt.active.slate { border-color: var(--tag-info-bd); background: var(--tag-info-bg); }
+.bc-policy-opt.active.danger { border-color: var(--tag-danger-bd); background: var(--tag-danger-bg); }
+.bc-policy-opt.active.danger strong { color: var(--tag-danger-ink); }
+
+.bc-commit-detail summary {
+  cursor: pointer; list-style: none; font-size: 13px; font-weight: 600; color: var(--ink-2);
+  padding: 4px 0;
+}
+.bc-commit-detail summary::-webkit-details-marker { display: none; }
+.bc-commit-detail summary::before { content: "▸ "; color: var(--muted); }
+.bc-commit-detail[open] summary::before { content: "▾ "; }
+.bc-commit-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bc-commit-item { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.bc-commit-item strong { font-size: 13px; font-weight: 600; color: var(--ink); }
+.bc-commit-item small { font-size: 12px; color: var(--tag-info-ink); line-height: 1.4; }
+
+.bc-commit-clear { display: flex; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.bc-commit-clear svg { color: var(--tag-good-ink); flex: 0 0 auto; margin-top: 1px; }
+.bc-commit-clear div { display: grid; gap: 3px; }
+.bc-commit-clear strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.bc-commit-clear span { font-size: 12.5px; color: var(--muted); }
+
+/* Footer */
+.bc-footer {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 22px 34px; border-top: 1px solid var(--line);
+}
+.bc-gov { font-size: 13px; color: var(--muted); }
+.bc-footer-actions { display: flex; align-items: center; gap: 14px; }
+.bc-queue { min-width: 264px; height: 48px; justify-content: center; font-size: 15px; }
+
+@media (max-width: 1120px) {
+  .bc-body { grid-template-columns: 1fr; gap: 28px; }
+  .bc-modal { width: calc(100vw - 32px); height: min(94vh, 940px); }
+}
+@media (max-width: 620px) {
+  .bc-message-row, .bc-source-toggle, .bc-library { grid-template-columns: 1fr; }
+  .bc-header, .bc-body, .bc-footer { padding-inline: 20px; }
+  .bc-footer { flex-direction: column; align-items: stretch; }
+  .bc-footer-actions { justify-content: stretch; }
+  .bc-queue { flex: 1; }
+}

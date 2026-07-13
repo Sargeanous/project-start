@@ -3964,12 +3964,12 @@ function SelectionActionDialog({
   const [messageEn, setMessageEn] = useState(actionKind === "schedule" ? "Visit Abu Dhabi this weekend" : "Road safety update: reduce speed and keep distance");
   const [messageAr, setMessageAr] = useState(actionKind === "schedule" ? "اكتشف أبوظبي هذا الأسبوع" : "تحديث السلامة المرورية: خفف السرعة واترك مسافة آمنة");
   const [scheduleWindow, setScheduleWindow] = useState("Today 18:00 - 22:00");
-  const [visualMode, setVisualMode] = useState<"library" | "upload" | "generate">("library");
+  const [visualMode, setVisualMode] = useState<"library" | "upload" | "generate" | null>(null);
   const [selectedLibraryId, setSelectedLibraryId] = useState("MED-008");
   const [visualUrl, setVisualUrl] = useState("");
   const [visualSource, setVisualSource] = useState("");
   const [aiPrompt, setAiPrompt] = useState("Abu Dhabi civic message, clean bilingual outdoor creative, high contrast, premium DOOH layout");
-  const [overlapPolicy, setOverlapPolicy] = useState<"exclude" | "override">("override");
+  const [overlapPolicy, setOverlapPolicy] = useState<"exclude" | "override">("exclude");
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -4003,13 +4003,17 @@ function SelectionActionDialog({
   const selectedVisual =
     visualMode === "library"
       ? creativeBackground(selectedLibraryCreativeId)
-      : visualUrl;
+      : visualMode === "upload" || visualMode === "generate"
+        ? visualUrl
+        : "";
   const selectedVisualLabel =
     visualMode === "library"
       ? selectedLibrary?.title ?? "Approved media"
       : visualMode === "generate"
         ? visualSource === "offline" ? "MediaGPT generated fallback" : "MediaGPT generated visual"
-        : "Uploaded visual";
+        : visualMode === "upload"
+          ? "Uploaded visual"
+          : "None chosen";
 
   function onFile(files: FileList | null) {
     const file = files?.[0];
@@ -4088,139 +4092,183 @@ function SelectionActionDialog({
     }
   }
 
+  // Nullable toggle: clicking the active source turns it off (no forced selection).
+  function toggleSource(src: "library" | "upload" | "generate") {
+    setVisualMode((mode) => (mode === src ? null : src));
+  }
+
   return (
     <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onClose}>
-      <section className="revision-dialog panel selection-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <header className="revision-header">
-          <span>{t("Bulk action")}</span>
-          <strong>{actionKind === "schedule" ? t("Schedule on selected screens") : t("Display on selected screens")}</strong>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}>×</button>
+      <section className="bc-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <header className="bc-header">
+          <div className="bc-title">
+            <span className="bc-kicker">{t("Bulk action")}</span>
+            <strong>{actionKind === "schedule" ? t("Schedule on selected screens") : t("Display on selected screens")}</strong>
+            <span className="bc-sub">
+              {t("One message")} · {assetIds.length} {assetIds.length === 1 ? t("screen") : t("screens")}
+              {actionKind === "schedule" && scheduleWindow ? ` · ${scheduleWindow}` : ""}
+            </span>
+          </div>
+          <div className="bc-ledger" aria-label={t("Selection readiness")}>
+            <span className="bc-tag good"><i />{clearCount} {t("will play")}</span>
+            {ruleFlagged.length ? <span className="bc-tag warn"><i />{ruleFlagged.length} {t("flagged")}</span> : null}
+            {hardConflicts.length ? <span className={`bc-tag ${overlapPolicy === "override" ? "danger" : "slate"}`}><i />{hardConflicts.length} {t("committed")}</span> : null}
+          </div>
+          <button type="button" className="bc-close" onClick={onClose} aria-label={t("Close")}>×</button>
         </header>
 
-        <div className="selection-modal-grid">
-          <aside className="selection-scope-panel">
-            <div className="selection-summary">
-              <span><strong>{assetIds.length}</strong> {assetIds.length === 1 ? t("screen selected") : t("screens selected")}</span>
-              <span className="good"><strong>{clearCount}</strong> {t("will play")}</span>
-              {ruleFlagged.length ? <span className="warn"><strong>{ruleFlagged.length}</strong> {t("flagged by rules")}</span> : null}
-              {conflicts.length ? <span className="danger"><strong>{conflicts.length}</strong> {t("overlap")}</span> : null}
-            </div>
-
-            {hardConflicts.length ? (
-              <div className="selection-policy">
-                <span>{t("Overlapping commitments")}</span>
-                <button type="button" className={overlapPolicy === "override" ? "active" : ""} onClick={() => setOverlapPolicy("override")}>
-                  <strong>{t("Override and display")}</strong>
-                  <span>{t("Keep this action possible; route the override for named approval.")}</span>
-                </button>
-                <button type="button" className={overlapPolicy === "exclude" ? "active" : ""} onClick={() => setOverlapPolicy("exclude")}>
-                  <strong>{t("Hold overlaps out")}</strong>
-                  <span>{t("Do not disturb committed screens; only clear screens will play.")}</span>
-                </button>
-              </div>
-            ) : null}
-
-            <div className="selection-screens">
+        <div className="bc-body">
+          <section className="bc-stage">
+            <div className="bc-fleet" aria-label={t("Selected screens")}>
               {(screens ?? []).map((s) => (
-                <div key={s.assetId} className={`selection-screen-row ${s.conflictLevel === "hard" ? "conflict" : ""}`}>
-                  <span className={`dot ${s.conflictLevel === "hard" ? "danger" : s.status === "flagged" || s.conflict ? "warn" : "good"}`} />
-                  <span className="selection-screen-main">
-                    <strong>{s.assetId}</strong>
-                    <small>{t(s.name)} | {t(s.zone)}</small>
-                  </span>
-                  <span className="selection-screen-note">
-                    {s.conflict ? t(s.conflict) : s.flagLabel ? t(s.flagLabel) : t("Clear")}
-                  </span>
-                </div>
+                <span key={s.assetId} className={`bc-fleet-chip ${s.conflictLevel === "hard" ? "committed" : s.status === "flagged" || s.conflict ? "flagged" : "clear"}`} title={`${s.assetId} · ${t(s.name)}`}>
+                  <i />{s.assetId}
+                </span>
               ))}
-              {screens === null ? <p className="cell-note">{t("Checking rules and overlaps...")}</p> : null}
+              {screens === null ? <span className="cell-note">{t("Checking rules and overlaps...")}</span> : null}
             </div>
-          </aside>
 
-          <section className="selection-compose-panel">
-            <div className="selection-form">
-              <label>{t("Campaign or message name")}
+            <div className={`bc-preview ${selectedVisual ? "has-visual" : "branded"}`} style={selectedVisual ? { backgroundImage: `url("${selectedVisual}")` } : undefined}>
+              <div className="bc-preview-body">
+                <small>ADMO · {actionKind === "schedule" ? t("Scheduled") : t("Now")}</small>
+                <strong>{messageEn || t("Your message appears here")}</strong>
+                {messageAr ? <em dir="rtl">{messageAr}</em> : null}
+              </div>
+              {!selectedVisual ? <span className="bc-preview-hint"><ImageIcon size={15} /> {t("Choose a visual source")}</span> : null}
+            </div>
+
+            <div className="bc-compose">
+              <label className="bc-field">
+                <span>{t("Campaign or message name")}</span>
                 <input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder={t("e.g. Summer road-safety push")} />
               </label>
-              <div className="selection-message-grid">
-                <label>{t("English message")}
-                  <textarea value={messageEn} onChange={(e) => setMessageEn(e.target.value)} placeholder={t("What plays on these screens")} />
-                </label>
-                <label dir="rtl">{t("Arabic message")}
-                  <textarea dir="rtl" value={messageAr} onChange={(e) => setMessageAr(e.target.value)} placeholder="الرسالة التي ستظهر على الشاشات" />
-                </label>
-              </div>
               {actionKind === "schedule" ? (
-                <label>{t("Schedule window")}
+                <label className="bc-field">
+                  <span>{t("Schedule window")}</span>
                   <input value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)} />
                 </label>
               ) : null}
-            </div>
-
-            <div className="selection-visual-source">
-              <button type="button" className={visualMode === "library" ? "active" : ""} onClick={() => setVisualMode("library")}>
-                <ImageIcon size={16} /> {t("Use media library")}
-              </button>
-              <button type="button" className={visualMode === "upload" ? "active" : ""} onClick={() => fileRef.current?.click()}>
-                <Upload size={16} /> {t("Upload visual")}
-              </button>
-              <button type="button" className={visualMode === "generate" ? "active" : ""} onClick={() => setVisualMode("generate")}>
-                <Sparkles size={16} /> {t("Create with MediaGPT")}
-              </button>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files)} />
-            </div>
-
-            {visualMode === "library" ? (
-              <div className="selection-library-grid">
-                {libraryItems.map((item, index) => (
-                  <button key={item.id} type="button" className={selectedLibraryId === item.id ? "active" : ""} onClick={() => setSelectedLibraryId(item.id)}>
-                    <span style={{ backgroundImage: `url("${creativeBackground(mediaCreative(index + 1))}")` }} />
-                    <strong>{t(item.title)}</strong>
-                    <small>{item.tags.map((tag) => t(tag)).join(" | ")}</small>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {visualMode === "generate" ? (
-              <div className="selection-ai-generate">
-                <label>{t("MediaGPT visual prompt")}
-                  <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+              <div className="bc-message-row">
+                <label className="bc-field">
+                  <span>{t("English message")}</span>
+                  <textarea value={messageEn} onChange={(e) => setMessageEn(e.target.value)} placeholder={t("What plays on these screens")} />
                 </label>
-                <Button icon={Sparkles} disabled={generating} onClick={generateCreative}>{generating ? t("Generating") : t("Generate visual and copy")}</Button>
-                {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template with the correct wording.")}</small> : null}
+                <label className="bc-field" dir="rtl">
+                  <span>{t("Arabic message")}</span>
+                  <textarea dir="rtl" value={messageAr} onChange={(e) => setMessageAr(e.target.value)} placeholder="الرسالة التي ستظهر على الشاشات" />
+                </label>
               </div>
-            ) : null}
+            </div>
           </section>
 
-          <aside className="selection-preview-panel">
-            <span>{t("Playback preview")}</span>
-            {selectedVisual ? (
-              <div className="selection-creative-preview" style={{ backgroundImage: `url("${selectedVisual}")` }}>
-                <div>
-                  <small>ADMO | {actionKind === "schedule" ? t("Scheduled") : t("Now")}</small>
-                  <strong>{messageEn || campaign}</strong>
-                  <em dir="rtl">{messageAr}</em>
-                </div>
+          <aside className="bc-rail">
+            <div className="bc-rail-block">
+              <div className="bc-rail-label">{t("Visual source")}</div>
+              <div className="bc-source-toggle">
+                <button type="button" className={`bc-source ${visualMode === "library" ? "active" : ""}`} onClick={() => toggleSource("library")}>
+                  <ImageIcon size={18} /><span>{t("Media library")}</span>
+                </button>
+                <button type="button" className={`bc-source ${visualMode === "upload" ? "active" : ""}`} onClick={() => toggleSource("upload")}>
+                  <Upload size={18} /><span>{t("Upload")}</span>
+                </button>
+                <button type="button" className={`bc-source ${visualMode === "generate" ? "active" : ""}`} onClick={() => toggleSource("generate")}>
+                  <Sparkles size={18} /><span>{t("MediaGPT")}</span>
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e.target.files)} />
               </div>
-            ) : (
-              <div className="selection-creative-empty"><ImageIcon size={24} /><span>{t("Choose or create a visual first")}</span></div>
-            )}
-            <div className="selection-review-cards">
-              <div><span>{t("Visual")}</span><strong>{t(selectedVisualLabel)}</strong></div>
-              <div><span>{t("Screens")}</span><strong>{clearCount} / {assetIds.length}</strong></div>
-              <div><span>{t("Overlap handling")}</span><strong>{hardConflicts.length ? t(overlapPolicy === "override" ? "Override and display" : "Hold overlaps out") : t("No overlap")}</strong></div>
-              <div><span>{t("Governance")}</span><strong>{t("Named approval required")}</strong></div>
+
+              {visualMode === "library" ? (
+                <div className="bc-library">
+                  {libraryItems.map((item, index) => (
+                    <button key={item.id} type="button" className={selectedLibraryId === item.id ? "active" : ""} onClick={() => setSelectedLibraryId(item.id)}>
+                      <span style={{ backgroundImage: `url("${creativeBackground(mediaCreative(index + 1))}")` }} />
+                      <strong>{t(item.title)}</strong>
+                      <small>{item.tags.map((tag) => t(tag)).join(" · ")}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {visualMode === "upload" ? (
+                <button type="button" className="bc-dropzone" onClick={() => fileRef.current?.click()}>
+                  <Upload size={22} />
+                  <strong>{visualSource === "upload" ? t("Replace uploaded visual") : t("Upload a visual")}</strong>
+                  <small>{t("PNG or JPG, 16:9 recommended")}</small>
+                </button>
+              ) : null}
+
+              {visualMode === "generate" ? (
+                <div className="bc-generate">
+                  <label className="bc-field">
+                    <span>{t("MediaGPT visual prompt")}</span>
+                    <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+                  </label>
+                  <Button icon={Sparkles} disabled={generating} onClick={generateCreative}>{generating ? t("Generating") : t("Generate visual and copy")}</Button>
+                  {visualSource === "offline" ? <small className="cell-note">{t("Image model offline. Showing a branded template with the correct wording.")}</small> : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="bc-rail-block">
+              <div className="bc-rail-label">{t("Commitments")}</div>
+              {hardConflicts.length ? (
+                <div className="bc-commit">
+                  <p className="bc-commit-head">
+                    <strong>{hardConflicts.length}</strong> {t("of")} {assetIds.length} {t("screens carry a prior commitment.")}
+                  </p>
+                  <div className="bc-readiness">
+                    {clearCount ? <span className="seg good" style={{ flexGrow: clearCount }} /> : null}
+                    {ruleFlagged.length ? <span className="seg warn" style={{ flexGrow: ruleFlagged.length }} /> : null}
+                    {hardConflicts.length ? <span className={`seg ${overlapPolicy === "override" ? "danger" : "slate"}`} style={{ flexGrow: hardConflicts.length }} /> : null}
+                  </div>
+                  <div className="bc-readiness-legend">
+                    <span><i className="good" />{clearCount} {t("clear")}</span>
+                    {ruleFlagged.length ? <span><i className="warn" />{ruleFlagged.length} {t("flagged")}</span> : null}
+                    <span><i className={overlapPolicy === "override" ? "danger" : "slate"} />{hardConflicts.length} {t("committed")}</span>
+                  </div>
+
+                  <div className="bc-policy">
+                    <button type="button" className={`bc-policy-opt ${overlapPolicy === "exclude" ? "active slate" : ""}`} onClick={() => setOverlapPolicy("exclude")}>
+                      <strong>{t("Protect committed screens")}</strong>
+                      <span>{clearCount} {t("clear screens play; committed screens stay untouched.")}</span>
+                    </button>
+                    <button type="button" className={`bc-policy-opt ${overlapPolicy === "override" ? "active danger" : ""}`} onClick={() => setOverlapPolicy("override")}>
+                      <strong>{t("Override and display on all")}</strong>
+                      <span>{t("Play on all")} {assetIds.length} {t("screens; routed for named approval.")}</span>
+                    </button>
+                  </div>
+
+                  <details className="bc-commit-detail">
+                    <summary>{t("Review committed screens")}</summary>
+                    <div className="bc-commit-list">
+                      {hardConflicts.map((s) => (
+                        <div key={s.assetId} className="bc-commit-item">
+                          <strong>{s.assetId} · {t(s.name)}</strong>
+                          <small>{s.conflict ? t(s.conflict) : t("Committed")}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <div className="bc-commit-clear">
+                  <CheckCircle2 size={18} />
+                  <div>
+                    <strong>{t("No commitments in this selection.")}</strong>
+                    <span>{t("All")} {clearCount} {t("selected screens are clear to play.")}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </aside>
         </div>
 
-        <footer className="revision-footer">
-          <span />
-          <div>
+        <footer className="bc-footer">
+          <span className="bc-gov">{t("Requires named approval before anything plays.")}</span>
+          <div className="bc-footer-actions">
             <button type="button" className="button secondary" onClick={onClose}>{t("Cancel")}</button>
-            <button type="button" className="button primary" disabled={submitting || !selectedVisual || !clearCount} onClick={submit}>
-              {submitting ? t("Sending") : actionKind === "schedule" ? t("Queue schedule") : t("Queue display")}
+            <button type="button" className="button primary bc-queue" disabled={submitting || !selectedVisual || clearCount === 0} onClick={submit}>
+              {submitting ? t("Queuing") : `${actionKind === "schedule" ? t("Queue schedule") : t("Queue display")} · ${clearCount} ${clearCount === 1 ? t("screen") : t("screens")}`}
             </button>
           </div>
         </footer>
