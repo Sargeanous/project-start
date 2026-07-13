@@ -11592,43 +11592,6 @@ html[data-theme="light"] .cc-selection-bar {
 }
 
 /* Vertical zoom slider */
-.nd-zoom-slider {
-  position: absolute;
-  inset-inline-end: 20px;
-  top: 26%;
-  z-index: 15;
-  display: grid;
-  place-items: center;
-}
-.nd-zoom-slider input {
-  -webkit-appearance: none;
-  appearance: none;
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 5px;
-  height: 150px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 24%, transparent);
-  cursor: pointer;
-}
-.nd-zoom-slider input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--ink);
-  border: 3px solid var(--surface);
-  cursor: pointer;
-}
-.nd-zoom-slider input::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--ink);
-  border: 3px solid var(--surface);
-  cursor: pointer;
-}
-
 /* Zoom stepper + fullscreen */
 .nd-viewer-tools {
   position: absolute;

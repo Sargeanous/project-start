@@ -6566,18 +6566,6 @@ function NetworkPage({
                 </div>
               </div>
 
-              <div className="nd-zoom-slider">
-                <input
-                  type="range"
-                  min={0.7}
-                  max={1.6}
-                  step={0.01}
-                  value={twinZoom}
-                  onChange={(event) => setTwinZoom(Number(event.target.value))}
-                  aria-label={t("Zoom")}
-                />
-              </div>
-
               <div className="nd-viewer-tools">
                 <button type="button" onClick={() => setTwinZoom((z) => Math.min(1.6, Number((z + 0.1).toFixed(2))))} aria-label={t("Zoom in")}><Plus size={16} /></button>
                 <span className="nd-tool-divider" aria-hidden="true" />
