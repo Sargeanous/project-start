@@ -11454,11 +11454,12 @@ html[data-theme="light"] .cc-selection-bar {
   display: grid;
   place-items: center;
 }
-.nd-asset-icon.tone-good { background: var(--tag-good-bg); color: var(--tag-good-ink); }
-.nd-asset-icon.tone-warn { background: var(--tag-warn-bg); color: var(--tag-warn-ink); }
-.nd-asset-icon.tone-danger { background: var(--tag-danger-bg); color: var(--tag-danger-ink); }
+/* Solid, filled tone tiles (per the kit) - opaque, not a see-through tint. */
+.nd-asset-icon.tone-good { background: color-mix(in srgb, var(--tag-good-bd) 42%, var(--surface-2)); color: var(--tag-good-ink); }
+.nd-asset-icon.tone-warn { background: color-mix(in srgb, var(--tag-warn-bd) 42%, var(--surface-2)); color: var(--tag-warn-ink); }
+.nd-asset-icon.tone-danger { background: color-mix(in srgb, var(--tag-danger-bd) 42%, var(--surface-2)); color: var(--tag-danger-ink); }
 .nd-asset-icon.tone-info,
-.nd-asset-icon.tone-neutral { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink-2); }
+.nd-asset-icon.tone-neutral { background: color-mix(in srgb, var(--ink) 15%, var(--surface-2)); color: var(--ink); }
 .nd-asset-name { flex: 1; min-width: 0; }
 .nd-asset-name strong {
   display: block;
@@ -11685,8 +11686,8 @@ html[data-theme="light"] .cc-selection-bar {
 /* --- Right detail panel ------------------------------------------------- */
 .nd-detail-head { display: flex; align-items: center; gap: 12px; }
 .nd-detail-head .nd-asset-icon { width: 40px; height: 40px; border-radius: 11px; }
-.nd-detail-head strong { display: block; font-size: 19px; font-weight: 600; color: var(--ink); }
-.nd-detail-head span { display: block; margin-top: 3px; font-size: 13px; color: var(--muted); }
+.nd-detail-head > div > strong { display: block; font-size: 19px; font-weight: 600; color: var(--ink); }
+.nd-detail-head > div > span { display: block; margin-top: 3px; font-size: 13px; color: var(--muted); }
 
 .nd-section-title {
   display: flex;
