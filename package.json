@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "eval:agent": "npx promptfoo@latest eval -c promptfoo.config.yaml",
+    "demo:executive": "node demo/build-executive-demo.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {
