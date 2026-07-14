@@ -7076,6 +7076,9 @@ function ticketPriorityTone(p: TicketPriority): string {
 function ticketStatusTone(s: TicketStatus): string {
   return s === "Resolved" ? "good" : s === "Blocked" ? "danger" : s === "In progress" ? "info" : s === "Cancelled" ? "neutral" : "warn";
 }
+function ticketStatusClass(s: TicketStatus): string {
+  return s === "Open" ? "st-open" : s === "In progress" ? "st-progress" : s === "Blocked" ? "st-blocked" : s === "Resolved" ? "st-resolved" : "st-cancelled";
+}
 
 function TicketObjChip({ obj, t, onEscalate }: { obj: TicketObject; t: (v: string) => string; onEscalate?: (o: TicketObject) => void }) {
   return (
@@ -7154,10 +7157,6 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
     setVisibleCols((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   }
   function openBlankModal() { setDraftTicket(emptyDraft); setModalOpen(true); }
-  function openModalForObject(obj: TicketObject) {
-    setDraftTicket({ ...emptyDraft, objectKind: obj.kind, objectRef: obj.ref, objectLabel: obj.label || "", title: `${obj.ref}: ` });
-    setModalOpen(true);
-  }
   function submitNew() {
     if (!draftTicket.title.trim() || !draftTicket.objectRef.trim()) return;
     const created = createTicket({
@@ -7201,22 +7200,22 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
       <div className="tkt-controls">
         <div className="tkt-filters">
           <select value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value })} aria-label={t("Criticality")}>
-            <option value="all">{t("All criticality")}</option>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+            <option value="all">{t("Criticality")}</option>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
           </select>
           <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} aria-label={t("Status")}>
-            <option value="all">{t("All status")}</option>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
+            <option value="all">{t("Status")}</option>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
           </select>
           <select value={filters.team} onChange={(e) => setFilters({ ...filters, team: e.target.value })} aria-label={t("Team")}>
-            <option value="all">{t("All teams")}</option>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}
+            <option value="all">{t("Team")}</option>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}
           </select>
           <select value={filters.assignee} onChange={(e) => setFilters({ ...filters, assignee: e.target.value })} aria-label={t("Assignee")}>
-            <option value="all">{t("All assignees")}</option>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+            <option value="all">{t("Assignee")}</option>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}
           </select>
           <select value={filters.raisedBy} onChange={(e) => setFilters({ ...filters, raisedBy: e.target.value })} aria-label={t("Created by")}>
-            <option value="all">{t("All creators")}</option>{createdByOptions.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+            <option value="all">{t("Created by")}</option>{createdByOptions.map((p) => <option key={p} value={p}>{t(p)}</option>)}
           </select>
           <select value={filters.since} onChange={(e) => setFilters({ ...filters, since: e.target.value })} aria-label={t("Date")}>
-            <option value="all">{t("Any time")}</option>
+            <option value="all">{t("Any date")}</option>
             <option value="7d">{t("Last 7 days")}</option>
             <option value="30d">{t("Last 30 days")}</option>
             <option value="90d">{t("Last 90 days")}</option>
@@ -7228,9 +7227,11 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
             <button type="button" className="tkt-cols-btn" onClick={() => setColsOpen((o) => !o)}><SlidersHorizontal size={14} /> {t("Columns")}</button>
             {colsOpen ? (
               <div className="tkt-cols-menu">
+                <div className="tkt-cols-title">{t("Show columns")}</div>
                 {TKT_COLUMNS.map((c) => (
                   <label key={c.key} className={c.locked ? "locked" : ""}>
-                    <input type="checkbox" checked={show(c.key)} disabled={c.locked} onChange={() => toggleCol(c.key)} /> {t(c.label)}
+                    <input type="checkbox" checked={show(c.key)} disabled={c.locked} onChange={() => toggleCol(c.key)} />
+                    <span>{t(c.label)}</span>
                   </label>
                 ))}
               </div>
@@ -7259,10 +7260,10 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
                   ) : null}
                   {show("id") ? <td className="col-id">{tk.id}</td> : null}
                   {show("title") ? <td className="col-title"><strong>{t(tk.title)}</strong></td> : null}
-                  {show("object") ? <td className="col-object">{tk.object ? <TicketObjChip obj={tk.object} t={t} onEscalate={openModalForObject} /> : null}</td> : null}
+                  {show("object") ? <td className="col-object">{tk.object ? <TicketObjChip obj={tk.object} t={t} /> : null}</td> : null}
                   {show("status") ? (
                     <td className="col-status" onClick={(e) => e.stopPropagation()}>
-                      <select className={`tkt-inline tone-${ticketStatusTone(tk.status)}`} value={tk.status} onChange={(e) => setTicketStatus(tk.id, e.target.value as TicketStatus)}>
+                      <select className={`tkt-status-sel ${ticketStatusClass(tk.status)}`} value={tk.status} onChange={(e) => setTicketStatus(tk.id, e.target.value as TicketStatus)}>
                         {TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
                       </select>
                     </td>
@@ -7294,9 +7295,9 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
           <div className="tkt-drawer-body">
             <div className="tkt-obj-block">
               <div className="nd-section-title">{t("Objects")}</div>
-              <div className="tkt-obj-main"><span className="tkt-obj-tag">{t("Main")}</span>{selected.object ? <TicketObjChip obj={selected.object} t={t} onEscalate={openModalForObject} /> : null}</div>
+              <div className="tkt-obj-main"><span className="tkt-obj-tag">{t("Main")}</span>{selected.object ? <TicketObjChip obj={selected.object} t={t} /> : null}</div>
               {(selected.linkedObjects ?? []).map((o, i) => (
-                <div key={`${o.kind}-${o.ref}-${i}`} className="tkt-obj-linked"><TicketObjChip obj={o} t={t} onEscalate={openModalForObject} /></div>
+                <div key={`${o.kind}-${o.ref}-${i}`} className="tkt-obj-linked"><TicketObjChip obj={o} t={t} /></div>
               ))}
               <div className="tkt-obj-add">
                 <select value={addObj.kind} onChange={(e) => setAddObj({ ...addObj, kind: e.target.value as TicketObjectKind })}>{TICKET_OBJECT_KINDS.map((k) => <option key={k} value={k}>{t(k)}</option>)}</select>
