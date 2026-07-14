@@ -127,6 +127,7 @@ import {
   addLinkedObject,
   lastComment,
   ticketSummary,
+  ticketMetrics,
   isTicketQuery,
   answerTicketQuery,
   TICKET_TEAMS,
@@ -7226,11 +7227,11 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const metrics = ticketMetrics();
   const kpis = [
     { icon: Ticket, value: String(summary.active), label: "Active tickets" },
-    { icon: Zap, value: String(summary.open + summary.inProgress), label: "Open and in progress" },
-    { icon: AlertTriangle, value: String(summary.blocked), label: "Blocked" },
-    { icon: CheckCircle2, value: String(summary.resolved), label: "Resolved" },
+    { icon: CalendarClock, value: String(metrics.openedLast14), label: "Opened last 14 days" },
+    { icon: Gauge, value: metrics.avgClosureLabel, label: "Avg time to closure" },
   ];
   const show = (k: string): boolean => visibleCols.has(k) || !!TKT_COLUMNS.find((c) => c.key === k)?.locked;
 
@@ -7266,7 +7267,7 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
 
   return (
     <PageBody>
-      <div className="nd-kpis">
+      <div className="nd-kpis tkt-kpis">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (

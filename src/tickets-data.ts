@@ -69,6 +69,7 @@ export interface Ticket {
   createdAt: string;
   createdAtISO: string;
   updatedAt: string;
+  closedAtISO?: string;
   history: TicketEvent[];
 }
 
@@ -179,6 +180,7 @@ const SEED: Ticket[] = [
     createdAt: "20 Jun, 13:45",
     createdAtISO: "2026-06-20T13:45:00",
     updatedAt: "24 Jun, 17:20",
+    closedAtISO: "2026-06-24T17:20:00",
     history: [
       ev("created", "20 Jun, 13:45", "L. Fernandes", { role: "Planner", detail: "Drafting the combined lift schedule." }),
       ev("status", "24 Jun, 17:20", "S. Al Mansoori", { detail: "Status: In progress -> Resolved" }),
@@ -264,7 +266,10 @@ export function setTicketStatus(id: string, status: TicketStatus, actor = "Contr
   if (!current || current.status === status) return;
   const kind: TicketEventKind = status === "Cancelled" ? "cancelled" : "status";
   const detail = status === "Cancelled" ? `Ticket cancelled (was ${current.status})` : `Status: ${current.status} -> ${status}`;
-  touch(id, ev(kind, stamp(), actor, { detail }), { status });
+  const patch: Partial<Ticket> = { status };
+  // Stamp closure time when a ticket is resolved (used for avg-time-to-closure).
+  if (status === "Resolved" && !current.closedAtISO) patch.closedAtISO = new Date().toISOString();
+  touch(id, ev(kind, stamp(), actor, { detail }), patch);
 }
 
 export function cancelTicket(id: string, reason?: string, actor = "Control room") {
@@ -315,6 +320,19 @@ export function ticketSummary() {
     cancelled: tickets.filter((t) => t.status === "Cancelled").length,
     active: active.length,
   };
+}
+
+/** Headline metrics for the tab: recent inflow + closure performance. */
+export function ticketMetrics() {
+  const now = Date.now();
+  const openedLast14 = tickets.filter((t) => now - new Date(t.createdAtISO).getTime() <= 14 * 86400000).length;
+  const closed = tickets.filter((t) => t.closedAtISO);
+  const avgMs = closed.length
+    ? closed.reduce((s, t) => s + (new Date(t.closedAtISO as string).getTime() - new Date(t.createdAtISO).getTime()), 0) / closed.length
+    : 0;
+  const avgDays = avgMs / 86400000;
+  const avgClosureLabel = closed.length ? (avgDays >= 1 ? `${avgDays.toFixed(1)}d` : `${Math.max(1, Math.round(avgDays * 24))}h`) : "—";
+  return { openedLast14, avgClosureLabel, closedCount: closed.length };
 }
 
 /* -------- MediaGPT ticket awareness -------- */
