@@ -510,6 +510,62 @@ export function coverageGaps(): Array<{ zone: PlanningZone; metrics: ZoneMetrics
     .map((row) => ({ ...row, priority: row.metrics.score >= 70 ? "High" : "Medium" as "High" | "Medium" }));
 }
 
+/** Synthesize a full zone profile for ANY pinned point on the map. This is the
+ *  "live probe" - a deterministic estimate derived from the nearest known zone,
+ *  standing in for the DMT digital twin until the technical team connects it for
+ *  real-time telemetry. Returns a PlanningZone so it reuses the same intel panel. */
+function hashPoint(lat: number, lng: number): number {
+  const s = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function pseudo(seed: number, salt: number): number {
+  const x = Math.sin(seed * 0.0001 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+export function zoneFromPoint(lat: number, lng: number): PlanningZone {
+  const seed = hashPoint(lat, lng);
+  let nearest = planningZones[0];
+  let best = Infinity;
+  for (const z of planningZones) {
+    const d = (z.center.lat - lat) ** 2 + (z.center.lng - lng) ** 2;
+    if (d < best) { best = d; nearest = z; }
+  }
+  const jitter = (salt: number, amp: number) => Math.round((pseudo(seed, salt) - 0.5) * 2 * amp);
+  const nd = nearest.demographics;
+  const affluenceIndex = Math.max(32, Math.min(97, nd.affluenceIndex + jitter(1, 12)));
+  const dwellSeconds = Math.max(11, nd.dwellSeconds + jitter(2, 10));
+  const dailyFootfall = Math.max(60_000, nd.dailyFootfall + jitter(3, 90_000));
+  const ageBands = nd.ageBands.map((b, i) => ({ band: b.band, pct: Math.max(4, b.pct + jitter(10 + i, 5)) }));
+  const ageTotal = ageBands.reduce((s, b) => s + b.pct, 0);
+  ageBands.forEach((b) => (b.pct = Math.round((b.pct / ageTotal) * 100)));
+  const capacity = 8 + (seed % 8);
+  const liveAssets = seed % Math.max(1, Math.floor(capacity * 0.6));
+  return {
+    id: "PROBE",
+    name: "Live-probe zone",
+    district: nearest.district,
+    tone: "emerging",
+    center: { lat, lng },
+    polygon: box(lat, lng, 0.012, 0.018),
+    areaSqKm: Math.round((2 + pseudo(seed, 4) * 6) * 10) / 10,
+    demographics: {
+      ageBands,
+      affluenceIndex,
+      dwellSeconds,
+      dailyFootfall,
+      dominantDaypart: nd.dominantDaypart,
+      segments: nd.segments,
+    },
+    liveAssets,
+    capacity,
+    candidateSites: [],
+    note: `Live probe near ${nearest.name}. Profile estimated from the DMT digital twin model; connect the twin for real-time telemetry.`,
+  };
+}
+
 /* ========================= CONSTRUCTION ========================= */
 
 export interface BuildPhase {

@@ -110,6 +110,7 @@ import {
   delayRisk,
   openPurchaseOrders as openConstructionPOs,
   planningZones,
+  zoneFromPoint,
   zoneMetrics,
   zoneSuggestion,
   type ConstructionRecord,
@@ -6566,10 +6567,14 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
   const [selectedZoneId, setSelectedZoneId] = useState(planningZones[0].id);
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
   const [promoted, setPromoted] = useState<string[]>([]);
+  const [pinMode, setPinMode] = useState(false);
+  const [probePoint, setProbePoint] = useState<{ lat: number; lng: number } | null>(null);
 
   const selectedZone: PlanningZone = planningZones.find((z) => z.id === selectedZoneId) ?? planningZones[0];
-  const metrics = zoneMetrics(selectedZone);
-  const suggestion = zoneSuggestion(selectedZone);
+  const probeZone = probePoint ? zoneFromPoint(probePoint.lat, probePoint.lng) : null;
+  const detailZone = probeZone ?? selectedZone;
+  const metrics = zoneMetrics(detailZone);
+  const suggestion = zoneSuggestion(detailZone);
   const hoverZone = hoveredZoneId ? planningZones.find((z) => z.id === hoveredZoneId) : null;
 
   const candidateCount = planningZones.reduce((s, z) => s + z.candidateSites.length, 0);
@@ -6627,7 +6632,22 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
       {planTab === "zones" ? (
         <section className="plan-workspace" aria-label={t("Zone intelligence")}>
           <div className="plan-stage">
-            <PlanningZoneMap zones={zoneShapes} selectedId={selectedZoneId} onSelect={setSelectedZoneId} onHover={setHoveredZoneId} t={t} />
+            <PlanningZoneMap
+              zones={zoneShapes}
+              selectedId={probePoint ? "" : selectedZoneId}
+              onSelect={(id) => { setProbePoint(null); setPinMode(false); setSelectedZoneId(id); }}
+              onHover={setHoveredZoneId}
+              probeMode={pinMode}
+              probePoint={probePoint}
+              onProbe={(lat, lng) => setProbePoint({ lat, lng })}
+              t={t}
+            />
+            <div className="plan-stage-tools">
+              <button type="button" className={`plan-pin-btn ${pinMode ? "active" : ""}`} onClick={() => setPinMode((m) => !m)}>
+                <MapPinned size={14} /> {pinMode ? t("Pinning - click the map") : t("Pin a live zone")}
+              </button>
+              {probePoint ? <button type="button" className="plan-pin-clear" onClick={() => { setProbePoint(null); setPinMode(false); }}>{t("Clear pin")}</button> : null}
+            </div>
             {hoverZone ? (() => {
               const hm = zoneMetrics(hoverZone);
               return (
@@ -6646,13 +6666,16 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
                 </div>
               );
             })() : (
-              <div className="plan-stage-hint">{t("Hover a zone for its audience profile. Click to open the full plan.")}</div>
+              <div className="plan-stage-hint">{t("Hover a zone for its profile, click to open it, or pin any point for live intelligence.")}</div>
             )}
           </div>
 
           <aside className="plan-detail">
+            {detailZone.id === "PROBE" ? (
+              <div className="plan-live-note"><span className="plan-live-dot" />{t("Live probe. Estimated from the DMT digital twin model; real-time once the twin is connected.")}</div>
+            ) : null}
             <header className="plan-detail-head">
-              <div><strong>{t(selectedZone.name)}</strong><span>{t(selectedZone.district)} · {selectedZone.areaSqKm} km²</span></div>
+              <div><strong>{t(detailZone.name)}</strong><span>{t(detailZone.district)} · {detailZone.areaSqKm} km²</span></div>
               <span className={`nd-tag ${scoreTagTone(metrics.score)}`}><i />{t("Opportunity")} {metrics.score}</span>
             </header>
 
@@ -6668,18 +6691,18 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
             <div className="plan-section">
               <div className="nd-section-title">{t("Audience")}</div>
               <div className="plan-deflist">
-                <div><span>{t("Affluence index")}</span><strong>{selectedZone.demographics.affluenceIndex}</strong></div>
-                <div><span><Clock size={12} /> {t("Median dwell")}</span><strong>{selectedZone.demographics.dwellSeconds}s</strong></div>
-                <div><span><Footprints size={12} /> {t("Daily footfall")}</span><strong>{(selectedZone.demographics.dailyFootfall / 1000).toFixed(0)}k</strong></div>
-                <div><span>{t("Peak")}</span><strong>{t(selectedZone.demographics.dominantDaypart)}</strong></div>
+                <div><span>{t("Affluence index")}</span><strong>{detailZone.demographics.affluenceIndex}</strong></div>
+                <div><span><Clock size={12} /> {t("Median dwell")}</span><strong>{detailZone.demographics.dwellSeconds}s</strong></div>
+                <div><span><Footprints size={12} /> {t("Daily footfall")}</span><strong>{(detailZone.demographics.dailyFootfall / 1000).toFixed(0)}k</strong></div>
+                <div><span>{t("Peak")}</span><strong>{t(detailZone.demographics.dominantDaypart)}</strong></div>
               </div>
               <div className="plan-ages">
-                {selectedZone.demographics.ageBands.map((b) => (
+                {detailZone.demographics.ageBands.map((b) => (
                   <LcBar key={b.band} label={b.band} value={b.pct} max={40} suffix="%" tone="neutral" />
                 ))}
               </div>
               <div className="plan-segments">
-                {selectedZone.demographics.segments.map((sg) => (
+                {detailZone.demographics.segments.map((sg) => (
                   <span key={sg.label} className="plan-seg"><b>{sg.pct}%</b> {t(sg.label)}</span>
                 ))}
               </div>
@@ -6706,8 +6729,8 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
 
             <div className="plan-section">
               <div className="nd-section-title">{t("Network saturation")}</div>
-              <LcBar label={`${selectedZone.liveAssets}/${selectedZone.capacity} ${t("live")}`} value={metrics.saturationPct} suffix="%" tone={metrics.saturationPct > 75 ? "danger" : "good"} />
-              {selectedZone.note ? <small className="plan-note">{t(selectedZone.note)}</small> : null}
+              <LcBar label={`${detailZone.liveAssets}/${detailZone.capacity} ${t("live")}`} value={metrics.saturationPct} suffix="%" tone={metrics.saturationPct > 75 ? "danger" : "good"} />
+              {detailZone.note ? <small className="plan-note">{t(detailZone.note)}</small> : null}
             </div>
           </aside>
         </section>

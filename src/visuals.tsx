@@ -1017,6 +1017,11 @@ interface PlanningZoneMapProps {
   selectedId: string;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
+  /* Live probe: in probe mode a map click drops a pin the parent turns into
+     an ad-hoc zone profile (digital-twin ready). */
+  probeMode?: boolean;
+  probePoint?: { lat: number; lng: number } | null;
+  onProbe?: (lat: number, lng: number) => void;
   t: (value: string) => string;
 }
 
@@ -1027,7 +1032,7 @@ function zoneColor(score: number): string {
   return "#8a94a6";
 }
 
-export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: PlanningZoneMapProps) {
+export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, probeMode, probePoint, onProbe, t }: PlanningZoneMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -1035,6 +1040,8 @@ export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: Pla
   const shapesRef = useRef<Record<string, any>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const labelsRef = useRef<Record<string, any>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const probeRef = useRef<any>(null);
   const disposeTilesRef = useRef<(() => void) | null>(null);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
@@ -1042,6 +1049,10 @@ export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: Pla
   hoverRef.current = onHover;
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  const probeModeRef = useRef(probeMode);
+  probeModeRef.current = probeMode;
+  const onProbeRef = useRef(onProbe);
+  onProbeRef.current = onProbe;
   const [failed, setFailed] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1066,6 +1077,8 @@ export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: Pla
       try {
         map = L.map(containerRef.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false }).setView([24.47, 54.45], 10);
         disposeTilesRef.current = addThemedTiles(L, map);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        map.on("click", (e: any) => { if (probeModeRef.current && onProbeRef.current) onProbeRef.current(e.latlng.lat, e.latlng.lng); });
         mapRef.current = map;
         shapesRef.current = {};
         labelsRef.current = {};
@@ -1125,6 +1138,35 @@ export function PlanningZoneMap({ zones, selectedId, onSelect, onHover, t }: Pla
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  // Drop / move / clear the live-probe pin.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    if (probePoint) {
+      if (probeRef.current) {
+        probeRef.current.setLatLng([probePoint.lat, probePoint.lng]);
+      } else {
+        probeRef.current = L.marker([probePoint.lat, probePoint.lng], {
+          interactive: false,
+          icon: L.divIcon({ className: "pz-probe-icon", html: `<span class="pz-probe"></span>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+        }).addTo(map);
+      }
+      map.panTo([probePoint.lat, probePoint.lng]);
+    } else if (probeRef.current) {
+      map.removeLayer(probeRef.current);
+      probeRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [probePoint]);
+
+  // Crosshair cursor while pinning.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.classList.toggle("probe-mode", !!probeMode);
+  }, [probeMode]);
 
   if (failed) return <div className="live-map-fallback"><p>{t("Live map tiles are unavailable offline.")}</p></div>;
   return <div className="pz-map" ref={containerRef} role="application" aria-label={t("Planning zone map")} />;
