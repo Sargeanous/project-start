@@ -6776,6 +6776,12 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
   const [selectedBuildId, setSelectedBuildId] = useState(constructionRecords[0].id);
   const [dossierId, setDossierId] = useState<string | null>(null);
   const [escalated, setEscalated] = useState<string[]>([]);
+  const [poStatus, setPoStatus] = useState("all");
+  const [poVendor, setPoVendor] = useState("all");
+  const [poPage, setPoPage] = useState(0);
+  const [bomStatus, setBomStatus] = useState("all");
+  const [bomBuild, setBomBuild] = useState("all");
+  const [bomPage, setBomPage] = useState(0);
 
   const summary = constructionSummary();
   const selectedBuild: ConstructionRecord = constructionRecords.find((r) => r.id === selectedBuildId) ?? constructionRecords[0];
@@ -6802,6 +6808,18 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
   const atRisk = constructionRecords.map((r) => ({ r, risk: delayRisk(r) })).filter((x) => x.risk.level !== "Low").sort((a, b) => b.risk.score - a.risk.score);
   const allPOs = constructionRecords.flatMap((r) => r.purchaseOrders.map((po) => ({ r, po })));
   const awaited = constructionRecords.flatMap((r) => r.bom.filter((l) => l.qtyReceived < l.qtyRequired && l.leadTimeDays >= 21).map((l) => ({ r, l })));
+  const allBom = constructionRecords.flatMap((r) => r.bom.map((l) => ({ r, l })));
+  const PROC_PAGE = 10;
+  const poVendorOptions = Array.from(new Set(allPOs.map((x) => x.po.vendor)));
+  const bomBuildOptions = Array.from(new Set(allBom.map((x) => x.r.name)));
+  const poFiltered = allPOs.filter((x) => (poStatus === "all" || x.po.status === poStatus) && (poVendor === "all" || x.po.vendor === poVendor));
+  const bomFiltered = allBom.filter((x) => (bomStatus === "all" || x.l.status === bomStatus) && (bomBuild === "all" || x.r.name === bomBuild));
+  const poPageCount = Math.max(1, Math.ceil(poFiltered.length / PROC_PAGE));
+  const bomPageCount = Math.max(1, Math.ceil(bomFiltered.length / PROC_PAGE));
+  const poPageC = Math.min(poPage, poPageCount - 1);
+  const bomPageC = Math.min(bomPage, bomPageCount - 1);
+  const poView = poFiltered.slice(poPageC * PROC_PAGE, poPageC * PROC_PAGE + PROC_PAGE);
+  const bomView = bomFiltered.slice(bomPageC * PROC_PAGE, bomPageC * PROC_PAGE + PROC_PAGE);
 
   function openDossier(id: string) { setSelectedBuildId(id); setDossierId(id); }
 
@@ -7036,34 +7054,97 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
             <div><span><CircleDollarSign size={14} /> {t("Committed value")}</span><strong>AED {(summary.committedAed / 1_000_000).toFixed(1)}M</strong></div>
             <div><span><PackageCheck size={14} /> {t("Long-lead parts awaited")}</span><strong>{awaited.length}</strong></div>
           </div>
-          <div className="cons-proc-grid">
-            <section className="cons-proc-panel">
-              <div className="nd-section-title">{t("Purchase orders across the programme")}</div>
-              <div className="cons-po-table">
-                <div className="cons-po-trow head"><span>{t("PO")}</span><span>{t("Build")}</span><span>{t("Vendor")}</span><span>{t("Amount")}</span><span>{t("Status")}</span></div>
-                {allPOs.map(({ r, po }) => (
-                  <div key={r.id + po.code} className="cons-po-trow">
-                    <span>{po.code}</span>
-                    <span>{t(r.name)}</span>
-                    <span>{t(po.vendor)}</span>
-                    <span>AED {po.amountAed.toLocaleString()}</span>
-                    <span className={`lc-txt ${poTone(po.status)}`}>{t(po.status)}</span>
-                  </div>
-                ))}
+          <section className="cons-proc-panel">
+            <div className="cons-tbl-head">
+              <div className="nd-section-title"><Package size={15} /> {t("Purchase orders")} <span className="cons-tbl-count">{poFiltered.length}</span></div>
+              <div className="cons-tbl-filters">
+                <select value={poStatus} onChange={(e) => { setPoStatus(e.target.value); setPoPage(0); }} aria-label={t("Status")}>
+                  <option value="all">{t("Status")}</option>{["Raised", "Approved", "Dispatched", "Received"].map((s) => <option key={s} value={s}>{t(s)}</option>)}
+                </select>
+                <select value={poVendor} onChange={(e) => { setPoVendor(e.target.value); setPoPage(0); }} aria-label={t("Vendor")}>
+                  <option value="all">{t("Vendor")}</option>{poVendorOptions.map((v) => <option key={v} value={v}>{t(v)}</option>)}
+                </select>
               </div>
-            </section>
-            <section className="cons-proc-panel">
-              <div className="nd-section-title"><Truck size={14} /> {t("Long-lead parts to expedite")}</div>
-              <div className="cons-parts">
-                {awaited.length ? awaited.map(({ r, l }) => (
-                  <div key={r.id + l.sku} className="cons-part">
-                    <div><strong>{t(l.part)}</strong><small>{t(r.name)} · {l.sku}</small></div>
-                    <div className="cons-part-side"><span>{l.leadTimeDays}d {t("lead")}</span><span className={`nd-tag ${bomTone(l.status)}`}><i />{t(l.status)}</span></div>
-                  </div>
-                )) : <p className="cons-parts-empty">{t("No long-lead parts outstanding.")}</p>}
+            </div>
+            <div className="cons-tbl-wrap">
+              <table className="cons-tbl">
+                <thead><tr>
+                  <th>{t("PO")}</th><th>{t("Build")}</th><th>{t("Asset")}</th><th>{t("Vendor")}</th><th>{t("Item")}</th><th className="num">{t("Amount")}</th><th>{t("ETA")}</th><th>{t("Status")}</th>
+                </tr></thead>
+                <tbody>
+                  {poView.map(({ r, po }) => (
+                    <tr key={r.id + po.code}>
+                      <td className="mono">{po.code}</td>
+                      <td>{t(r.name)}</td>
+                      <td className="mono">{r.assetId}</td>
+                      <td>{t(po.vendor)}</td>
+                      <td>{t(po.item)}</td>
+                      <td className="num">AED {po.amountAed.toLocaleString()}</td>
+                      <td>{po.eta ? t(po.eta) : "-"}</td>
+                      <td><span className={`nd-tag ${poTone(po.status)}`}><i />{t(po.status)}</span></td>
+                    </tr>
+                  ))}
+                  {poView.length === 0 ? <tr><td colSpan={8} className="cons-tbl-empty">{t("No purchase orders match these filters.")}</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+            {poPageCount > 1 ? (
+              <div className="cons-tbl-pager">
+                <span>{poPageC * PROC_PAGE + 1}-{Math.min(poFiltered.length, poPageC * PROC_PAGE + PROC_PAGE)} {t("of")} {poFiltered.length}</span>
+                <div>
+                  <button type="button" disabled={poPageC === 0} onClick={() => setPoPage(poPageC - 1)} aria-label={t("Previous")}><ChevronLeft size={15} /></button>
+                  <span>{t("Page")} {poPageC + 1}/{poPageCount}</span>
+                  <button type="button" disabled={poPageC >= poPageCount - 1} onClick={() => setPoPage(poPageC + 1)} aria-label={t("Next")}><ChevronRight size={15} /></button>
+                </div>
               </div>
-            </section>
-          </div>
+            ) : null}
+          </section>
+
+          <section className="cons-proc-panel">
+            <div className="cons-tbl-head">
+              <div className="nd-section-title"><Truck size={15} /> {t("Bill of materials")} <span className="cons-tbl-count">{bomFiltered.length}</span></div>
+              <div className="cons-tbl-filters">
+                <select value={bomStatus} onChange={(e) => { setBomStatus(e.target.value); setBomPage(0); }} aria-label={t("Status")}>
+                  <option value="all">{t("Status")}</option>{["Pending", "Ordered", "In transit", "On site", "Installed"].map((s) => <option key={s} value={s}>{t(s)}</option>)}
+                </select>
+                <select value={bomBuild} onChange={(e) => { setBomBuild(e.target.value); setBomPage(0); }} aria-label={t("Build")}>
+                  <option value="all">{t("Build")}</option>{bomBuildOptions.map((b) => <option key={b} value={b}>{t(b)}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="cons-tbl-wrap">
+              <table className="cons-tbl">
+                <thead><tr>
+                  <th>{t("Part")}</th><th>{t("SKU")}</th><th>{t("Build")}</th><th>{t("Asset")}</th><th className="num">{t("Recv/Req")}</th><th className="num">{t("Unit cost")}</th><th className="num">{t("Lead")}</th><th>{t("Status")}</th>
+                </tr></thead>
+                <tbody>
+                  {bomView.map(({ r, l }, i) => (
+                    <tr key={r.id + l.sku + i}>
+                      <td>{t(l.part)}</td>
+                      <td className="mono">{l.sku}</td>
+                      <td>{t(r.name)}</td>
+                      <td className="mono">{r.assetId}</td>
+                      <td className={`num ${l.qtyReceived < l.qtyRequired ? "short" : ""}`}>{l.qtyReceived}/{l.qtyRequired}</td>
+                      <td className="num">AED {l.unitCostAed.toLocaleString()}</td>
+                      <td className="num">{l.leadTimeDays}d</td>
+                      <td><span className={`nd-tag ${bomTone(l.status)}`}><i />{t(l.status)}</span></td>
+                    </tr>
+                  ))}
+                  {bomView.length === 0 ? <tr><td colSpan={8} className="cons-tbl-empty">{t("No parts match these filters.")}</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+            {bomPageCount > 1 ? (
+              <div className="cons-tbl-pager">
+                <span>{bomPageC * PROC_PAGE + 1}-{Math.min(bomFiltered.length, bomPageC * PROC_PAGE + PROC_PAGE)} {t("of")} {bomFiltered.length}</span>
+                <div>
+                  <button type="button" disabled={bomPageC === 0} onClick={() => setBomPage(bomPageC - 1)} aria-label={t("Previous")}><ChevronLeft size={15} /></button>
+                  <span>{t("Page")} {bomPageC + 1}/{bomPageCount}</span>
+                  <button type="button" disabled={bomPageC >= bomPageCount - 1} onClick={() => setBomPage(bomPageC + 1)} aria-label={t("Next")}><ChevronRight size={15} /></button>
+                </div>
+              </div>
+            ) : null}
+          </section>
         </section>
       ) : null}
     </PageBody>
