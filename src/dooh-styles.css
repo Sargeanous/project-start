@@ -10685,6 +10685,78 @@ html[data-theme="light"] .cc-selection-bar {
   line-height: 1.3;
 }
 
+/* Emergency lifecycle timeline: shows where the alert sits in its flow. */
+.emg-timeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 4px 2px 2px;
+}
+.emg-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  text-align: center;
+}
+.emg-stage::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  inset-inline-start: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--ctrl-border-dim);
+}
+.emg-stage:first-child::before { display: none; }
+.emg-stage-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1.5px solid var(--ctrl-border);
+  color: var(--muted);
+  z-index: 1;
+}
+.emg-stage small { font-size: 11px; color: var(--muted); line-height: 1.2; }
+.emg-stage.done .emg-stage-dot { background: var(--tag-good-bd); border-color: var(--tag-good-bd); color: #fff; }
+.emg-stage.done::before { background: var(--tag-good-bd); }
+.emg-stage.done small { color: var(--ink-2); }
+.emg-stage.current .emg-stage-dot {
+  background: var(--surface);
+  border-color: var(--tag-warn-bd);
+  color: var(--tag-warn-ink);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tag-warn-bd) 22%, transparent);
+}
+.emg-stage.current small { color: var(--ink); font-weight: 600; }
+
+.emg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  padding: 12px 2px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.emg-meta b { color: var(--ink); font-weight: 600; }
+
+/* Distinguishable verification steps: done / current / pending. */
+.alert-check-list article.done > span:first-child { background: var(--tag-good-bg); color: var(--tag-good-ink); }
+.alert-check-list article.current {
+  border-color: color-mix(in srgb, var(--tag-info-bd) 45%, transparent);
+  background: color-mix(in srgb, var(--tag-info-bd) 8%, var(--surface-3));
+}
+.alert-check-list article.current > span:first-child { background: var(--tag-info-bg); color: var(--tag-info-ink); }
+.alert-check-list article.pending { opacity: 0.62; }
+.alert-check-list article.pending > span:first-child { background: var(--surface-2); color: var(--muted); }
+
 .alerts-create-card {
   overflow: hidden;
   border: 1px solid var(--line);

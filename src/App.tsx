@@ -5904,6 +5904,25 @@ function AlertsPage({
   };
   const stepsDone = stepsDoneByState[selected.state] ?? 0;
   const viewSteps: VerificationStep[] = steps.map((step, i) => ({ ...step, state: i < stepsDone ? "Checked" : "Check required" }));
+  // The alert's position along its own lifecycle, so "Check required" and
+  // "Approval required" land at visibly different points on the timeline.
+  const emgStages = [
+    { key: "checks", label: "Checks" },
+    { key: "approval", label: "Approval" },
+    { key: "queued", label: "Queued" },
+    { key: "broadcasting", label: "Broadcasting" },
+    { key: "live", label: "Live" },
+  ];
+  const stateStageIndex: Record<string, number> = {
+    "Check required": 0,
+    "Checked": 1,
+    "Approval required": 1,
+    "Approved": 2,
+    "Broadcast queued": 2,
+    "Broadcasting": 3,
+    "Live on network": 4,
+  };
+  const currentStage = stateStageIndex[selected.state] ?? 0;
 
   useEffect(() => {
     if (alerts.length && !alerts.some((alert) => alert.id === selectedAlertId)) {
@@ -6046,12 +6065,23 @@ function AlertsPage({
             ) : null}
           </section>
 
-          <div className="alerts-summary-grid">
-            <div><span>{t("Sender")}</span><strong>{t(selected.sender ?? selected.authority)}</strong></div>
-            <div><span>{t("Severity")}</span><strong>{t(selected.severity ?? selected.criticality)}</strong></div>
-            <div><span>{t("SLA")}</span><strong>{t(selected.sla)}</strong></div>
-            <div><span>{t("Targets")}</span><strong>{selected.targetAssets?.length ?? 0} {t("assets")}</strong></div>
+          <div className="emg-timeline" role="list" aria-label={t("Alert lifecycle")}>
+            {emgStages.map((stage, i) => {
+              const stageState = i < currentStage ? "done" : i === currentStage ? "current" : "upcoming";
+              return (
+                <div key={stage.key} className={`emg-stage ${stageState}`} role="listitem" aria-current={stageState === "current" ? "step" : undefined}>
+                  <span className="emg-stage-dot">{i < currentStage ? <CheckCircle2 size={13} /> : i + 1}</span>
+                  <small>{t(stage.label)}</small>
+                </div>
+              );
+            })}
           </div>
+          <p className="emg-meta">
+            <span>{t("Sender")}: <b>{t(selected.sender ?? selected.authority)}</b></span>
+            <span>{t("Severity")}: <b>{t(selected.severity ?? selected.criticality)}</b></span>
+            <span>{t("SLA")}: <b>{t(selected.sla)}</b></span>
+            <span>{t("Targets")}: <b>{selected.targetAssets?.length ?? 0} {t("assets")}</b></span>
+          </p>
 
           {selected.bodyEn || selected.bodyAr ? (
             <div className="alerts-message-grid">
@@ -6066,13 +6096,18 @@ function AlertsPage({
                 <strong>{t("MediaGPT checks")}</strong>
               </header>
               <div className="alert-check-list">
-                {viewSteps.map((step, index) => (
-                  <article key={step.label}>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
-                    <StatusPill label={step.state} tone={step.state === "Checked" ? "good" : "warn"} />
-                  </article>
-                ))}
+                {viewSteps.map((step, index) => {
+                  const stepState = index < stepsDone ? "done" : index === stepsDone ? "current" : "pending";
+                  const pillLabel = stepState === "done" ? "Checked" : stepState === "current" ? "In progress" : "Pending";
+                  const pillTone = stepState === "done" ? "good" : stepState === "current" ? "info" : "neutral";
+                  return (
+                    <article key={step.label} className={`emg-check ${stepState}`}>
+                      <span>{stepState === "done" ? <CheckCircle2 size={15} /> : String(index + 1).padStart(2, "0")}</span>
+                      <div><strong>{t(step.label)}</strong><small>{t(step.owner)}</small></div>
+                      <StatusPill label={t(pillLabel)} tone={pillTone} />
+                    </article>
+                  );
+                })}
               </div>
             </section>
 
