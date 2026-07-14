@@ -121,11 +121,22 @@ import {
   addTicketComment,
   setTicketStatus,
   setTicketTeam,
+  setTicketPriority,
+  setTicketAssignee,
+  cancelTicket,
+  addLinkedObject,
+  lastComment,
   ticketSummary,
+  isTicketQuery,
+  answerTicketQuery,
   TICKET_TEAMS,
+  TICKET_PEOPLE,
+  TICKET_OBJECT_KINDS,
   type Ticket as TicketRecord,
   type TicketStatus,
   type TicketPriority,
+  type TicketObject,
+  type TicketObjectKind,
 } from "./tickets-data";
 import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
 import { distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
@@ -6800,10 +6811,11 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
     createTicket({
       title: `${selectedBuild.name}: ${selectedBuild.blockers[0]?.title ?? "delay risk"}`,
       body: `${selectedRisk.mitigation} (Auto-raised from the construction delay-risk monitor. Drivers: ${selectedRisk.drivers.join("; ") || "schedule variance"}.)`,
+      object: { kind: "Asset", ref: selectedBuild.assetId, label: selectedBuild.name },
+      linkedObjects: [{ kind: "Work order", ref: selectedBuild.workOrder.code, label: selectedBuild.workOrder.scope }],
       team: escalateOwner,
       priority,
       source: "Delay risk",
-      assetId: selectedBuild.assetId,
       raisedBy: selectedBuild.projectManager,
     });
     setEscalated((e) => [...e, selectedBuild.id]);
@@ -7062,47 +7074,114 @@ function ticketPriorityTone(p: TicketPriority): string {
   return p === "Critical" ? "danger" : p === "High" ? "warn" : p === "Medium" ? "info" : "neutral";
 }
 function ticketStatusTone(s: TicketStatus): string {
-  return s === "Resolved" ? "good" : s === "Blocked" ? "danger" : s === "In progress" ? "info" : "warn";
+  return s === "Resolved" ? "good" : s === "Blocked" ? "danger" : s === "In progress" ? "info" : s === "Cancelled" ? "neutral" : "warn";
 }
+
+function TicketObjChip({ obj, t, onEscalate }: { obj: TicketObject; t: (v: string) => string; onEscalate?: (o: TicketObject) => void }) {
+  return (
+    <span className="tkt-obj">
+      <span className="tkt-obj-kind">{t(obj.kind)}</span>
+      <b>{obj.ref}</b>
+      {obj.label ? <em>{t(obj.label)}</em> : null}
+      {onEscalate ? (
+        <button type="button" className="tkt-obj-esc" title={t("Escalate this object into a ticket")} onClick={(e) => { e.stopPropagation(); onEscalate(obj); }}>
+          <Ticket size={11} />
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+const TKT_COLUMNS: Array<{ key: string; label: string; locked?: boolean }> = [
+  { key: "priority", label: "Criticality", locked: true },
+  { key: "id", label: "ID" },
+  { key: "title", label: "Title", locked: true },
+  { key: "object", label: "Main object" },
+  { key: "status", label: "Status", locked: true },
+  { key: "team", label: "Team" },
+  { key: "assignee", label: "Assignee" },
+  { key: "raisedBy", label: "Created by" },
+  { key: "createdAt", label: "Opened" },
+  { key: "lastComment", label: "Last comment" },
+  { key: "updatedAt", label: "Updated" },
+];
+const TKT_PRIORITIES: TicketPriority[] = ["Critical", "High", "Medium", "Low"];
+const TKT_STATUSES: TicketStatus[] = ["Open", "In progress", "Blocked", "Resolved", "Cancelled"];
 
 function TicketsPage({ t }: { t: (value: string) => string }) {
   const tickets = useTickets();
-  const [filter, setFilter] = useState<"all" | TicketStatus>("all");
-  const [selectedId, setSelectedId] = useState<string>(tickets[0]?.id ?? "");
-  const [draft, setDraft] = useState("");
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [newTicket, setNewTicket] = useState<{ title: string; body: string; team: string; priority: TicketPriority }>({ title: "", body: "", team: TICKET_TEAMS[0], priority: "Medium" });
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [colsOpen, setColsOpen] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(() => new Set(TKT_COLUMNS.filter((c) => c.key !== "updatedAt").map((c) => c.key)));
+  const [reply, setReply] = useState("");
+  const [addObj, setAddObj] = useState<{ kind: TicketObjectKind; ref: string }>({ kind: "Asset", ref: "" });
+  const [filters, setFilters] = useState({ priority: "all", status: "all", team: "all", assignee: "all", raisedBy: "all", since: "all" });
+  const emptyDraft = { title: "", body: "", objectKind: "Asset" as TicketObjectKind, objectRef: "", objectLabel: "", team: TICKET_TEAMS[0] as string, assignee: "Unassigned" as string, priority: "Medium" as TicketPriority };
+  const [draftTicket, setDraftTicket] = useState(emptyDraft);
 
   const summary = ticketSummary();
-  const filtered = filter === "all" ? tickets : tickets.filter((tk) => tk.status === filter);
-  const selected: TicketRecord | null = tickets.find((tk) => tk.id === selectedId) ?? filtered[0] ?? tickets[0] ?? null;
+  const selected: TicketRecord | null = tickets.find((tk) => tk.id === selectedId) ?? null;
+  const createdByOptions = Array.from(new Set(tickets.map((tk) => tk.raisedBy)));
+
+  const sinceMs: Record<string, number> = { all: Infinity, "7d": 7 * 86400000, "30d": 30 * 86400000, "90d": 90 * 86400000 };
+  const now = Date.now();
+  const filtered = tickets.filter((tk) =>
+    (filters.priority === "all" || tk.priority === filters.priority) &&
+    (filters.status === "all" || tk.status === filters.status) &&
+    (filters.team === "all" || tk.team === filters.team) &&
+    (filters.assignee === "all" || tk.assignee === filters.assignee) &&
+    (filters.raisedBy === "all" || tk.raisedBy === filters.raisedBy) &&
+    (filters.since === "all" || now - new Date(tk.createdAtISO).getTime() <= sinceMs[filters.since]),
+  );
+  const anyFilter = Object.values(filters).some((v) => v !== "all");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setModalOpen(false); setSelectedId(""); setColsOpen(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const kpis = [
-    { icon: Ticket, value: String(summary.total), label: "Total tickets" },
+    { icon: Ticket, value: String(summary.active), label: "Active tickets" },
     { icon: Zap, value: String(summary.open + summary.inProgress), label: "Open and in progress" },
     { icon: AlertTriangle, value: String(summary.blocked), label: "Blocked" },
     { icon: CheckCircle2, value: String(summary.resolved), label: "Resolved" },
   ];
-  const filters: Array<{ id: "all" | TicketStatus; label: string }> = [
-    { id: "all", label: "All" },
-    { id: "Open", label: "Open" },
-    { id: "In progress", label: "In progress" },
-    { id: "Blocked", label: "Blocked" },
-    { id: "Resolved", label: "Resolved" },
-  ];
-  const statuses: TicketStatus[] = ["Open", "In progress", "Blocked", "Resolved"];
+  const show = (k: string): boolean => visibleCols.has(k) || !!TKT_COLUMNS.find((c) => c.key === k)?.locked;
 
-  function submitComment() {
-    if (!selected || !draft.trim()) return;
-    addTicketComment(selected.id, draft);
-    setDraft("");
+  function toggleCol(key: string) {
+    setVisibleCols((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   }
-  function submitNewTicket() {
-    if (!newTicket.title.trim()) return;
-    const created = createTicket({ title: newTicket.title, body: newTicket.body, team: newTicket.team, priority: newTicket.priority, source: "Manual", raisedBy: "Control room" });
-    setComposerOpen(false);
-    setNewTicket({ title: "", body: "", team: TICKET_TEAMS[0], priority: "Medium" });
+  function openBlankModal() { setDraftTicket(emptyDraft); setModalOpen(true); }
+  function openModalForObject(obj: TicketObject) {
+    setDraftTicket({ ...emptyDraft, objectKind: obj.kind, objectRef: obj.ref, objectLabel: obj.label || "", title: `${obj.ref}: ` });
+    setModalOpen(true);
+  }
+  function submitNew() {
+    if (!draftTicket.title.trim() || !draftTicket.objectRef.trim()) return;
+    const created = createTicket({
+      title: draftTicket.title,
+      body: draftTicket.body,
+      object: { kind: draftTicket.objectKind, ref: draftTicket.objectRef.trim(), label: draftTicket.objectLabel.trim() || undefined },
+      team: draftTicket.team,
+      assignee: draftTicket.assignee,
+      priority: draftTicket.priority,
+      source: "Manual",
+      raisedBy: "Control room",
+    });
+    setModalOpen(false);
     setSelectedId(created.id);
+  }
+  function submitReply() {
+    if (!selected || !reply.trim()) return;
+    addTicketComment(selected.id, reply);
+    setReply("");
+  }
+  function submitAddObject() {
+    if (!selected || !addObj.ref.trim()) return;
+    addLinkedObject(selected.id, { kind: addObj.kind, ref: addObj.ref.trim() });
+    setAddObj({ kind: "Asset", ref: "" });
   }
 
   return (
@@ -7119,91 +7198,182 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
         })}
       </div>
 
-      <div className="tkt-toolbar">
-        <div className="nd-tabs" role="tablist" aria-label={t("Filter tickets")}>
-          {filters.map((f) => (
-            <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`nd-tab ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
-              <span>{t(f.label)}</span>
-            </button>
-          ))}
+      <div className="tkt-controls">
+        <div className="tkt-filters">
+          <select value={filters.priority} onChange={(e) => setFilters({ ...filters, priority: e.target.value })} aria-label={t("Criticality")}>
+            <option value="all">{t("All criticality")}</option>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+          </select>
+          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} aria-label={t("Status")}>
+            <option value="all">{t("All status")}</option>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
+          </select>
+          <select value={filters.team} onChange={(e) => setFilters({ ...filters, team: e.target.value })} aria-label={t("Team")}>
+            <option value="all">{t("All teams")}</option>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}
+          </select>
+          <select value={filters.assignee} onChange={(e) => setFilters({ ...filters, assignee: e.target.value })} aria-label={t("Assignee")}>
+            <option value="all">{t("All assignees")}</option>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+          </select>
+          <select value={filters.raisedBy} onChange={(e) => setFilters({ ...filters, raisedBy: e.target.value })} aria-label={t("Created by")}>
+            <option value="all">{t("All creators")}</option>{createdByOptions.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+          </select>
+          <select value={filters.since} onChange={(e) => setFilters({ ...filters, since: e.target.value })} aria-label={t("Date")}>
+            <option value="all">{t("Any time")}</option>
+            <option value="7d">{t("Last 7 days")}</option>
+            <option value="30d">{t("Last 30 days")}</option>
+            <option value="90d">{t("Last 90 days")}</option>
+          </select>
+          {anyFilter ? <button type="button" className="tkt-clear" onClick={() => setFilters({ priority: "all", status: "all", team: "all", assignee: "all", raisedBy: "all", since: "all" })}>{t("Clear")}</button> : null}
         </div>
-        <button type="button" className="tkt-new" onClick={() => setComposerOpen((o) => !o)}><Plus size={15} /> {t("New ticket")}</button>
+        <div className="tkt-controls-right">
+          <div className="tkt-cols">
+            <button type="button" className="tkt-cols-btn" onClick={() => setColsOpen((o) => !o)}><SlidersHorizontal size={14} /> {t("Columns")}</button>
+            {colsOpen ? (
+              <div className="tkt-cols-menu">
+                {TKT_COLUMNS.map((c) => (
+                  <label key={c.key} className={c.locked ? "locked" : ""}>
+                    <input type="checkbox" checked={show(c.key)} disabled={c.locked} onChange={() => toggleCol(c.key)} /> {t(c.label)}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <button type="button" className="tkt-new" onClick={openBlankModal}><Plus size={15} /> {t("New ticket")}</button>
+        </div>
       </div>
 
-      {composerOpen ? (
-        <div className="tkt-composer">
-          <input placeholder={t("Ticket title")} value={newTicket.title} onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })} />
-          <textarea placeholder={t("Describe what needs attention")} value={newTicket.body} onChange={(e) => setNewTicket({ ...newTicket, body: e.target.value })} rows={2} />
-          <div className="tkt-composer-row">
-            <label>{t("Team")}<select value={newTicket.team} onChange={(e) => setNewTicket({ ...newTicket, team: e.target.value })}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
-            <label>{t("Priority")}<select value={newTicket.priority} onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value as TicketPriority })}>{(["Critical", "High", "Medium", "Low"] as TicketPriority[]).map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
-            <button type="button" className="tkt-send" onClick={submitNewTicket}><Send size={14} /> {t("Raise ticket")}</button>
-          </div>
-        </div>
-      ) : null}
+      <div className="tkt-table-wrap">
+        <table className="tkt-table">
+          <thead>
+            <tr>{TKT_COLUMNS.filter((c) => show(c.key)).map((c) => <th key={c.key} className={`col-${c.key}`}>{t(c.label)}</th>)}</tr>
+          </thead>
+          <tbody>
+            {filtered.map((tk) => {
+              const lc = lastComment(tk);
+              return (
+                <tr key={tk.id} className={tk.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(tk.id)}>
+                  {show("priority") ? (
+                    <td className="col-priority" onClick={(e) => e.stopPropagation()}>
+                      <select className={`tkt-inline tone-${ticketPriorityTone(tk.priority)}`} value={tk.priority} onChange={(e) => setTicketPriority(tk.id, e.target.value as TicketPriority)}>
+                        {TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
+                      </select>
+                    </td>
+                  ) : null}
+                  {show("id") ? <td className="col-id">{tk.id}</td> : null}
+                  {show("title") ? <td className="col-title"><strong>{t(tk.title)}</strong></td> : null}
+                  {show("object") ? <td className="col-object">{tk.object ? <TicketObjChip obj={tk.object} t={t} onEscalate={openModalForObject} /> : null}</td> : null}
+                  {show("status") ? (
+                    <td className="col-status" onClick={(e) => e.stopPropagation()}>
+                      <select className={`tkt-inline tone-${ticketStatusTone(tk.status)}`} value={tk.status} onChange={(e) => setTicketStatus(tk.id, e.target.value as TicketStatus)}>
+                        {TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
+                      </select>
+                    </td>
+                  ) : null}
+                  {show("team") ? <td className="col-team">{t(tk.team)}</td> : null}
+                  {show("assignee") ? <td className="col-assignee">{t(tk.assignee)}</td> : null}
+                  {show("raisedBy") ? <td className="col-raisedBy">{t(tk.raisedBy)}</td> : null}
+                  {show("createdAt") ? <td className="col-createdAt">{tk.createdAt}</td> : null}
+                  {show("lastComment") ? <td className="col-lastComment">{lc ? <span className="tkt-lc">{t(lc)}</span> : <span className="tkt-lc muted">-</span>}</td> : null}
+                  {show("updatedAt") ? <td className="col-updatedAt">{tk.updatedAt}</td> : null}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {filtered.length === 0 ? <p className="tkt-empty">{t("No tickets match these filters.")}</p> : null}
+      </div>
 
-      <section className="tkt-workspace" aria-label={t("Tickets")}>
-        <aside className="tkt-list">
-          {filtered.map((tk) => (
-            <button key={tk.id} type="button" className={`tkt-item ${tk.id === selected?.id ? "selected" : ""}`} onClick={() => setSelectedId(tk.id)}>
-              <span className={`lc-dot ${ticketPriorityTone(tk.priority)}`} />
-              <div className="tkt-item-main">
-                <strong>{t(tk.title)}</strong>
-                <small>{tk.id} · {t(tk.team)}{tk.assetId ? ` · ${tk.assetId}` : ""}</small>
-              </div>
-              <span className={`nd-tag ${ticketStatusTone(tk.status)}`}><i />{t(tk.status)}</span>
-            </button>
-          ))}
-          {filtered.length === 0 ? <p className="tkt-empty">{t("No tickets in this view.")}</p> : null}
-        </aside>
+      {selected ? (
+        <aside className="tkt-drawer" role="dialog" aria-label={selected.id}>
+          <header className="tkt-drawer-head">
+            <div>
+              <span className="tkt-drawer-id">{selected.id} · {t(selected.source)}</span>
+              <strong>{t(selected.title)}</strong>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => setSelectedId("")} aria-label={t("Close")}>×</button>
+          </header>
 
-        {selected ? (
-          <div className="tkt-detail">
-            <header className="tkt-detail-head">
-              <div>
-                <strong>{t(selected.title)}</strong>
-                <span>{selected.id} · {t(selected.source)}{selected.assetId ? ` · ${selected.assetId}` : ""}</span>
+          <div className="tkt-drawer-body">
+            <div className="tkt-obj-block">
+              <div className="nd-section-title">{t("Objects")}</div>
+              <div className="tkt-obj-main"><span className="tkt-obj-tag">{t("Main")}</span>{selected.object ? <TicketObjChip obj={selected.object} t={t} onEscalate={openModalForObject} /> : null}</div>
+              {(selected.linkedObjects ?? []).map((o, i) => (
+                <div key={`${o.kind}-${o.ref}-${i}`} className="tkt-obj-linked"><TicketObjChip obj={o} t={t} onEscalate={openModalForObject} /></div>
+              ))}
+              <div className="tkt-obj-add">
+                <select value={addObj.kind} onChange={(e) => setAddObj({ ...addObj, kind: e.target.value as TicketObjectKind })}>{TICKET_OBJECT_KINDS.map((k) => <option key={k} value={k}>{t(k)}</option>)}</select>
+                <input placeholder={t("Reference (e.g. AD-BRG-014)")} value={addObj.ref} onChange={(e) => setAddObj({ ...addObj, ref: e.target.value })} />
+                <button type="button" onClick={submitAddObject} disabled={!addObj.ref.trim()}><Plus size={13} /> {t("Link")}</button>
               </div>
-              <span className={`nd-tag ${ticketStatusTone(selected.status)}`}><i />{t(selected.status)}</span>
-            </header>
-
-            <div className="tkt-meta">
-              <div>
-                <span>{t("Team")}</span>
-                <select value={selected.team} onChange={(e) => setTicketTeam(selected.id, e.target.value)}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select>
-              </div>
-              <div><span>{t("Priority")}</span><strong className={`lc-txt ${ticketPriorityTone(selected.priority)}`}>{t(selected.priority)}</strong></div>
-              <div><span>{t("Raised by")}</span><strong>{t(selected.raisedBy)}</strong></div>
-              <div><span>{t("Opened")}</span><strong>{selected.createdAt}</strong></div>
             </div>
 
+            <div className="tkt-drawer-meta">
+              <label>{t("Criticality")}<select value={selected.priority} onChange={(e) => setTicketPriority(selected.id, e.target.value as TicketPriority)}>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+              <label>{t("Status")}<select value={selected.status} onChange={(e) => setTicketStatus(selected.id, e.target.value as TicketStatus)}>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}</select></label>
+              <label>{t("Team")}<select value={selected.team} onChange={(e) => setTicketTeam(selected.id, e.target.value)}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
+              <label>{t("Assignee")}<select value={selected.assignee} onChange={(e) => setTicketAssignee(selected.id, e.target.value)}>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+            </div>
+
+            <div className="tkt-drawer-sub">{t("Raised by")} {t(selected.raisedBy)} · {t("opened")} {selected.createdAt}</div>
             <p className="tkt-body">{t(selected.body)}</p>
 
-            <div className="tkt-status-actions">
-              {statuses.map((s) => (
-                <button key={s} type="button" className={`tkt-status-btn ${ticketStatusTone(s)} ${selected.status === s ? "active" : ""}`} onClick={() => setTicketStatus(selected.id, s)}>{t(s)}</button>
-              ))}
+            <div className="tkt-drawer-actions">
+              {selected.status !== "Cancelled" ? (
+                <button type="button" className="tkt-cancel" onClick={() => cancelTicket(selected.id)}><X size={14} /> {t("Cancel ticket")}</button>
+              ) : <span className="tkt-cancelled-note">{t("This ticket is cancelled.")}</span>}
             </div>
 
             <div className="tkt-thread">
-              <div className="nd-section-title">{t("Collaboration")}</div>
-              {selected.comments.map((c) => (
-                <div key={c.id} className="tkt-comment">
-                  <div className="tkt-comment-head"><strong>{t(c.author)}</strong><span>{t(c.role)} · {c.at}</span></div>
-                  <p>{t(c.body)}</p>
-                </div>
+              <div className="nd-section-title">{t("History and collaboration")}</div>
+              {(selected.history ?? []).map((h) => (
+                h.kind === "comment" ? (
+                  <div key={h.id} className="tkt-comment">
+                    <div className="tkt-comment-head"><strong>{t(h.actor)}</strong><span>{h.role ? `${t(h.role)} · ` : ""}{h.at}</span></div>
+                    <p>{t(h.body || "")}</p>
+                  </div>
+                ) : (
+                  <div key={h.id} className={`tkt-event ${h.kind}`}>
+                    <span className="tkt-event-dot" />
+                    <span className="tkt-event-text">{t(h.detail || h.kind)}</span>
+                    <span className="tkt-event-meta">{t(h.actor)} · {h.at}</span>
+                  </div>
+                )
               ))}
-              {selected.comments.length === 0 ? <p className="tkt-empty">{t("No comments yet. Start the thread below.")}</p> : null}
               <div className="tkt-reply">
-                <textarea placeholder={t("Add a comment for the team...")} value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} />
-                <button type="button" className="tkt-send" disabled={!draft.trim()} onClick={submitComment}><Send size={14} /> {t("Comment")}</button>
+                <textarea placeholder={t("Add a comment for the team...")} value={reply} onChange={(e) => setReply(e.target.value)} rows={2} />
+                <button type="button" className="tkt-send" disabled={!reply.trim()} onClick={submitReply}><Send size={14} /> {t("Comment")}</button>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="tkt-detail tkt-empty-detail">{t("Select a ticket to collaborate.")}</div>
-        )}
-      </section>
+        </aside>
+      ) : null}
+
+      {modalOpen ? (
+        <div className="tkt-modal-scrim" onClick={() => setModalOpen(false)}>
+          <div className="tkt-modal" role="dialog" aria-label={t("New ticket")} onClick={(e) => e.stopPropagation()}>
+            <header className="tkt-modal-head">
+              <strong>{t("New ticket")}</strong>
+              <button type="button" className="icon-btn" onClick={() => setModalOpen(false)} aria-label={t("Close")}>×</button>
+            </header>
+            <div className="tkt-modal-body">
+              <label className="tkt-field">{t("Title")}<input value={draftTicket.title} onChange={(e) => setDraftTicket({ ...draftTicket, title: e.target.value })} placeholder={t("Short summary")} /></label>
+              <div className="tkt-modal-obj">
+                <label>{t("Main object")}<select value={draftTicket.objectKind} onChange={(e) => setDraftTicket({ ...draftTicket, objectKind: e.target.value as TicketObjectKind })}>{TICKET_OBJECT_KINDS.map((k) => <option key={k} value={k}>{t(k)}</option>)}</select></label>
+                <label>{t("Reference")}<input value={draftTicket.objectRef} onChange={(e) => setDraftTicket({ ...draftTicket, objectRef: e.target.value })} placeholder="AD-BRG-014 / PO / SO" /></label>
+                <label>{t("Label")}<input value={draftTicket.objectLabel} onChange={(e) => setDraftTicket({ ...draftTicket, objectLabel: e.target.value })} placeholder={t("optional")} /></label>
+              </div>
+              <label className="tkt-field">{t("Description")}<textarea value={draftTicket.body} onChange={(e) => setDraftTicket({ ...draftTicket, body: e.target.value })} rows={3} placeholder={t("What needs attention?")} /></label>
+              <div className="tkt-modal-row">
+                <label>{t("Team")}<select value={draftTicket.team} onChange={(e) => setDraftTicket({ ...draftTicket, team: e.target.value })}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
+                <label>{t("Assignee")}<select value={draftTicket.assignee} onChange={(e) => setDraftTicket({ ...draftTicket, assignee: e.target.value })}>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+                <label>{t("Criticality")}<select value={draftTicket.priority} onChange={(e) => setDraftTicket({ ...draftTicket, priority: e.target.value as TicketPriority })}>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+              </div>
+            </div>
+            <footer className="tkt-modal-foot">
+              <button type="button" className="tkt-modal-cancel" onClick={() => setModalOpen(false)}>{t("Cancel")}</button>
+              <button type="button" className="tkt-send" disabled={!draftTicket.title.trim() || !draftTicket.objectRef.trim()} onClick={submitNew}><Send size={14} /> {t("Raise ticket")}</button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </PageBody>
   );
 }
@@ -11222,7 +11392,7 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
   const [loading, setLoading] = useState(false);
   const [pendingActions, setPendingActions] = useState<PendingAgentAction[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", body: "Ask about assets, schedules, submissions, financials or emergencies. Large outputs expand here." },
+    { role: "assistant", body: "Ask about assets, schedules, submissions, financials, tickets or emergencies. Try 'how many tickets are open?' or 'ticket closing evolution'. Large outputs expand here." },
   ]);
 
   useEffect(() => {
@@ -11241,6 +11411,11 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
     setQuery("");
     setLoading(true);
     setMessages((items) => [...items, { role: "user", body: nextQuery }]);
+    if (isTicketQuery(nextQuery)) {
+      setMessages((items) => [...items, { role: "assistant", body: answerTicketQuery(nextQuery) }]);
+      setLoading(false);
+      return;
+    }
     const result = await aiRunMediaGPTAgent({
       message: nextQuery,
       role: profile.id,
