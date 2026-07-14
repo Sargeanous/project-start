@@ -331,7 +331,7 @@ export function ticketMetrics() {
     ? closed.reduce((s, t) => s + (new Date(t.closedAtISO as string).getTime() - new Date(t.createdAtISO).getTime()), 0) / closed.length
     : 0;
   const avgDays = avgMs / 86400000;
-  const avgClosureLabel = closed.length ? (avgDays >= 1 ? `${avgDays.toFixed(1)}d` : `${Math.max(1, Math.round(avgDays * 24))}h`) : "—";
+  const avgClosureLabel = closed.length ? (avgDays >= 1 ? `${avgDays.toFixed(1)}d` : `${Math.max(1, Math.round(avgDays * 24))}h`) : "-";
   return { openedLast14, avgClosureLabel, closedCount: closed.length };
 }
 

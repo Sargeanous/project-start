@@ -5258,7 +5258,7 @@ function SubmissionDetail({
 const CATEGORY_TONE: Record<SubmissionCategory, Tone> = { routine: "neutral", sensitive: "warn", "high-impact": "danger" };
 
 function hashPrefix(hash: string) {
-  return hash && hash !== "seed" ? `${hash.slice(0, 10)}…` : "—";
+  return hash && hash !== "seed" ? `${hash.slice(0, 10)}…` : "-";
 }
 
 function SubmissionJournal({ submission, t }: { submission: Submission; t: (value: string) => string }) {
@@ -6895,7 +6895,7 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
             <div>
               <strong>{t("AI build monitor")}</strong>
               {atRisk.length ? (
-                <p><b>{atRisk.length}</b> {t("builds need attention.")} {t(atRisk[0].r.name)} — {t(atRisk[0].risk.mitigation)}</p>
+                <p><b>{atRisk.length}</b> {t("builds need attention.")} {t(atRisk[0].r.name)} · {t(atRisk[0].risk.mitigation)}</p>
               ) : (
                 <p>{t("All active builds are tracking to plan.")}</p>
               )}
