@@ -566,6 +566,29 @@ export function zoneFromPoint(lat: number, lng: number): PlanningZone {
   };
 }
 
+/** Turn a pinned live-probe zone into a candidate site, so a promising ad-hoc
+ *  point flows into the Plan -> Build pipeline (Candidate sites -> Promote to
+ *  build). Projections are deterministic from the probed zone profile, same
+ *  advisor logic as the rest of planning. */
+export function candidateFromProbe(zone: PlanningZone, seq: number): CandidateSite {
+  const m = zoneMetrics(zone);
+  const s = zoneSuggestion(zone);
+  const weeklyFootfall = zone.demographics.dailyFootfall * 7;
+  const reach = Math.round((weeklyFootfall * (0.24 + m.match / 500)) / 1000) * 1000;
+  const impressions = Math.round((weeklyFootfall * (3.2 + m.score / 45)) / 10_000) * 10_000;
+  const capex = Math.round(((1.4 + (100 - m.availability) / 60 + m.score / 120) * 1_000_000) / 50_000) * 50_000;
+  return {
+    code: `SITE-LP${String(seq).padStart(2, "0")}`,
+    name: `Pinned site ${zone.center.lat.toFixed(3)}, ${zone.center.lng.toFixed(3)}`,
+    format: s.formats[0]?.label ?? "Large-format digital",
+    projectedReachWeekly: reach,
+    projectedImpressions: impressions,
+    estCapexAed: capex,
+    fit: m.score,
+    status: "Proposed",
+  };
+}
+
 /* ========================= CONSTRUCTION ========================= */
 
 export interface BuildPhase {

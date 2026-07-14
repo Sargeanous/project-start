@@ -104,6 +104,7 @@ import {
 import { creativeBackground, feedBackground, LiveMap, RadiusMap, ConstructionMap, PlanningZoneMap } from "./visuals";
 import {
   BUILD_PHASES,
+  candidateFromProbe,
   constructionRecords,
   constructionSummary,
   coverageGaps,
@@ -113,6 +114,7 @@ import {
   zoneFromPoint,
   zoneMetrics,
   zoneSuggestion,
+  type CandidateSite,
   type ConstructionRecord,
   type PlanningZone,
 } from "./lifecycle-data";
@@ -6569,6 +6571,7 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
   const [promoted, setPromoted] = useState<string[]>([]);
   const [pinMode, setPinMode] = useState(false);
   const [probePoint, setProbePoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [savedSites, setSavedSites] = useState<Array<{ zone: PlanningZone; c: CandidateSite }>>([]);
 
   const selectedZone: PlanningZone = planningZones.find((z) => z.id === selectedZoneId) ?? planningZones[0];
   const probeZone = probePoint ? zoneFromPoint(probePoint.lat, probePoint.lng) : null;
@@ -6577,8 +6580,17 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
   const suggestion = zoneSuggestion(detailZone);
   const hoverZone = hoveredZoneId ? planningZones.find((z) => z.id === hoveredZoneId) : null;
 
-  const candidateCount = planningZones.reduce((s, z) => s + z.candidateSites.length, 0);
-  const netNewReach = planningZones.reduce((s, z) => s + z.candidateSites.reduce((a, c) => a + c.projectedReachWeekly, 0), 0);
+  const probeSaved = detailZone.id === "PROBE" && savedSites.some(
+    (sv) => sv.zone.center.lat === detailZone.center.lat && sv.zone.center.lng === detailZone.center.lng,
+  );
+  const saveProbe = () => {
+    if (detailZone.id !== "PROBE" || probeSaved) return;
+    setSavedSites((prev) => [...prev, { zone: detailZone, c: candidateFromProbe(detailZone, prev.length + 1) }]);
+  };
+
+  const candidateCount = planningZones.reduce((s, z) => s + z.candidateSites.length, 0) + savedSites.length;
+  const netNewReach = planningZones.reduce((s, z) => s + z.candidateSites.reduce((a, c) => a + c.projectedReachWeekly, 0), 0)
+    + savedSites.reduce((a, sv) => a + sv.c.projectedReachWeekly, 0);
   const avgScore = Math.round(planningZones.reduce((s, z) => s + zoneMetrics(z).score, 0) / planningZones.length);
 
   const kpis = [
@@ -6600,9 +6612,10 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
     [t],
   );
   const gaps = coverageGaps();
-  const allCandidates = planningZones
-    .flatMap((z) => z.candidateSites.map((c) => ({ zone: z, c })))
-    .sort((a, b) => b.c.fit - a.c.fit);
+  const allCandidates = [
+    ...planningZones.flatMap((z) => z.candidateSites.map((c) => ({ zone: z, c }))),
+    ...savedSites,
+  ].sort((a, b) => b.c.fit - a.c.fit);
 
   return (
     <PageBody>
@@ -6672,7 +6685,12 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
 
           <aside className="plan-detail">
             {detailZone.id === "PROBE" ? (
-              <div className="plan-live-note"><span className="plan-live-dot" />{t("Live probe. Estimated from the DMT digital twin model; real-time once the twin is connected.")}</div>
+              <div className="plan-live">
+                <div className="plan-live-note"><span className="plan-live-dot" />{t("Live probe. Estimated from the DMT digital twin model; real-time once the twin is connected.")}</div>
+                <button type="button" className={`plan-save-cand ${probeSaved ? "done" : ""}`} disabled={probeSaved} onClick={saveProbe}>
+                  {probeSaved ? <><CheckCircle2 size={14} />{t("Saved to candidate sites")}</> : <><Target size={14} />{t("Save as candidate site")}</>}
+                </button>
+              </div>
             ) : null}
             <header className="plan-detail-head">
               <div><strong>{t(detailZone.name)}</strong><span>{t(detailZone.district)} · {detailZone.areaSqKm} km²</span></div>
@@ -6747,7 +6765,7 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
                   <span>{t("fit")}</span>
                 </div>
                 <div className="plan-cand-main">
-                  <strong>{t(c.name)}</strong>
+                  <strong>{t(c.name)}{zone.id === "PROBE" ? <span className="plan-cand-pin"><MapPinned size={11} />{t("Live pin")}</span> : null}</strong>
                   <small>{c.code} · {t(zone.name)} · {t(c.format)}</small>
                   <div className="plan-cand-metrics">
                     <span><Users size={13} />{(c.projectedReachWeekly / 1000).toFixed(0)}k {t("weekly reach")}</span>
