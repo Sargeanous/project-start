@@ -12708,7 +12708,7 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 .cons-tbl-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .cons-tbl-count { font-size: 11px; font-weight: 600; color: var(--muted); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: 999px; padding: 1px 9px; margin-inline-start: 4px; }
 .cons-tbl-filters { display: flex; gap: 6px; }
-.cons-tbl-filters select { padding: 4px 8px; border: 1px solid var(--ctrl-border); border-radius: 7px; background: var(--surface-input); color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer; }
+.cons-tbl-filters select { width: auto; min-width: 118px; max-width: 168px; padding: 4px 8px; border: 1px solid var(--ctrl-border); border-radius: 7px; background: var(--surface-input); color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer; }
 .cons-tbl-filters select:hover { color: var(--ink); border-color: var(--line-strong); }
 .cons-tbl-wrap { border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
 .cons-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -12799,6 +12799,7 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 .tkt-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .tkt-filters { display: flex; flex-wrap: wrap; gap: 6px; }
 .tkt-filters select {
+  width: auto; min-width: 118px; max-width: 168px;
   padding: 4px 8px; border: 1px solid var(--ctrl-border); border-radius: 7px;
   background: var(--surface-input); color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer;
 }
