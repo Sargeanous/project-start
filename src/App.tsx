@@ -84,6 +84,7 @@ import {
   Users,
   TrendingUp,
   Footprints,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -114,6 +115,18 @@ import {
   type ConstructionRecord,
   type PlanningZone,
 } from "./lifecycle-data";
+import {
+  useTickets,
+  createTicket,
+  addTicketComment,
+  setTicketStatus,
+  setTicketTeam,
+  ticketSummary,
+  TICKET_TEAMS,
+  type Ticket as TicketRecord,
+  type TicketStatus,
+  type TicketPriority,
+} from "./tickets-data";
 import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
 import { distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
 import {
@@ -194,7 +207,8 @@ type Page =
   | "campaigns"
   | "marketplace"
   | "planning"
-  | "construction";
+  | "construction"
+  | "tickets";
 
 type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
 type Lang = "en" | "ar";
@@ -543,7 +557,7 @@ const profiles: Profile[] = [
     name: "ADMO Control Room",
     role: "Operations operator",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "alerts", "network", "planning", "construction", "mediagpt", "radiusBroadcast", "yieldAdvisor"],
+    pages: ["control", "alerts", "network", "planning", "construction", "tickets", "mediagpt", "radiusBroadcast", "yieldAdvisor"],
   },
   {
     id: "reviewer",
@@ -564,14 +578,14 @@ const profiles: Profile[] = [
     name: "Platform Admin",
     role: "Platform governance",
     organization: "Abu Dhabi Media Office",
-    pages: ["control", "cms", "alerts", "network", "planning", "construction", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["control", "cms", "alerts", "network", "planning", "construction", "tickets", "financials", "allocations", "reports", "mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "technical",
     name: "Technical Platform Owner",
     role: "Technical layers",
     organization: "Abu Dhabi Media Office",
-    pages: ["mediagpt", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
+    pages: ["mediagpt", "tickets", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
   {
     id: "bidder",
@@ -607,6 +621,7 @@ const navItems: Record<Page, NavItem> = {
   marketplace: { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
   planning: { id: "planning", label: "Planning", icon: Compass },
   construction: { id: "construction", label: "Construction", icon: HardHat },
+  tickets: { id: "tickets", label: "Tickets", icon: Ticket },
 };
 
 const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; label: string; helper: string }> = [
@@ -627,6 +642,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "marketplace", label: "Marketplace", helper: "Bid lots, bids, and auction changes" },
   { key: "planning", label: "Planning", helper: "Zone demand, site opportunities, and placement recommendations" },
   { key: "construction", label: "Construction", helper: "Build progress, work orders, procurement, and delays" },
+  { key: "tickets", label: "Tickets", helper: "Escalations, team collaboration, and status changes" },
   { key: "skillsCatalogue", label: "Skills Catalogue", helper: "MediaGPT skill coverage changes" },
   { key: "skillWorkflows", label: "Skill Workflows", helper: "Workflow design and approval updates" },
   { key: "skillRuns", label: "Skill Runs", helper: "Agent run completion and failures" },
@@ -644,7 +660,7 @@ const defaultNotificationPreferences = notificationPreferenceOptions.reduce((pre
 
 const navGroups: NavGroup[] = [
   { label: "Operational", pages: ["control", "cms", "alerts", "network", "financials", "allocations", "reports"] },
-  { label: "Project lifecycle", pages: ["planning", "construction"] },
+  { label: "Project lifecycle", pages: ["planning", "construction", "tickets"] },
   { label: "Intelligence / Agentic", pages: ["mediagpt", "radiusBroadcast", "yieldAdvisor", "knowledge"] },
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
@@ -3323,6 +3339,7 @@ function App() {
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "planning" && <PlanningPage t={t} />}
           {page === "construction" && <ConstructionPage t={t} />}
+          {page === "tickets" && <TicketsPage t={t} />}
         </main>
         <MediaGptChatbot profile={profile} t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
@@ -6747,6 +6764,7 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
   const [consTab, setConsTab] = useState<"programme" | "tracker" | "procurement">("programme");
   const [selectedBuildId, setSelectedBuildId] = useState(constructionRecords[0].id);
   const [dossierId, setDossierId] = useState<string | null>(null);
+  const [escalated, setEscalated] = useState<string[]>([]);
 
   const summary = constructionSummary();
   const selectedBuild: ConstructionRecord = constructionRecords.find((r) => r.id === selectedBuildId) ?? constructionRecords[0];
@@ -6775,6 +6793,21 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
   const awaited = constructionRecords.flatMap((r) => r.bom.filter((l) => l.qtyReceived < l.qtyRequired && l.leadTimeDays >= 21).map((l) => ({ r, l })));
 
   function openDossier(id: string) { setSelectedBuildId(id); setDossierId(id); }
+
+  const escalateOwner = selectedBuild.blockers[0]?.owner?.split(" - ")[0] || "Maintenance planning";
+  function escalateBuild() {
+    const priority: TicketPriority = selectedRisk.level === "High" ? "Critical" : selectedRisk.level === "Medium" ? "High" : "Medium";
+    createTicket({
+      title: `${selectedBuild.name}: ${selectedBuild.blockers[0]?.title ?? "delay risk"}`,
+      body: `${selectedRisk.mitigation} (Auto-raised from the construction delay-risk monitor. Drivers: ${selectedRisk.drivers.join("; ") || "schedule variance"}.)`,
+      team: escalateOwner,
+      priority,
+      source: "Delay risk",
+      assetId: selectedBuild.assetId,
+      raisedBy: selectedBuild.projectManager,
+    });
+    setEscalated((e) => [...e, selectedBuild.id]);
+  }
 
   return (
     <PageBody>
@@ -6910,6 +6943,13 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
                 <p>{t("No risk drivers detected.")}</p>
               )}
               <div className="cons-mitigation"><strong>{t("Recommended action")}</strong><p>{t(selectedRisk.mitigation)}</p></div>
+              {selectedRisk.level !== "Low" ? (
+                escalated.includes(selectedBuild.id) ? (
+                  <div className="cons-escalated"><CheckCircle2 size={14} /> {t("Escalated to")} {t(escalateOwner)} · {t("open in Tickets")}</div>
+                ) : (
+                  <button type="button" className="cons-escalate" onClick={escalateBuild}><Ticket size={14} /> {t("Escalate to")} {t(escalateOwner)}</button>
+                )
+              ) : null}
             </div>
 
             <div className="cons-section">
@@ -7014,6 +7054,156 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
           </div>
         </section>
       ) : null}
+    </PageBody>
+  );
+}
+
+function ticketPriorityTone(p: TicketPriority): string {
+  return p === "Critical" ? "danger" : p === "High" ? "warn" : p === "Medium" ? "info" : "neutral";
+}
+function ticketStatusTone(s: TicketStatus): string {
+  return s === "Resolved" ? "good" : s === "Blocked" ? "danger" : s === "In progress" ? "info" : "warn";
+}
+
+function TicketsPage({ t }: { t: (value: string) => string }) {
+  const tickets = useTickets();
+  const [filter, setFilter] = useState<"all" | TicketStatus>("all");
+  const [selectedId, setSelectedId] = useState<string>(tickets[0]?.id ?? "");
+  const [draft, setDraft] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [newTicket, setNewTicket] = useState<{ title: string; body: string; team: string; priority: TicketPriority }>({ title: "", body: "", team: TICKET_TEAMS[0], priority: "Medium" });
+
+  const summary = ticketSummary();
+  const filtered = filter === "all" ? tickets : tickets.filter((tk) => tk.status === filter);
+  const selected: TicketRecord | null = tickets.find((tk) => tk.id === selectedId) ?? filtered[0] ?? tickets[0] ?? null;
+
+  const kpis = [
+    { icon: Ticket, value: String(summary.total), label: "Total tickets" },
+    { icon: Zap, value: String(summary.open + summary.inProgress), label: "Open and in progress" },
+    { icon: AlertTriangle, value: String(summary.blocked), label: "Blocked" },
+    { icon: CheckCircle2, value: String(summary.resolved), label: "Resolved" },
+  ];
+  const filters: Array<{ id: "all" | TicketStatus; label: string }> = [
+    { id: "all", label: "All" },
+    { id: "Open", label: "Open" },
+    { id: "In progress", label: "In progress" },
+    { id: "Blocked", label: "Blocked" },
+    { id: "Resolved", label: "Resolved" },
+  ];
+  const statuses: TicketStatus[] = ["Open", "In progress", "Blocked", "Resolved"];
+
+  function submitComment() {
+    if (!selected || !draft.trim()) return;
+    addTicketComment(selected.id, draft);
+    setDraft("");
+  }
+  function submitNewTicket() {
+    if (!newTicket.title.trim()) return;
+    const created = createTicket({ title: newTicket.title, body: newTicket.body, team: newTicket.team, priority: newTicket.priority, source: "Manual", raisedBy: "Control room" });
+    setComposerOpen(false);
+    setNewTicket({ title: "", body: "", team: TICKET_TEAMS[0], priority: "Medium" });
+    setSelectedId(created.id);
+  }
+
+  return (
+    <PageBody>
+      <div className="nd-kpis">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} className="nd-kpi">
+              <span className="nd-kpi-icon"><Icon size={30} strokeWidth={1.5} /></span>
+              <div className="nd-kpi-body"><strong>{kpi.value}</strong><span>{t(kpi.label)}</span></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="tkt-toolbar">
+        <div className="nd-tabs" role="tablist" aria-label={t("Filter tickets")}>
+          {filters.map((f) => (
+            <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`nd-tab ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
+              <span>{t(f.label)}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="tkt-new" onClick={() => setComposerOpen((o) => !o)}><Plus size={15} /> {t("New ticket")}</button>
+      </div>
+
+      {composerOpen ? (
+        <div className="tkt-composer">
+          <input placeholder={t("Ticket title")} value={newTicket.title} onChange={(e) => setNewTicket({ ...newTicket, title: e.target.value })} />
+          <textarea placeholder={t("Describe what needs attention")} value={newTicket.body} onChange={(e) => setNewTicket({ ...newTicket, body: e.target.value })} rows={2} />
+          <div className="tkt-composer-row">
+            <label>{t("Team")}<select value={newTicket.team} onChange={(e) => setNewTicket({ ...newTicket, team: e.target.value })}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
+            <label>{t("Priority")}<select value={newTicket.priority} onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value as TicketPriority })}>{(["Critical", "High", "Medium", "Low"] as TicketPriority[]).map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+            <button type="button" className="tkt-send" onClick={submitNewTicket}><Send size={14} /> {t("Raise ticket")}</button>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="tkt-workspace" aria-label={t("Tickets")}>
+        <aside className="tkt-list">
+          {filtered.map((tk) => (
+            <button key={tk.id} type="button" className={`tkt-item ${tk.id === selected?.id ? "selected" : ""}`} onClick={() => setSelectedId(tk.id)}>
+              <span className={`lc-dot ${ticketPriorityTone(tk.priority)}`} />
+              <div className="tkt-item-main">
+                <strong>{t(tk.title)}</strong>
+                <small>{tk.id} · {t(tk.team)}{tk.assetId ? ` · ${tk.assetId}` : ""}</small>
+              </div>
+              <span className={`nd-tag ${ticketStatusTone(tk.status)}`}><i />{t(tk.status)}</span>
+            </button>
+          ))}
+          {filtered.length === 0 ? <p className="tkt-empty">{t("No tickets in this view.")}</p> : null}
+        </aside>
+
+        {selected ? (
+          <div className="tkt-detail">
+            <header className="tkt-detail-head">
+              <div>
+                <strong>{t(selected.title)}</strong>
+                <span>{selected.id} · {t(selected.source)}{selected.assetId ? ` · ${selected.assetId}` : ""}</span>
+              </div>
+              <span className={`nd-tag ${ticketStatusTone(selected.status)}`}><i />{t(selected.status)}</span>
+            </header>
+
+            <div className="tkt-meta">
+              <div>
+                <span>{t("Team")}</span>
+                <select value={selected.team} onChange={(e) => setTicketTeam(selected.id, e.target.value)}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select>
+              </div>
+              <div><span>{t("Priority")}</span><strong className={`lc-txt ${ticketPriorityTone(selected.priority)}`}>{t(selected.priority)}</strong></div>
+              <div><span>{t("Raised by")}</span><strong>{t(selected.raisedBy)}</strong></div>
+              <div><span>{t("Opened")}</span><strong>{selected.createdAt}</strong></div>
+            </div>
+
+            <p className="tkt-body">{t(selected.body)}</p>
+
+            <div className="tkt-status-actions">
+              {statuses.map((s) => (
+                <button key={s} type="button" className={`tkt-status-btn ${ticketStatusTone(s)} ${selected.status === s ? "active" : ""}`} onClick={() => setTicketStatus(selected.id, s)}>{t(s)}</button>
+              ))}
+            </div>
+
+            <div className="tkt-thread">
+              <div className="nd-section-title">{t("Collaboration")}</div>
+              {selected.comments.map((c) => (
+                <div key={c.id} className="tkt-comment">
+                  <div className="tkt-comment-head"><strong>{t(c.author)}</strong><span>{t(c.role)} · {c.at}</span></div>
+                  <p>{t(c.body)}</p>
+                </div>
+              ))}
+              {selected.comments.length === 0 ? <p className="tkt-empty">{t("No comments yet. Start the thread below.")}</p> : null}
+              <div className="tkt-reply">
+                <textarea placeholder={t("Add a comment for the team...")} value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} />
+                <button type="button" className="tkt-send" disabled={!draft.trim()} onClick={submitComment}><Send size={14} /> {t("Comment")}</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="tkt-detail tkt-empty-detail">{t("Select a ticket to collaborate.")}</div>
+        )}
+      </section>
     </PageBody>
   );
 }
