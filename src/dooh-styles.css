@@ -8943,20 +8943,16 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
 .maintenance-kanban .maintenance-task-card {
   position: relative;
   display: grid;
-  gap: 10px;
-  min-height: 132px;
-  padding: 14px 14px 13px;
+  gap: 8px;
+  padding: 13px 14px;
   border: 1px solid var(--line);
-  border-inline-start-width: 4px;
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, #fff 4%), var(--surface-input));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  border-inline-start-width: 3px;
+  border-radius: 10px;
+  background: var(--surface);
 }
 
 .maintenance-kanban .maintenance-task-card:hover {
-  border-color: color-mix(in srgb, var(--primary) 32%, var(--line));
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--line));
 }
 
 .maintenance-card-top {
@@ -8970,69 +8966,74 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
 .maintenance-id {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 850;
+  min-height: 22px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1;
 }
 
 .maintenance-severity {
-  padding: 0 9px;
+  padding: 0 8px;
 }
 
 .maintenance-id {
   padding: 0 8px;
-  background: color-mix(in srgb, var(--surface-3) 78%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-color: var(--line-strong);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .maintenance-task-card h3 {
   margin: 0;
   color: var(--ink);
   font-size: 15px;
-  font-weight: 760;
+  font-weight: 650;
   line-height: 1.28;
 }
 
 .maintenance-task-card p {
-  margin: -2px 0 0;
+  margin: -1px 0 0;
   color: var(--muted);
   font-size: 12.5px;
-  font-weight: 560;
+  font-weight: 500;
   line-height: 1.35;
 }
 
 .maintenance-task-card dl {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 2px 0 0;
+  gap: 4px 18px;
+  margin: 4px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--ctrl-border-dim);
 }
 
 .maintenance-task-card dl div {
   min-width: 0;
-  padding: 8px 9px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .maintenance-task-card dt {
-  margin: 0 0 4px;
+  margin: 0;
   color: var(--muted);
-  font-size: 9.5px;
-  font-weight: 850;
-  letter-spacing: 0.07em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .maintenance-task-card dd {
   margin: 0;
   color: var(--ink);
-  font-size: 12px;
-  font-weight: 720;
-  line-height: 1.25;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .maintenance-task-card.severity-critical,
@@ -9054,19 +9055,22 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
 
 .maintenance-task-card.severity-critical .maintenance-severity,
 .maintenance-task-card.severity-overdue .maintenance-severity {
-  background: var(--red-soft);
-  color: var(--red);
+  background: color-mix(in srgb, var(--tag-danger-bd) 13%, transparent);
+  border-color: color-mix(in srgb, var(--tag-danger-bd) 40%, transparent);
+  color: var(--tag-danger-ink);
 }
 
 .maintenance-task-card.severity-high .maintenance-severity,
 .maintenance-task-card.severity-medium .maintenance-severity {
-  background: var(--amber-soft);
-  color: var(--amber);
+  background: color-mix(in srgb, var(--tag-warn-bd) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tag-warn-bd) 40%, transparent);
+  color: var(--tag-warn-ink);
 }
 
 .maintenance-task-card.severity-low .maintenance-severity {
-  background: var(--primary-soft);
-  color: var(--primary-dark);
+  background: color-mix(in srgb, var(--tag-good-bd) 13%, transparent);
+  border-color: color-mix(in srgb, var(--tag-good-bd) 40%, transparent);
+  color: var(--tag-good-ink);
 }
 
 /* --- Theme 3 + 5: selection = green fill-tint only, no bar/glow --- */
