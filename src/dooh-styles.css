@@ -6875,26 +6875,31 @@ html[dir="rtl"] .network-tabs button.active {
 }
 
 .twin-window-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   margin-top: 10px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-  font-size: 10.5px;
-  font-weight: 850;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--tag-good-bd) 13%, transparent);
+  border-color: color-mix(in srgb, var(--tag-good-bd) 40%, transparent);
+  color: var(--tag-good-ink);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .twin-window-badge.tone-fault {
-  background: var(--red-soft);
-  color: var(--red);
+  background: color-mix(in srgb, var(--tag-danger-bd) 13%, transparent);
+  border-color: color-mix(in srgb, var(--tag-danger-bd) 40%, transparent);
+  color: var(--tag-danger-ink);
 }
 
 .twin-window-badge.tone-degrading {
-  background: var(--amber-soft);
-  color: var(--amber);
+  background: color-mix(in srgb, var(--tag-warn-bd) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tag-warn-bd) 40%, transparent);
+  color: var(--tag-warn-ink);
 }
 
 .twin-window-detail {
@@ -6917,13 +6922,33 @@ html[dir="rtl"] .network-tabs button.active {
 
 .twin-window-action span {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   color: var(--muted);
-  font-size: 9.5px;
-  font-weight: 850;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+
+.twin-window-action p {
+  margin: 0;
+}
+
+.twin-window-dispatch {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.twin-window-dispatch:hover { background: var(--primary-dark); }
 
 .twin-window-id {
   display: block;
@@ -7077,15 +7102,16 @@ html[dir="rtl"] .network-tabs button.active {
 
 .twin-issue em {
   flex: 0 0 auto;
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-2);
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink-2);
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .twin-issue:hover,
@@ -8679,12 +8705,12 @@ html[data-theme="light"] .network-tabs button:hover { background: rgba(2, 32, 21
   background: transparent !important;
   box-shadow: none;
   overflow: visible;
-  color: #0090ff;
+  color: var(--ink-2);
 }
 
 .notification-trigger:hover {
   background: transparent !important;
-  color: #007fe6;
+  color: var(--ink);
 }
 
 .notification-bell-icon {

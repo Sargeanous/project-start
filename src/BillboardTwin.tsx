@@ -29,6 +29,8 @@ export type BillboardTwinProps = {
   focusPart?: string | null;
   // Controlled explode value (0..1) driven from outside (e.g. the panel gauge).
   explodeOverride?: number | null;
+  // Act on a fault straight from the part popup (e.g. raise a service order).
+  onDispatch?: (fault: { title: string; part: string; action: string; code: string; family?: string; state: "fault" | "degrading" }) => void;
 };
 
 const BOARD_TECH_STACK = [
@@ -337,7 +339,7 @@ function Billboard({
   );
 }
 
-export default function BillboardTwin({ variant = "embedded", focusPart = null, explodeOverride = null }: BillboardTwinProps) {
+export default function BillboardTwin({ variant = "embedded", focusPart = null, explodeOverride = null, onDispatch }: BillboardTwinProps) {
   const [explodeState, setExplodeState] = useState(0);
   const explode = explodeOverride != null ? explodeOverride : explodeState;
   const [hover, setHover] = useState<Hover | null>(null);
@@ -382,7 +384,7 @@ export default function BillboardTwin({ variant = "embedded", focusPart = null, 
   // Focus a part when a parent (e.g. the Active issues panel) requests it.
   // Poll for the scene so it lands even if the model is still loading at click.
   useEffect(() => {
-    if (!focusPart) return;
+    if (!focusPart) { setSel(null); return; }
     const idx = focusPart.indexOf(":");
     if (idx < 0) return;
     const code = focusPart.slice(0, idx);
@@ -480,7 +482,16 @@ export default function BillboardTwin({ variant = "embedded", focusPart = null, 
             {info.fault ? (
               <div className="twin-window-action">
                 <span>Recommended</span>
-                {info.fault.action}
+                <p>{info.fault.action}</p>
+                {onDispatch ? (
+                  <button
+                    type="button"
+                    className="twin-window-dispatch"
+                    onClick={() => onDispatch({ title: info.fault!.title, part: info.fault!.part, action: info.fault!.action, code: info.code, family: info.family ?? undefined, state: info.fault!.state })}
+                  >
+                    Dispatch technician
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <code className="twin-window-id">{info.id}</code>

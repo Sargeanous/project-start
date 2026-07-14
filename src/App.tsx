@@ -7137,6 +7137,21 @@ function NetworkPage({
     }
   }
 
+  // Raise a service order straight from the 3D twin fault popup.
+  async function dispatchFromTwin(fault: { title: string; part: string; action: string; code: string; family?: string; state: "fault" | "degrading" }) {
+    const severity: ServiceOrder["severity"] = fault.state === "fault" ? "Critical" : "High";
+    const created = await onCreateServiceOrder({
+      assetId: selected.id,
+      assetName: selected.name,
+      componentId: fault.code,
+      title: fault.title,
+      severity,
+      summary: `${fault.part} (${fault.code}): ${fault.action}`,
+      partsNeeded: [],
+    });
+    if (created) setNetworkTab("maintenanceWorkbench");
+  }
+
   async function createPurchaseOrderFromIssue(linkedServiceOrder?: ServiceOrder) {
     const created = await onCreatePurchaseOrder({
       assetId: selected.id,
@@ -7250,7 +7265,7 @@ function NetworkPage({
 
               <div className="nd-stage-clip">
                 <div className="nd-stage-scale" style={{ transform: `scale(${twinZoom})` }}>
-                  <ClientOnlyBillboardTwin variant="stage" focusPart={focusPart} explodeOverride={twinExplode} />
+                  <ClientOnlyBillboardTwin variant="stage" focusPart={focusPart} explodeOverride={twinExplode} onDispatch={dispatchFromTwin} />
                 </div>
               </div>
 
