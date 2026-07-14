@@ -6559,7 +6559,12 @@ function PlanningPage({ t }: { t: (value: string) => string }) {
     { id: "coverage", label: "Demand & coverage", icon: Layers3 },
   ] as const;
 
-  const zoneShapes = planningZones.map((z) => ({ id: z.id, name: t(z.name), score: zoneMetrics(z).score, center: z.center, polygon: z.polygon }));
+  // Memoized so hover/selection re-renders don't hand the map a new array
+  // reference (which would tear down and rebuild the whole Leaflet map -> flicker).
+  const zoneShapes = useMemo(
+    () => planningZones.map((z) => ({ id: z.id, name: t(z.name), score: zoneMetrics(z).score, center: z.center, polygon: z.polygon })),
+    [t],
+  );
   const gaps = coverageGaps();
   const allCandidates = planningZones
     .flatMap((z) => z.candidateSites.map((c) => ({ zone: z, c })))
@@ -6760,7 +6765,11 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
     { id: "procurement", label: "Procurement & BOM", icon: Package },
   ] as const;
 
-  const mapAssets = constructionRecords.map((r) => ({ id: r.id, name: t(r.name), lat: r.lat, lng: r.lng, progress: r.progress, level: delayRisk(r).level }));
+  // Memoized so selecting a build / opening the dossier doesn't rebuild the map.
+  const mapAssets = useMemo(
+    () => constructionRecords.map((r) => ({ id: r.id, name: t(r.name), lat: r.lat, lng: r.lng, progress: r.progress, level: delayRisk(r).level })),
+    [t],
+  );
   const atRisk = constructionRecords.map((r) => ({ r, risk: delayRisk(r) })).filter((x) => x.risk.level !== "Low").sort((a, b) => b.risk.score - a.risk.score);
   const allPOs = constructionRecords.flatMap((r) => r.purchaseOrders.map((po) => ({ r, po })));
   const awaited = constructionRecords.flatMap((r) => r.bom.filter((l) => l.qtyReceived < l.qtyRequired && l.leadTimeDays >= 21).map((l) => ({ r, l })));
