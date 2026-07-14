@@ -4372,6 +4372,7 @@ function ControlCentre({
   const fleetOnline = estateAssets.filter((asset) => asset.status !== "Offline").length;
   const queued = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled");
   const headlineTicket = tickets.find((ticket) => ticket.status !== "Resolved") ?? null;
+  const headlineAlert = alerts.find((alert) => alert.severity === "Critical" && alert.status === "Open" && alert.assetId !== headlineTicket?.asset) ?? null;
   const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? null;
 
   // Popover facts for the selected screen.
@@ -4488,6 +4489,17 @@ function ControlCentre({
               <small className="cc-toast-time">12 {t("min ago")}</small>
             </div>
             <button type="button" className="cc-handle" onClick={goToNetwork}>{t("Handle")}</button>
+          </div>
+        ) : null}
+        {headlineAlert && !toastDismissed ? (
+          <div className="cc-toast" role="status">
+            <span className="cc-toast-glyph-box"><img src="/icons/alert-bell.png" alt="" /></span>
+            <div>
+              <strong>{t(headlineAlert.title)}</strong>
+              <small>{headlineAlert.assetId} • {t(estateAssets.find((asset) => asset.id === headlineAlert.assetId)?.name ?? headlineAlert.zone)}</small>
+              <small className="cc-toast-time">26 {t("min ago")}</small>
+            </div>
+            <button type="button" className="cc-handle" onClick={goToAlerts}>{t("Handle")}</button>
           </div>
         ) : null}
         <div className="cc-more">
