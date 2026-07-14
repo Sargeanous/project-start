@@ -8390,17 +8390,19 @@ html[data-theme="light"] {
    pad 2/8, gap 4, tinted fill + semantic border + semantic text) ---- */
 .status-pill, .status-pill.tone-good, .status-pill.tone-warn, .status-pill.tone-danger,
 .status-pill.tone-info, .status-pill.tone-neutral {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: 2px;
-  font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 5px; min-height: 22px;
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em;
   text-transform: none; border: 1px solid transparent;
 }
-.status-pill::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex: none; }
-.status-pill.tone-good  { background: var(--tag-good-bg);  border-color: var(--tag-good-bd);  color: var(--tag-good-ink); }
-.status-pill.tone-warn  { background: var(--tag-warn-bg);  border-color: var(--tag-warn-bd);  color: var(--tag-warn-ink); }
-.status-pill.tone-danger{ background: var(--tag-danger-bg);border-color: var(--tag-danger-bd);color: var(--tag-danger-ink); }
-.status-pill.tone-info  { background: var(--tag-info-bg);  border-color: var(--tag-info-bd);  color: var(--tag-info-ink); }
-.status-pill.tone-neutral{background: var(--tag-idle-bg);  border-color: var(--tag-idle-bd);  color: var(--tag-idle-ink); }
+.status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+/* Softer, uniform chips: light same-hue fill + a hairline (not a loud
+   saturated ring) + semantic text. Reads more refined than a bordered box. */
+.status-pill.tone-good  { background: color-mix(in srgb, var(--tag-good-bd) 13%, transparent);   border-color: color-mix(in srgb, var(--tag-good-bd) 40%, transparent);   color: var(--tag-good-ink); }
+.status-pill.tone-warn  { background: color-mix(in srgb, var(--tag-warn-bd) 14%, transparent);   border-color: color-mix(in srgb, var(--tag-warn-bd) 40%, transparent);   color: var(--tag-warn-ink); }
+.status-pill.tone-danger{ background: color-mix(in srgb, var(--tag-danger-bd) 13%, transparent); border-color: color-mix(in srgb, var(--tag-danger-bd) 40%, transparent); color: var(--tag-danger-ink); }
+.status-pill.tone-info  { background: color-mix(in srgb, var(--tag-info-bd) 13%, transparent);   border-color: color-mix(in srgb, var(--tag-info-bd) 40%, transparent);   color: var(--tag-info-ink); }
+.status-pill.tone-neutral{background: color-mix(in srgb, var(--ink) 6%, transparent);            border-color: var(--line-strong);                                       color: var(--ink-2); }
 
 /* ---- Tabs: kit tabs-line, node-exact (gap 32, pad 10/0, 2px underline,
    hover = subtle r2 block) ---- */
