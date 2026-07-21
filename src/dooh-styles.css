@@ -13017,3 +13017,28 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
   .tkt-modal-obj, .tkt-modal-row { grid-template-columns: 1fr; }
   .tkt-drawer-meta { grid-template-columns: 1fr; }
 }
+
+/* ============================== ADVISOR ==============================
+   Advertiser assistance: Media Planner (reuses yield-* rows) and the
+   per-campaign delivery KPI strips on the Campaigns page. */
+.yield-metric .nd-tag { margin-top: 5px; }
+
+.dlv-list { display: grid; gap: 10px; }
+.dlv-row {
+  display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(120px, 1fr)) auto;
+  gap: 18px; align-items: center;
+  padding: 13px 16px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.dlv-main { display: grid; gap: 5px; min-width: 0; }
+.dlv-main strong { font-size: 13.5px; color: var(--ink); }
+.dlv-main small { font-size: 11.5px; color: var(--muted); }
+.dlv-bar { display: block; height: 5px; border-radius: 999px; background: var(--surface-3, var(--surface-2)); overflow: hidden; }
+.dlv-bar span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
+.dlv-kpi { display: grid; gap: 2px; }
+.dlv-kpi span { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.dlv-kpi strong { font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dlv-kpi small { font-size: 11px; color: var(--ink-2); }
+@media (max-width: 1100px) {
+  .dlv-row { grid-template-columns: 1fr 1fr; }
+}

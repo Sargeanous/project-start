@@ -119,6 +119,14 @@ import {
   type PlanningZone,
 } from "./lifecycle-data";
 import {
+  campaignDelivery,
+  mediaPlan,
+  PLAN_CATEGORIES,
+  PLAN_GOALS,
+  type CampaignDelivery,
+  type MediaPlan,
+} from "./advisor-data";
+import {
   useTickets,
   createTicket,
   addTicketComment,
@@ -221,6 +229,7 @@ type Page =
   | "reports"
   | "campaigns"
   | "marketplace"
+  | "mediaPlanner"
   | "planning"
   | "construction"
   | "tickets";
@@ -607,7 +616,7 @@ const profiles: Profile[] = [
     name: "Advertiser",
     role: "Bidder account",
     organization: "External partner",
-    pages: ["campaigns", "marketplace"],
+    pages: ["campaigns", "marketplace", "mediaPlanner"],
   },
 ];
 
@@ -634,6 +643,7 @@ const navItems: Record<Page, NavItem> = {
   edgeCompute: { id: "edgeCompute", label: "Edge & Compute", icon: HardDrive },
   campaigns: { id: "campaigns", label: "Campaigns", icon: Megaphone },
   marketplace: { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+  mediaPlanner: { id: "mediaPlanner", label: "Media Planner", icon: Target },
   planning: { id: "planning", label: "Planning", icon: Compass },
   construction: { id: "construction", label: "Construction", icon: HardHat },
   tickets: { id: "tickets", label: "Tickets", icon: Ticket },
@@ -655,6 +665,7 @@ const notificationPreferenceOptions: Array<{ key: NotificationPreferenceKey; lab
   { key: "rules", label: "Rules", helper: "Rule changes and governance decisions" },
   { key: "campaigns", label: "Campaigns", helper: "Bidder campaign status and ADMO messages" },
   { key: "marketplace", label: "Marketplace", helper: "Bid lots, bids, and auction changes" },
+  { key: "mediaPlanner", label: "Media Planner", helper: "Budget plans and delivery KPIs" },
   { key: "planning", label: "Planning", helper: "Zone demand, site opportunities, and placement recommendations" },
   { key: "construction", label: "Construction", helper: "Build progress, work orders, procurement, and delays" },
   { key: "tickets", label: "Tickets", helper: "Escalations, team collaboration, and status changes" },
@@ -680,7 +691,7 @@ const navGroups: NavGroup[] = [
   { label: "Skills", pages: ["rules", "skillsCatalogue", "skillWorkflows", "skillRuns"] },
   { label: "Models", pages: ["modelCenter"] },
   { label: "Infrastructure", pages: ["integrations", "accessRoles", "auditLog", "edgeCompute"] },
-  { label: "Bidder Workspace", pages: ["campaigns", "marketplace"] },
+  { label: "Bidder Workspace", pages: ["campaigns", "marketplace", "mediaPlanner"] },
 ];
 
 const stageOrder: SubmissionStage[] = ["Submitted", "In review", "Approved", "Scheduled", "Published"];
@@ -3352,6 +3363,7 @@ function App() {
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "mediaPlanner" && <MediaPlannerPage campaigns={campaigns} t={t} />}
           {page === "planning" && <PlanningPage t={t} />}
           {page === "construction" && <ConstructionPage t={t} />}
           {page === "tickets" && <TicketsPage t={t} />}
@@ -11127,6 +11139,81 @@ function FinancialsPage({
   );
 }
 
+// Advertiser media planner: budget + objective -> ranked plan with CPM and
+// reasoning. Advertiser-safe data only (availability, audience, rate cards,
+// aggregate demand); booking still flows through bidding and approval.
+function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (value: string) => string }) {
+  const [budget, setBudget] = useState("250000");
+  const [goal, setGoal] = useState("retail");
+  const [category, setCategory] = useState(PLAN_CATEGORIES[0]);
+  const [plan, setPlan] = useState<MediaPlan | null>(null);
+
+  const inFlight = campaigns.filter((c) => c.status === "Published" || c.status === "Scheduled").length;
+  const budgetAed = Number(budget.replace(/[^\d]/g, "")) || 0;
+  const maxImpr = plan ? Math.max(...plan.lines.map((l) => l.projectedImpressions), 1) : 1;
+
+  return (
+    <PageBody>
+      <MetricGrid>
+        <Metric label="Your campaigns" value={String(campaigns.length)} helper={`${inFlight} ${t("in flight")}`} tone="info" />
+        <Metric label="Working budget" value={`AED ${budgetAed.toLocaleString("en-US")}`} helper={t(PLAN_GOALS.find((g) => g.value === goal)?.label ?? "Retail sales")} tone="neutral" />
+        <Metric label="Creative category" value={t(category.split(" and ")[0])} helper={t("Guides the fit notes")} tone="neutral" />
+        <Metric label="Plan status" value={plan ? `${plan.lines.length} ${t("placements")}` : t("Not built")} helper={plan ? `${(plan.totalImpressions / 1_000_000).toFixed(1)}M ${t("impressions")}` : t("Set a budget and build")} tone={plan ? "good" : "neutral"} />
+      </MetricGrid>
+      <div className="split-grid wide-left">
+        <Panel icon={Target} title={t("Media planner")} action={<StatusPill label={t("Where your budget works hardest")} tone="good" />}>
+          <div className="yield-form">
+            <label><span>{t("Budget")} (AED)</span><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="numeric" /></label>
+            <label><span>{t("Objective")}</span><select value={goal} onChange={(event) => setGoal(event.target.value)}>{PLAN_GOALS.map((g) => <option key={g.value} value={g.value}>{t(g.label)}</option>)}</select></label>
+            <label><span>{t("Creative")}</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{PLAN_CATEGORIES.map((c) => <option key={c} value={c}>{t(c)}</option>)}</select></label>
+            <Button icon={Sparkles} onClick={() => setPlan(mediaPlan(budgetAed, goal, category))} disabled={!budgetAed}>{t("Build my plan")}</Button>
+          </div>
+          {plan ? (
+            <div className="linked-detail">
+              <section className="ai-mini-panel">
+                <div>
+                  <span>{t("MediaGPT plan")}</span>
+                  <strong>{plan.summary}</strong>
+                  <small>{t("Recommended dayparts")}: {plan.dayparts.map((d) => t(d)).join(" · ")}</small>
+                </div>
+                <StatusPill label="MediaGPT" tone="good" />
+              </section>
+              <div className="yield-list">
+                {plan.lines.map((line, index) => (
+                  <div key={line.assetId} className="yield-row">
+                    <span className="yield-rank">{index + 1}</span>
+                    <span className="yield-main">
+                      <strong>{t(line.name)} · {t(line.zone)}</strong>
+                      <small>{t(line.reason)}</small>
+                      <span className="yield-bar"><span className="yield-fill" style={{ width: `${Math.round((line.projectedImpressions / maxImpr) * 100)}%` }} /></span>
+                    </span>
+                    <span className="yield-metric">
+                      <strong>{(line.projectedImpressions / 1_000_000).toFixed(2)}M</strong>
+                      <small>{t("impressions")} · AED {line.cpm.toFixed(2)} {t("CPM")}</small>
+                      <span className={`nd-tag ${line.demand === "High" ? "warn" : line.demand === "Moderate" ? "info" : "good"}`}><i />{t(line.demand)} {t("demand")}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="cell-note">{t("Set a budget, pick an objective, and MediaGPT ranks the screens where your money buys the most audience, with the reasoning.")}</p>
+          )}
+        </Panel>
+        <Panel icon={Sparkles} title={t("How this plan is built")}>
+          <div className="detail-cards yield-factors">
+            <Detail label={t("Audience per dirham")} value={t("Weekly reach against the weekly rate card")} />
+            <Detail label={t("Objective fit")} value={t("Zones weighted for your campaign goal")} />
+            <Detail label={t("Availability")} value={t("Only weeks a screen can actually take")} />
+            <Detail label={t("Demand")} value={t("Aggregate pressure on each location")} />
+          </div>
+          <p className="cell-note">{t("The planner only proposes. Booking runs through bidding and the standard checks, and rates shown are public rate cards.")}</p>
+        </Panel>
+      </div>
+    </PageBody>
+  );
+}
+
 function CampaignsPage({
   campaigns,
   bidderMessages,
@@ -11239,6 +11326,34 @@ function CampaignsPage({
             </tbody>
           </table>
         </div>
+      </Panel>
+      <Panel icon={Gauge} title={t("Delivery performance")} action={<StatusPill label={t("Live from proof of play")} tone="info" />}>
+        {(() => {
+          const rows = campaigns
+            .map((c) => campaignDelivery({ id: c.id, campaign: c.campaign, budget: c.budget, status: c.status, reach: c.reach }))
+            .filter((d): d is CampaignDelivery => Boolean(d));
+          if (!rows.length) return <p className="cell-note">{t("Delivery KPIs appear here once a campaign goes live on the network.")}</p>;
+          return (
+            <div className="dlv-list">
+              {rows.map((d) => (
+                <article key={d.campaignId} className="dlv-row">
+                  <div className="dlv-main">
+                    <strong>{t(d.name)}</strong>
+                    <small>{t(d.status)} · {d.flightWeeks} {t("week flight")} · {d.elapsedPct}% {t("elapsed")}</small>
+                    <span className="dlv-bar"><span style={{ width: `${Math.min(100, d.deliveredPct)}%` }} /></span>
+                  </div>
+                  <div className="dlv-kpi"><span>{t("Delivered")}</span><strong>{(d.deliveredImpressions / 1_000_000).toFixed(2)}M</strong><small>{t("of")} {(d.bookedImpressions / 1_000_000).toFixed(2)}M ({d.deliveredPct}%)</small></div>
+                  <div className="dlv-kpi"><span>{t("Effective CPM")}</span><strong>AED {d.effectiveCpm.toFixed(2)}</strong><small>{t("spend")} AED {Math.round(d.spendToDateAed / 1000)}k {t("of")} {Math.round(d.budgetAed / 1000)}k</small></div>
+                  <div className="dlv-kpi"><span>{t("Proof of play")}</span><strong>{d.popPct}%</strong><small>{t("signed playout")}</small></div>
+                  <StatusPill
+                    label={d.pace === "On plan" ? t("On plan") : `${t(d.pace)} ${d.pacingDeltaPct > 0 ? "+" : ""}${d.pacingDeltaPct}%`}
+                    tone={d.pace === "On plan" ? "good" : "warn"}
+                  />
+                </article>
+              ))}
+            </div>
+          );
+        })()}
       </Panel>
     </PageBody>
   );
