@@ -13,7 +13,7 @@ import { useSyncExternalStore } from "react";
 
 export type TicketStatus = "Open" | "In progress" | "Blocked" | "Resolved" | "Cancelled";
 export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
-export type TicketSource = "Delay risk" | "Maintenance" | "Digital twin" | "Planning" | "Manual";
+export type TicketSource = "Delay risk" | "Maintenance" | "Digital twin" | "Planning" | "MediaGPT" | "Manual";
 export type TicketObjectKind = "Asset" | "Device" | "Purchase order" | "Service order" | "Work order" | "Zone" | "Campaign";
 export type TicketEventKind = "created" | "comment" | "status" | "priority" | "assignee" | "team" | "object" | "cancelled";
 
@@ -24,6 +24,7 @@ export const TICKET_TEAMS = [
   "Maintenance planning",
   "Civil & structures",
   "Permits & authorities",
+  "Commercial desk",
 ] as const;
 
 export const TICKET_PEOPLE = [

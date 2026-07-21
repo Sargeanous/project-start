@@ -119,11 +119,16 @@ import {
   type PlanningZone,
 } from "./lifecycle-data";
 import {
+  answerAdvertiserQuery,
+  answerAssetCommercialQuery,
+  assetEconomics,
   campaignDelivery,
+  comparables as assetComparables,
   mediaPlan,
   PLAN_CATEGORIES,
   PLAN_GOALS,
   type CampaignDelivery,
+  type Comparable,
   type MediaPlan,
 } from "./advisor-data";
 import {
@@ -10600,6 +10605,7 @@ function CommercialMapPage({
                 ) : (
                   <p className="cell-note">{t("Next slot")}: {t(asset.nextSlot)}</p>
                 )}
+                <EmbeddedCopilot mode="commercial" assetId={asset.id} actor="Commercial desk" collapsible t={t} />
               </section>
             );
           })() : null}
@@ -11355,6 +11361,9 @@ function CampaignsPage({
           );
         })()}
       </Panel>
+      <Panel icon={Bot} title={t("MediaGPT for your campaigns")} action={<StatusPill label={t("Scoped to your data")} tone="info" />}>
+        <EmbeddedCopilot mode="advertiser" campaigns={campaigns} actor="Advertiser" t={t} />
+      </Panel>
     </PageBody>
   );
 }
@@ -11623,6 +11632,102 @@ type ChatMessage = {
   toolTrace?: AgentToolTrace[];
   proposedActions?: PendingAgentAction[];
 };
+
+// Embedded, context-anchored MediaGPT. Two modes: "commercial" is pinned to
+// one asset (may name operators and contract values; internal roles only) and
+// can draft a relocation proposal into Tickets; "advertiser" is scoped to the
+// bidder's own campaigns and public availability. Deterministic answers from
+// advisor-data, same pattern as the ticket Q&A.
+function EmbeddedCopilot({ mode, assetId, campaigns, actor, collapsible, t }: {
+  mode: "commercial" | "advertiser";
+  assetId?: string;
+  campaigns?: BidderCampaign[];
+  actor: string;
+  collapsible?: boolean;
+  t: (value: string) => string;
+}) {
+  const [openChat, setOpenChat] = useState(!collapsible);
+  const [thread, setThread] = useState<Array<{ role: "user" | "assistant"; body: string; relocate?: boolean }>>([]);
+  const [q, setQ] = useState("");
+  const [drafted, setDrafted] = useState<string[]>([]);
+  const chips = mode === "commercial"
+    ? ["How much is left on this contract", "When is it free", "Can I place this campaign elsewhere"]
+    : ["How much budget is left", "Am I pacing on plan", "Where should I spend 300k"];
+
+  function ask(text?: string) {
+    const query = (text ?? q).trim();
+    if (!query) return;
+    setQ("");
+    const body = mode === "commercial" && assetId
+      ? answerAssetCommercialQuery(assetId, query)
+      : answerAdvertiserQuery(query, (campaigns ?? []).map((c) => ({ id: c.id, campaign: c.campaign, budget: c.budget, status: c.status, reach: c.reach })));
+    const relocate = mode === "commercial" && /elsewhere|place|move|relocat|alternative|similar|instead/i.test(query);
+    setThread((items) => [...items, { role: "user", body: query }, { role: "assistant", body, relocate }]);
+  }
+
+  function draftRelocation(target: Comparable) {
+    if (!assetId) return;
+    const eco = assetEconomics(assetId);
+    createTicket({
+      title: `Relocation proposal: ${assetId} to ${target.eco.asset.id}`,
+      body: `MediaGPT proposed moving the active campaign from ${eco?.asset.name ?? assetId} to ${target.eco.asset.name}. ${target.reason}. Requires commercial approval before any booking changes.`,
+      object: { kind: "Asset", ref: assetId, label: eco?.asset.name ?? assetId },
+      linkedObjects: [{ kind: "Asset", ref: target.eco.asset.id, label: target.eco.asset.name }],
+      team: "Commercial desk",
+      raisedBy: actor,
+      priority: "Medium",
+      source: "MediaGPT",
+    });
+    setDrafted((ids) => [...ids, target.eco.asset.id]);
+  }
+
+  if (!openChat) {
+    return (
+      <button type="button" className="ecp-toggle" onClick={() => setOpenChat(true)}>
+        <Bot size={14} /> {t("Ask MediaGPT about this asset")}
+      </button>
+    );
+  }
+
+  return (
+    <div className="ecp">
+      <header className="ecp-head">
+        <span className="ecp-icon"><Bot size={13} /></span>
+        <strong>MediaGPT</strong>
+        <small>{mode === "commercial" ? `${t("anchored to")} ${assetId}` : t("scoped to your campaigns")}</small>
+      </header>
+      {thread.length ? (
+        <div className="ecp-thread">
+          {thread.map((m, i) => (
+            <div key={i} className={`ecp-msg ${m.role}`}>
+              <p>{m.body}</p>
+              {m.relocate && assetId ? (
+                <div className="ecp-reloc">
+                  {assetComparables(assetId).map((c) => (
+                    <div key={c.eco.asset.id} className="ecp-reloc-row">
+                      <span><strong>{t(c.eco.asset.name)}</strong><small>{t(c.reason)}</small></span>
+                      <button type="button" disabled={drafted.includes(c.eco.asset.id)} onClick={() => draftRelocation(c)}>
+                        {drafted.includes(c.eco.asset.id) ? <><CheckCircle2 size={12} /> {t("Drafted")}</> : t("Draft relocation proposal")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ecp-chips">
+          {chips.map((c) => <button key={c} type="button" onClick={() => ask(t(c))}>{t(c)}</button>)}
+        </div>
+      )}
+      <form className="ecp-input" onSubmit={(event) => { event.preventDefault(); ask(); }}>
+        <input value={q} onChange={(event) => setQ(event.target.value)} placeholder={mode === "commercial" ? t("Ask about this asset") : t("Ask about your campaigns")} />
+        <button type="submit" aria-label={t("Send")}><Sparkles size={13} /></button>
+      </form>
+    </div>
+  );
+}
 
 function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) => string }) {
   const [open, setOpen] = useState(false);
