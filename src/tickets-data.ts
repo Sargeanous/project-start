@@ -310,24 +310,25 @@ export function lastComment(t: Ticket): string | null {
   return null;
 }
 
-export function ticketSummary() {
-  const active = tickets.filter((t) => t.status !== "Cancelled");
+/** Board totals; pass a pre-filtered list for scoped views (e.g. operator logins). */
+export function ticketSummary(list: Ticket[] = tickets) {
+  const active = list.filter((t) => t.status !== "Cancelled");
   return {
-    total: tickets.length,
-    open: tickets.filter((t) => t.status === "Open").length,
-    inProgress: tickets.filter((t) => t.status === "In progress").length,
-    blocked: tickets.filter((t) => t.status === "Blocked").length,
-    resolved: tickets.filter((t) => t.status === "Resolved").length,
-    cancelled: tickets.filter((t) => t.status === "Cancelled").length,
+    total: list.length,
+    open: list.filter((t) => t.status === "Open").length,
+    inProgress: list.filter((t) => t.status === "In progress").length,
+    blocked: list.filter((t) => t.status === "Blocked").length,
+    resolved: list.filter((t) => t.status === "Resolved").length,
+    cancelled: list.filter((t) => t.status === "Cancelled").length,
     active: active.length,
   };
 }
 
 /** Headline metrics for the tab: recent inflow + closure performance. */
-export function ticketMetrics() {
+export function ticketMetrics(list: Ticket[] = tickets) {
   const now = Date.now();
-  const openedLast14 = tickets.filter((t) => now - new Date(t.createdAtISO).getTime() <= 14 * 86400000).length;
-  const closed = tickets.filter((t) => t.closedAtISO);
+  const openedLast14 = list.filter((t) => now - new Date(t.createdAtISO).getTime() <= 14 * 86400000).length;
+  const closed = list.filter((t) => t.closedAtISO);
   const avgMs = closed.length
     ? closed.reduce((s, t) => s + (new Date(t.closedAtISO as string).getTime() - new Date(t.createdAtISO).getTime()), 0) / closed.length
     : 0;

@@ -152,6 +152,7 @@ import {
 import { assetAudienceBands } from "./audience-data";
 import {
   assetOwnership,
+  assetsOwnedBy,
   operatorById,
   OWNERSHIP_MODELS,
   OWNERSHIP_MODEL_SHORT,
@@ -281,7 +282,7 @@ type Page =
   | "construction"
   | "tickets";
 
-type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder";
+type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "operator-oasis" | "operator-wathba" | "bidder";
 type Lang = "en" | "ar";
 type Tone = "neutral" | "good" | "warn" | "danger" | "info";
 type NotificationPreferenceKey = Page | "critical";
@@ -297,6 +298,8 @@ interface Profile {
   role: string;
   organization: string;
   pages: Page[];
+  /** Set on external operator logins: every asset-driven view is scoped to assetsOwnedBy(operatorId). */
+  operatorId?: string;
 }
 
 interface NavItem {
@@ -673,6 +676,25 @@ const profiles: Profile[] = [
     organization: "Abu Dhabi Media Office",
     pages: ["mediagpt", "tickets", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
+  // External operator logins sit between the ADMO roles and the Advertiser:
+  // two private screen-owning companies from the operator registry. Their
+  // operatorId scopes every asset-driven view to the assets they own.
+  {
+    id: "operator-oasis",
+    name: "Oasis Media Holdings",
+    role: "Operator account",
+    organization: "External operator",
+    operatorId: "OP-OMH",
+    pages: ["control", "network", "tickets", "allocations"],
+  },
+  {
+    id: "operator-wathba",
+    name: "Al Wathba Media Infrastructure",
+    role: "Operator account",
+    organization: "External operator",
+    operatorId: "OP-AWI",
+    pages: ["control", "network", "tickets", "allocations"],
+  },
   {
     id: "bidder",
     name: "Advertiser",
@@ -681,6 +703,24 @@ const profiles: Profile[] = [
     pages: ["campaigns", "marketplace", "mediaPlanner"],
   },
 ];
+
+/* -------- Operator-scoped views -------- *\
+   One central helper decides what the active profile may see. Internal
+   ADMO roles get null (the full estate); operator logins get the exact
+   set of asset ids their company owns in the ownership register. Pages
+   apply the scope at their data-selection points via scopeByAssetId,
+   which returns the SAME array reference when the scope is null so
+   internal profiles keep today's behavior bit for bit.
+\* --------------------------------------- */
+
+function profileAssetScope(profile: Profile | null): Set<string> | null {
+  if (!profile?.operatorId) return null;
+  return new Set(assetsOwnedBy(profile.operatorId).map((record) => record.assetId));
+}
+
+function scopeByAssetId<T>(list: T[], scope: Set<string> | null, assetIdOf: (item: T) => string): T[] {
+  return scope ? list.filter((item) => scope.has(assetIdOf(item))) : list;
+}
 
 const navItems: Record<Page, NavItem> = {
   control: { id: "control", label: "Control Centre", icon: LayoutDashboard },
@@ -2934,6 +2974,9 @@ const translations: Record<string, string> = {
   "A firm runs the site for a fee; ownership does not move": "شركة تدير الموقع مقابل رسوم؛ ولا تنتقل الملكية",
   "Creates a governed proposal for the Commercial desk; nothing changes on the register until it is approved.": "ينشئ اقتراحاً محوكماً للمكتب التجاري؛ لا يتغير شيء في السجل حتى تتم الموافقة عليه.",
   "Ownership proposal sent to the Commercial desk": "أُرسل اقتراح الملكية إلى المكتب التجاري",
+  // Operator login profiles (scoped views)
+  "Operator account": "حساب مشغل",
+  "External operator": "مشغل خارجي",
   "Al Ain City Media Assets": "أصول الإعلام لمدينة العين",
   "Gulf Vision Outdoor": "غلف فيجن للإعلان الخارجي",
   "Emirates Transit Media": "الإمارات لإعلانات النقل",
@@ -3285,6 +3328,9 @@ function App() {
     [notifications, notificationPreferences, profile],
   );
 
+  // Operator logins see only the assets their company owns; null for ADMO roles.
+  const assetScope = useMemo(() => profileAssetScope(profile), [profile]);
+
   async function markNotificationRead(id: string) {
     if (!profile) return;
     await syncMutation<{ state: DoohStatePayload }>(`notifications/${id}/read`, {
@@ -3593,7 +3639,7 @@ function App() {
             t={t}
           />
           {page === "control" && (
-            <ControlCentre submissions={submissions} published={published} killedAssetIds={killedAssetIds} aiAvailable={aiAvailable} notify={notify} onKill={remoteKill} onRestore={restoreDisplays} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} goToNetwork={() => profile?.pages.includes("network") && setPage("network")} t={t} />
+            <ControlCentre submissions={submissions} published={published} killedAssetIds={killedAssetIds} assetScope={assetScope} aiAvailable={aiAvailable} notify={notify} onKill={remoteKill} onRestore={restoreDisplays} goToAlerts={() => profile?.pages.includes("alerts") && setPage("alerts")} goToNetwork={() => profile?.pages.includes("network") && setPage("network")} t={t} />
           )}
           {page === "cms" && (
             <CmsPage
@@ -3630,6 +3676,7 @@ function App() {
               aiAvailable={aiAvailable}
               serviceOrders={serviceOrders}
               purchaseOrders={purchaseOrders}
+              assetScope={assetScope}
               onCreateServiceOrder={createServiceOrder}
               onCreatePurchaseOrder={createPurchaseOrder}
               t={t}
@@ -3649,14 +3696,14 @@ function App() {
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
-          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} profile={profile} notify={notify} t={t} />}
+          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} profile={profile} assetScope={assetScope} notify={notify} t={t} />}
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings.filter((booking) => !booking.historySeed)} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "mediaPlanner" && <MediaPlannerPage campaigns={campaigns} t={t} />}
           {page === "planning" && <PlacementPlanningPage t={t} isArabic={lang === "ar"} />}
           {page === "construction" && <ConstructionPage t={t} />}
-          {page === "tickets" && <TicketsPage t={t} />}
+          {page === "tickets" && <TicketsPage profile={profile} assetScope={assetScope} t={t} />}
         </main>
         <MediaGptChatbot profile={profile} t={t} />
         {toast ? <Toast>{toast}</Toast> : null}
@@ -3680,6 +3727,8 @@ const PROFILE_META: Record<string, { icon: LucideIcon; scope: string; privileged
   finance: { icon: WalletCards, scope: "Commercial" },
   admin: { icon: ShieldCheck, scope: "Full governance", privileged: true },
   technical: { icon: Cpu, scope: "Technical" },
+  "operator-oasis": { icon: Building2, scope: "External operator" },
+  "operator-wathba": { icon: Building2, scope: "External operator" },
   bidder: { icon: Megaphone, scope: "External" },
 };
 
@@ -4677,6 +4726,7 @@ function ControlCentre({
   submissions,
   published,
   killedAssetIds,
+  assetScope,
   aiAvailable,
   notify,
   onKill,
@@ -4688,6 +4738,7 @@ function ControlCentre({
   submissions: Submission[];
   published: PublishedItem[];
   killedAssetIds: string[];
+  assetScope: Set<string> | null;
   aiAvailable: boolean;
   notify: (message: string) => void;
   onKill: (payload: { scope: "asset" | "zone" | "emirate"; target?: string; reason: string; confirm?: boolean }) => void;
@@ -4720,25 +4771,30 @@ function ControlCentre({
     });
   const clearSelection = () => { setMultiSelected([]); setMarqueeMode(false); };
 
-  const zoneStats = useMemo(() => summarizeZones(estateAssets), []);
+  // Operator logins: pins, boards, KPIs, alarms and alerts all draw from
+  // the owned-asset scope; ADMO roles keep the full estate (scope null).
+  const scopedAssets = useMemo(() => scopeByAssetId(estateAssets, assetScope, (asset) => asset.id), [assetScope]);
+  const scopedTickets = useMemo(() => scopeByAssetId(tickets, assetScope, (ticket) => ticket.asset), [assetScope]);
+  const scopedAlerts = useMemo(() => scopeByAssetId(alerts, assetScope, (alert) => alert.assetId), [assetScope]);
+  const zoneStats = useMemo(() => summarizeZones(scopedAssets), [scopedAssets]);
   const visibleAssets = useMemo(
-    () => (zone === "All zones" ? estateAssets : estateAssets.filter((asset) => asset.zone === zone)),
-    [zone],
+    () => (zone === "All zones" ? scopedAssets : scopedAssets.filter((asset) => asset.zone === zone)),
+    [zone, scopedAssets],
   );
   const openAlarmAssetIds = useMemo(
-    () => tickets.filter((ticket) => ticket.status !== "Resolved").map((ticket) => ticket.asset),
-    [],
+    () => scopedTickets.filter((ticket) => ticket.status !== "Resolved").map((ticket) => ticket.asset),
+    [scopedTickets],
   );
   const allocatedIds = useMemo(
     () => new Set(assetAllocations.filter((allocation) => allocation.status === "Allocated").map((allocation) => allocation.assetId)),
     [],
   );
-  const liveCount = estateAssets.filter((asset) => asset.status === "Live").length;
-  const fleetOnline = estateAssets.filter((asset) => asset.status !== "Offline").length;
+  const liveCount = scopedAssets.filter((asset) => asset.status === "Live").length;
+  const fleetOnline = scopedAssets.filter((asset) => asset.status !== "Offline").length;
   const queued = submissions.filter((item) => item.stage === "Approved" || item.stage === "Scheduled");
-  const headlineTicket = tickets.find((ticket) => ticket.status !== "Resolved") ?? null;
-  const headlineAlert = alerts.find((alert) => alert.severity === "Critical" && alert.status === "Open" && alert.assetId !== headlineTicket?.asset) ?? null;
-  const selectedAsset = estateAssets.find((asset) => asset.id === selectedAssetId) ?? null;
+  const headlineTicket = scopedTickets.find((ticket) => ticket.status !== "Resolved") ?? null;
+  const headlineAlert = scopedAlerts.find((alert) => alert.severity === "Critical" && alert.status === "Open" && alert.assetId !== headlineTicket?.asset) ?? null;
+  const selectedAsset = scopedAssets.find((asset) => asset.id === selectedAssetId) ?? null;
 
   // Popover facts for the selected screen.
   const selectedPublished = selectedAsset ? published.find((item) => item.asset === selectedAsset.id) ?? null : null;
@@ -4790,10 +4846,10 @@ function ControlCentre({
   }
 
   const kpis: Array<{ icon: LucideIcon; value: string; label: string }> = [
-    { icon: MonitorPlay, value: `${liveCount}/${estateAssets.length}`, label: "Assets live" },
-    { icon: Globe2, value: `${fleetOnline}/${estateAssets.length}`, label: "Fleet online" },
+    { icon: MonitorPlay, value: `${liveCount}/${scopedAssets.length}`, label: "Assets live" },
+    { icon: Globe2, value: `${fleetOnline}/${scopedAssets.length}`, label: "Fleet online" },
     { icon: ShieldCheck, value: "99.62%", label: "Proof of play" },
-    { icon: Bell, value: String(tickets.filter((ticket) => ticket.status !== "Resolved").length), label: "Active alerts" },
+    { icon: Bell, value: String(scopedTickets.filter((ticket) => ticket.status !== "Resolved").length), label: "Active alerts" },
     { icon: CalendarClock, value: queued.length ? `${queued.length} · ${t("next")} ${fmtGst(slotEnd).slice(0, 5)}` : "0", label: "Queued campaigns" },
   ];
 
@@ -4820,7 +4876,7 @@ function ControlCentre({
           </button>
           {zoneOpen ? (
             <div className="cc-zone-menu" role="menu">
-              <button type="button" onClick={() => { setZone("All zones"); setZoneOpen(false); }}>{t("Abu Dhabi City")} <em>{estateAssets.length}</em></button>
+              <button type="button" onClick={() => { setZone("All zones"); setZoneOpen(false); }}>{t("Abu Dhabi City")} <em>{scopedAssets.length}</em></button>
               {zoneStats.map((item) => (
                 <button key={item.name} type="button" onClick={() => { setZone(item.name); setZoneOpen(false); }}>
                   {t(item.name)} <em>{item.total}</em>
@@ -5010,7 +5066,7 @@ function ControlCentre({
           </div>
           <div className="cc-strip">
             {boardTab === "now"
-              ? estateAssets.map((asset) => {
+              ? scopedAssets.map((asset) => {
                   // Full estate, one card per screen (Figma). Status tag rides
                   // inside the image; the asset id sits below the card.
                   const alarmed = openAlarmAssetIds.includes(asset.id);
@@ -7732,8 +7788,22 @@ const TKT_COLUMNS: Array<{ key: string; label: string; locked?: boolean }> = [
 const TKT_PRIORITIES: TicketPriority[] = ["Critical", "High", "Medium", "Low"];
 const TKT_STATUSES: TicketStatus[] = ["Open", "In progress", "Blocked", "Resolved", "Cancelled"];
 
-function TicketsPage({ t }: { t: (value: string) => string }) {
+function TicketsPage({ profile, assetScope, t }: { profile: Profile; assetScope: Set<string> | null; t: (value: string) => string }) {
   const tickets = useTickets();
+  // Operator logins only see tickets whose main or linked objects reference
+  // an asset their company owns, and everything they do on a ticket is
+  // stamped with the company name so the ADMO side sees who raised it.
+  const scopedTickets = useMemo(
+    () =>
+      assetScope
+        ? tickets.filter((ticket) =>
+            [ticket.object, ...ticket.linkedObjects].some((obj) => obj.kind === "Asset" && assetScope.has(obj.ref)),
+          )
+        : tickets,
+    [tickets, assetScope],
+  );
+  const actorName = profile.operatorId ? profile.name : "Control room";
+  const actorRole = profile.operatorId ? "External operator" : "Control room";
   const [selectedId, setSelectedId] = useState<string>("");
   const [modalOpen, setModalOpen] = useState(false);
   const [colsOpen, setColsOpen] = useState(false);
@@ -7744,13 +7814,13 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
   const emptyDraft = { title: "", body: "", objectKind: "Asset" as TicketObjectKind, objectRef: "", objectLabel: "", team: TICKET_TEAMS[0] as string, assignee: "Unassigned" as string, priority: "Medium" as TicketPriority };
   const [draftTicket, setDraftTicket] = useState(emptyDraft);
 
-  const summary = ticketSummary();
-  const selected: TicketRecord | null = tickets.find((tk) => tk.id === selectedId) ?? null;
-  const createdByOptions = Array.from(new Set(tickets.map((tk) => tk.raisedBy)));
+  const summary = ticketSummary(scopedTickets);
+  const selected: TicketRecord | null = scopedTickets.find((tk) => tk.id === selectedId) ?? null;
+  const createdByOptions = Array.from(new Set(scopedTickets.map((tk) => tk.raisedBy)));
 
   const sinceMs: Record<string, number> = { all: Infinity, "7d": 7 * 86400000, "30d": 30 * 86400000, "90d": 90 * 86400000 };
   const now = Date.now();
-  const filtered = tickets.filter((tk) =>
+  const filtered = scopedTickets.filter((tk) =>
     (filters.priority === "all" || tk.priority === filters.priority) &&
     (filters.status === "all" || tk.status === filters.status) &&
     (filters.team === "all" || tk.team === filters.team) &&
@@ -7766,7 +7836,7 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const metrics = ticketMetrics();
+  const metrics = ticketMetrics(scopedTickets);
   const kpis = [
     { icon: Ticket, value: String(summary.active), label: "Active tickets" },
     { icon: CalendarClock, value: String(metrics.openedLast14), label: "Opened last 14 days" },
@@ -7788,19 +7858,19 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
       assignee: draftTicket.assignee,
       priority: draftTicket.priority,
       source: "Manual",
-      raisedBy: "Control room",
+      raisedBy: actorName,
     });
     setModalOpen(false);
     setSelectedId(created.id);
   }
   function submitReply() {
     if (!selected || !reply.trim()) return;
-    addTicketComment(selected.id, reply);
+    addTicketComment(selected.id, reply, actorName, actorRole);
     setReply("");
   }
   function submitAddObject() {
     if (!selected || !addObj.ref.trim()) return;
-    addLinkedObject(selected.id, { kind: addObj.kind, ref: addObj.ref.trim() });
+    addLinkedObject(selected.id, { kind: addObj.kind, ref: addObj.ref.trim() }, actorName);
     setAddObj({ kind: "Asset", ref: "" });
   }
 
@@ -7874,7 +7944,7 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
                 <tr key={tk.id} className={tk.id === selectedId ? "selected" : ""} onClick={() => setSelectedId(tk.id)}>
                   {show("priority") ? (
                     <td className="col-priority" onClick={(e) => e.stopPropagation()}>
-                      <select className={`tkt-inline tone-${ticketPriorityTone(tk.priority)}`} value={tk.priority} onChange={(e) => setTicketPriority(tk.id, e.target.value as TicketPriority)}>
+                      <select className={`tkt-inline tone-${ticketPriorityTone(tk.priority)}`} value={tk.priority} onChange={(e) => setTicketPriority(tk.id, e.target.value as TicketPriority, actorName)}>
                         {TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}
                       </select>
                     </td>
@@ -7884,7 +7954,7 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
                   {show("object") ? <td className="col-object">{tk.object ? <TicketObjChip obj={tk.object} t={t} /> : null}</td> : null}
                   {show("status") ? (
                     <td className="col-status" onClick={(e) => e.stopPropagation()}>
-                      <select className={`tkt-status-sel ${ticketStatusClass(tk.status)}`} value={tk.status} onChange={(e) => setTicketStatus(tk.id, e.target.value as TicketStatus)}>
+                      <select className={`tkt-status-sel ${ticketStatusClass(tk.status)}`} value={tk.status} onChange={(e) => setTicketStatus(tk.id, e.target.value as TicketStatus, actorName)}>
                         {TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}
                       </select>
                     </td>
@@ -7928,10 +7998,10 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
             </div>
 
             <div className="tkt-drawer-meta">
-              <label>{t("Criticality")}<select value={selected.priority} onChange={(e) => setTicketPriority(selected.id, e.target.value as TicketPriority)}>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
-              <label>{t("Status")}<select value={selected.status} onChange={(e) => setTicketStatus(selected.id, e.target.value as TicketStatus)}>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}</select></label>
-              <label>{t("Team")}<select value={selected.team} onChange={(e) => setTicketTeam(selected.id, e.target.value)}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
-              <label>{t("Assignee")}<select value={selected.assignee} onChange={(e) => setTicketAssignee(selected.id, e.target.value)}>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+              <label>{t("Criticality")}<select value={selected.priority} onChange={(e) => setTicketPriority(selected.id, e.target.value as TicketPriority, actorName)}>{TKT_PRIORITIES.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
+              <label>{t("Status")}<select value={selected.status} onChange={(e) => setTicketStatus(selected.id, e.target.value as TicketStatus, actorName)}>{TKT_STATUSES.map((sx) => <option key={sx} value={sx}>{t(sx)}</option>)}</select></label>
+              <label>{t("Team")}<select value={selected.team} onChange={(e) => setTicketTeam(selected.id, e.target.value, actorName)}>{TICKET_TEAMS.map((tm) => <option key={tm} value={tm}>{t(tm)}</option>)}</select></label>
+              <label>{t("Assignee")}<select value={selected.assignee} onChange={(e) => setTicketAssignee(selected.id, e.target.value, actorName)}>{TICKET_PEOPLE.map((p) => <option key={p} value={p}>{t(p)}</option>)}</select></label>
             </div>
 
             <div className="tkt-drawer-sub">{t("Raised by")} {t(selected.raisedBy)} · {t("opened")} {selected.createdAt}</div>
@@ -7939,7 +8009,7 @@ function TicketsPage({ t }: { t: (value: string) => string }) {
 
             <div className="tkt-drawer-actions">
               {selected.status !== "Cancelled" ? (
-                <button type="button" className="tkt-cancel" onClick={() => cancelTicket(selected.id)}><X size={14} /> {t("Cancel ticket")}</button>
+                <button type="button" className="tkt-cancel" onClick={() => cancelTicket(selected.id, undefined, actorName)}><X size={14} /> {t("Cancel ticket")}</button>
               ) : <span className="tkt-cancelled-note">{t("This ticket is cancelled.")}</span>}
             </div>
 
@@ -8004,6 +8074,7 @@ function NetworkPage({
   aiAvailable,
   serviceOrders,
   purchaseOrders,
+  assetScope,
   onCreateServiceOrder,
   onCreatePurchaseOrder,
   t,
@@ -8011,6 +8082,7 @@ function NetworkPage({
   aiAvailable: boolean;
   serviceOrders: ServiceOrder[];
   purchaseOrders: PurchaseOrder[];
+  assetScope: Set<string> | null;
   onCreateServiceOrder: (payload: {
     assetId: string;
     assetName: string;
@@ -8032,7 +8104,14 @@ function NetworkPage({
   }) => Promise<PurchaseOrder | null>;
   t: (value: string) => string;
 }) {
-  const [selectedId, setSelectedId] = useState(estateAssets[1].id);
+  // Operator logins: registry, twin, workbench and supply chain draw from
+  // the owned-asset scope; ADMO roles keep the full estate (scope null).
+  const scopedAssets = useMemo(() => scopeByAssetId(estateAssets, assetScope, (asset) => asset.id), [assetScope]);
+  const scopedServiceOrders = useMemo(() => scopeByAssetId(serviceOrders, assetScope, (order) => order.assetId), [serviceOrders, assetScope]);
+  const scopedPurchaseOrders = useMemo(() => scopeByAssetId(purchaseOrders, assetScope, (order) => order.assetId), [purchaseOrders, assetScope]);
+  const scopedSupplyRecords = useMemo(() => scopeByAssetId(assetSupplyRecords, assetScope, (record) => record.assetId), [assetScope]);
+  const scopedFieldTasks = useMemo(() => scopeByAssetId(fieldTasks, assetScope, (task) => task.asset), [assetScope]);
+  const [selectedId, setSelectedId] = useState(() => (scopedAssets[1] ?? scopedAssets[0]).id);
   const [networkTab, setNetworkTab] = useState<NetworkTab>("assetOperations");
   const [twinFullscreen, setTwinFullscreen] = useState(false);
   // Escape closes the fullscreen twin, like every other overlay.
@@ -8053,13 +8132,13 @@ function NetworkPage({
   const [twinZoom, setTwinZoom] = useState(1);
   const [twinExplode, setTwinExplode] = useState(0);
   const [selectedIssueIndex, setSelectedIssueIndex] = useState<number | null>(null);
-  const selected = estateAssets.find((asset) => asset.id === selectedId) || estateAssets[0];
-  const visibleAssets = useMemo(() => applyEstateFilter(estateAssets, estateFilter), [estateFilter]);
-  const live = estateAssets.filter((asset) => asset.status === "Live").length;
-  const connectivity = Math.round((live / estateAssets.length) * 100);
-  const openPurchaseOrders = assetSupplyRecords.reduce((sum, record) => sum + record.openPos, 0) + purchaseOrders.filter((order) => order.status !== "Received").length;
-  const attentionAssets = estateAssets.filter((asset) => asset.status !== "Live").length;
-  const activeServiceOrders = serviceOrders.filter((order) => order.status !== "Completed").length;
+  const selected = scopedAssets.find((asset) => asset.id === selectedId) || scopedAssets[0];
+  const visibleAssets = useMemo(() => applyEstateFilter(scopedAssets, estateFilter), [scopedAssets, estateFilter]);
+  const live = scopedAssets.filter((asset) => asset.status === "Live").length;
+  const connectivity = Math.round((live / scopedAssets.length) * 100);
+  const openPurchaseOrders = scopedSupplyRecords.reduce((sum, record) => sum + record.openPos, 0) + scopedPurchaseOrders.filter((order) => order.status !== "Received").length;
+  const attentionAssets = scopedAssets.filter((asset) => asset.status !== "Live").length;
+  const activeServiceOrders = scopedServiceOrders.filter((order) => order.status !== "Completed").length;
   const existingServiceOrder = serviceOrders.find((order) => order.assetId === selected.id && order.status !== "Completed");
   const linkedPurchaseOrders = purchaseOrders.filter((order) => order.assetId === selected.id && order.status !== "Received");
   const orderableItem = ticketDraft?.partsNeeded.find(Boolean) || existingServiceOrder?.partsNeeded.find(Boolean) || defaultProcurementItem(selected);
@@ -8070,9 +8149,9 @@ function NetworkPage({
     { id: "supplyChain", label: "Supply chain", icon: Package },
   ];
   const networkKpis: Array<{ icon: LucideIcon; value: string; label: string }> = [
-    { icon: Monitor, value: String(estateAssets.length), label: "Registered devices" },
+    { icon: Monitor, value: String(scopedAssets.length), label: "Registered devices" },
     { icon: Wifi, value: `${connectivity}%`, label: "Live or reachable" },
-    { icon: ListChecks, value: String(fieldTasks.length + activeServiceOrders), label: "Service tasks" },
+    { icon: ListChecks, value: String(scopedFieldTasks.length + activeServiceOrders), label: "Service tasks" },
     { icon: ClipboardCheck, value: String(openPurchaseOrders), label: "Open purchase orders" },
   ];
   const selectedIssues = assetIssues(selected);
@@ -8201,7 +8280,7 @@ function NetworkPage({
               <section className="nd-registry" aria-label={t("Asset registry")}>
                 <header className="nd-panel-head">
                   <h2>{t("Asset registry")}</h2>
-                  <span className="nd-count">{visibleAssets.length}/{estateAssets.length}</span>
+                  <span className="nd-count">{visibleAssets.length}/{scopedAssets.length}</span>
                 </header>
                 <div className="nd-asset-list">
                   {visibleAssets.map((asset) => {
@@ -8389,14 +8468,14 @@ function NetworkPage({
       ) : null}
 
       {networkTab === "maintenanceWorkbench" ? (
-        <Panel icon={Wrench} title="Maintenance workbench" action={`${fieldTasks.length + serviceOrders.length} ${t("service tasks")}`}>
-          <KanbanBoard serviceOrders={serviceOrders} />
+        <Panel icon={Wrench} title="Maintenance workbench" action={`${scopedFieldTasks.length + scopedServiceOrders.length} ${t("service tasks")}`}>
+          <KanbanBoard serviceOrders={scopedServiceOrders} tasks={scopedFieldTasks} />
         </Panel>
       ) : null}
 
       {networkTab === "supplyChain" ? (
-        <Panel icon={ClipboardCheck} title="Supply chain" action={`${assetSupplyRecords.filter((record) => record.tone !== "good").length} ${t("assets need action")}`}>
-          <InventoryOperationsTable serviceOrders={serviceOrders} purchaseOrders={purchaseOrders} />
+        <Panel icon={ClipboardCheck} title="Supply chain" action={`${scopedSupplyRecords.filter((record) => record.tone !== "good").length} ${t("assets need action")}`}>
+          <InventoryOperationsTable records={scopedSupplyRecords} serviceOrders={scopedServiceOrders} purchaseOrders={scopedPurchaseOrders} />
         </Panel>
       ) : null}
     </PageBody>
@@ -8575,9 +8654,9 @@ const assetSupplyRecords: AssetSupplyRecord[] = [
   },
 ];
 
-function InventoryOperationsTable({ serviceOrders, purchaseOrders }: { serviceOrders: ServiceOrder[]; purchaseOrders: PurchaseOrder[] }) {
+function InventoryOperationsTable({ records, serviceOrders, purchaseOrders }: { records: AssetSupplyRecord[]; serviceOrders: ServiceOrder[]; purchaseOrders: PurchaseOrder[] }) {
   const t = useT();
-  const [expandedIds, setExpandedIds] = useState<string[]>([assetSupplyRecords[0].assetId]);
+  const [expandedIds, setExpandedIds] = useState<string[]>(() => (records[0] ? [records[0].assetId] : []));
   const [supplyNotice, setSupplyNotice] = useState("");
 
   function toggle(assetId: string) {
@@ -8605,7 +8684,7 @@ function InventoryOperationsTable({ serviceOrders, purchaseOrders }: { serviceOr
             </tr>
           </thead>
           <tbody>
-            {assetSupplyRecords.map((record) => {
+            {records.map((record) => {
               const expanded = expandedIds.includes(record.assetId);
               const actionableComponents = record.components.filter((component) => hasActionableRecommendation(component.recommendation));
               const linkedOrders = serviceOrders.filter((order) => order.assetId === record.assetId);
@@ -8732,7 +8811,7 @@ function InventoryOperationsTable({ serviceOrders, purchaseOrders }: { serviceOr
   );
 }
 
-function KanbanBoard({ serviceOrders }: { serviceOrders: ServiceOrder[] }) {
+function KanbanBoard({ serviceOrders, tasks }: { serviceOrders: ServiceOrder[]; tasks: typeof fieldTasks }) {
   const t = useT();
   const columns: Array<{ label: string; states: Array<(typeof fieldTasks)[number]["column"]> }> = [
     { label: "Pending Assignment", states: ["Pending Assignment"] },
@@ -8744,12 +8823,12 @@ function KanbanBoard({ serviceOrders }: { serviceOrders: ServiceOrder[] }) {
     <div className="kanban maintenance-kanban">
       {columns.map((column) => {
         const orders = serviceOrders.filter((order) => column.states.includes(order.status));
-        const tasks = fieldTasks.filter((task) => column.states.includes(task.column));
+        const columnTasks = tasks.filter((task) => column.states.includes(task.column));
         return (
           <section key={column.label} className="maintenance-column">
             <header className="maintenance-column-head">
               <strong>{t(column.label)}</strong>
-              <span>{orders.length + tasks.length}</span>
+              <span>{orders.length + columnTasks.length}</span>
             </header>
             <div className="maintenance-card-stack">
               {orders.map((order) => (
@@ -8772,7 +8851,7 @@ function KanbanBoard({ serviceOrders }: { serviceOrders: ServiceOrder[] }) {
                   </dl>
                 </article>
               ))}
-              {tasks.map((task) => {
+              {columnTasks.map((task) => {
                 const severity = task.column === "Overdue" ? "Overdue" : task.priority;
                 return (
                   <article key={task.id} className={`maintenance-task-card severity-${severity.toLowerCase()}`}>
@@ -11121,12 +11200,14 @@ function CommercialMapPage({
   auctions,
   schedule,
   profile,
+  assetScope,
   notify,
   t,
 }: {
   auctions: AuctionLot[];
   schedule: ScheduleItem[];
   profile: Profile | null;
+  assetScope: Set<string> | null;
   notify: (message: string) => void;
   t: (value: string) => string;
 }) {
@@ -11138,14 +11219,17 @@ function CommercialMapPage({
   // the ownership facts.
   const canProposeOwnership = profile?.id === "finance" || profile?.id === "admin";
 
+  // Operator logins: pins, KPIs and the allocation register cover only the
+  // assets their company owns; ADMO roles keep the full estate (scope null).
+  const scopedAssets = useMemo(() => scopeByAssetId(estateAssets, assetScope, (asset) => asset.id), [assetScope]);
   const records = useMemo(
     () =>
-      estateAssets.map((asset) => {
+      scopedAssets.map((asset) => {
         const allocation = assetAllocations.find((item) => item.assetId === asset.id);
         const lot = allocation?.lotId ? auctions.find((item) => item.id === allocation.lotId) : undefined;
         return { asset, allocation, lot };
       }),
-    [auctions],
+    [auctions, scopedAssets],
   );
   const mapAssets = useMemo(
     () =>
