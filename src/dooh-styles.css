@@ -14538,3 +14538,103 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
   white-space: nowrap;
 }
 .cms-ops-sources .status-pill { flex: none; }
+
+/* ================================================================
+   OPERATOR REGISTRY + ASSET OWNERSHIP (Commercial Map)
+   Ownership card in the asset popover (owner company, model, since,
+   counterparty line, transition history), compact owner column in
+   the allocation register, and the governed change-model dialog.
+   Logical properties keep RTL correct; shared tokens keep both
+   themes right.
+   ================================================================ */
+.commercial-popover-ownership { display: grid; gap: 6px; }
+.commercial-popover-ownership > strong {
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cpo-card {
+  display: grid;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.cpo-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.cpo-head > span { display: grid; gap: 1px; min-width: 0; }
+.cpo-head strong { overflow: hidden; color: var(--ink); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.cpo-head small { color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.cpo-head .status-pill { flex: 0 0 auto; }
+.cpo-counterparty { margin: 0; font-size: 11px; color: var(--ink-2); line-height: 1.5; }
+.cpo-counterparty strong { color: var(--ink); font-weight: 640; }
+.cpo-history-wrap { display: grid; gap: 5px; }
+.cpo-history-wrap > em {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cpo-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cpo-history li {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  padding-inline-start: 14px;
+  min-width: 0;
+}
+.cpo-history li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.cpo-history li.planned::before { background: transparent; border: 2px solid var(--primary); width: 5px; height: 5px; }
+.cpo-history li strong { color: var(--ink); font-size: 11.5px; line-height: 1.4; }
+.cpo-history li small { color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.cpo-actions { display: flex; }
+.cpo-actions .button { font-size: 12px; padding: 7px 12px; }
+.cpo-pending { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cpo-pending small { color: var(--muted); font-size: 11px; }
+
+/* Allocation register: compact owner column (name over short model). */
+.alloc-owner-cell strong { display: block; color: var(--ink); font-size: 12.5px; }
+.alloc-owner-cell span { display: block; color: var(--muted); font-size: 11px; }
+
+/* Change-ownership dialog: reuses the revision-dialog frame with a
+   compact model radiogroup and a short note field. */
+.ownership-dialog { max-width: 560px; }
+.own-model-block { display: grid; gap: 8px; }
+.own-field-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.own-model-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.own-model-grid button {
+  display: grid;
+  gap: 3px;
+  text-align: start;
+  padding: 11px 13px;
+  border: 1px solid var(--ctrl-border);
+  border-radius: 12px;
+  background: var(--surface-input);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.own-model-grid button strong { font-size: 13px; }
+.own-model-grid button small { font-size: 11px; color: var(--muted); line-height: 1.45; }
+.own-model-grid button.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}
+.ownership-dialog .revision-field textarea { min-height: 96px; }
+.own-dialog-note { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 720px) {
+  .own-model-grid { grid-template-columns: 1fr; }
+}

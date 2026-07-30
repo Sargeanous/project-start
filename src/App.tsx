@@ -151,6 +151,17 @@ import {
 } from "./advisor-data";
 import { assetAudienceBands } from "./audience-data";
 import {
+  assetOwnership,
+  operatorById,
+  OWNERSHIP_MODELS,
+  OWNERSHIP_MODEL_SHORT,
+  OWNERSHIP_MODEL_HINTS,
+  registerOwnershipProposal,
+  usePendingOwnershipChanges,
+  type AssetOwnership,
+  type OwnershipModel,
+} from "./operators-data";
+import {
   useTickets,
   createTicket,
   addTicketComment,
@@ -2894,7 +2905,45 @@ const translations: Record<string, string> = {
   "Set the inputs and build": "حدد المدخلات وابنِ الخطة",
   "Set a budget and MediaGPT anchors the strongest screen in every zone, so the whole emirate sees the campaign.": "حدد ميزانية وسيرسي MediaGPT أقوى شاشة في كل منطقة، لتشاهد الإمارة كلها الحملة.",
   "Set an impressions target and MediaGPT searches for the smallest budget that reaches it.": "حدد هدفًا من المشاهدات وسيبحث MediaGPT عن أصغر ميزانية تصل إليه.",
-  "Set a budget and MediaGPT ranks the busiest corridors by weekly audience, our proxy for corridor traffic.": "حدد ميزانية وسيرتب MediaGPT الممرات الأكثر ازدحامًا حسب الجمهور الأسبوعي، مؤشرنا البديل لحركة المرور."
+  "Set a budget and MediaGPT ranks the busiest corridors by weekly audience, our proxy for corridor traffic.": "حدد ميزانية وسيرتب MediaGPT الممرات الأكثر ازدحامًا حسب الجمهور الأسبوعي، مؤشرنا البديل لحركة المرور.",
+  // Operator registry + asset ownership models (Commercial Map)
+  "Ownership": "الملكية",
+  "Ownership history": "سجل الملكية",
+  "Ownership governance": "حوكمة الملكية",
+  "Government-owned, rented to operator": "ملكية حكومية مؤجرة لمشغل",
+  "Operator-owned": "ملكية المشغل",
+  "Under management contract": "بموجب عقد إدارة",
+  "Government rental": "إيجار حكومي",
+  "Management contract": "عقد إدارة",
+  "Government": "حكومي",
+  "Private operator": "مشغل خاص",
+  "since": "منذ",
+  "Rented to": "مؤجرة إلى",
+  "Managed by": "تُدار بواسطة",
+  "Planned": "مخطط له",
+  "Pending approval": "بانتظار الموافقة",
+  "Proposal": "الاقتراح",
+  "Change ownership model": "تغيير نموذج الملكية",
+  "New ownership model": "نموذج الملكية الجديد",
+  "Current model": "النموذج الحالي",
+  "Justification note": "ملاحظة التبرير",
+  "Submit proposal": "إرسال الاقتراح",
+  "Why the model should change, e.g. renewal terms or a capex transfer": "لماذا يجب تغيير النموذج، مثل شروط التجديد أو نقل النفقات الرأسمالية",
+  "The government owns the structure and rents it to an operator": "الحكومة تملك الهيكل وتؤجره لمشغل",
+  "The operator owns the structure outright": "المشغل يملك الهيكل ملكية كاملة",
+  "A firm runs the site for a fee; ownership does not move": "شركة تدير الموقع مقابل رسوم؛ ولا تنتقل الملكية",
+  "Creates a governed proposal for the Commercial desk; nothing changes on the register until it is approved.": "ينشئ اقتراحاً محوكماً للمكتب التجاري؛ لا يتغير شيء في السجل حتى تتم الموافقة عليه.",
+  "Ownership proposal sent to the Commercial desk": "أُرسل اقتراح الملكية إلى المكتب التجاري",
+  "Al Ain City Media Assets": "أصول الإعلام لمدينة العين",
+  "Gulf Vision Outdoor": "غلف فيجن للإعلان الخارجي",
+  "Emirates Transit Media": "الإمارات لإعلانات النقل",
+  "Liwa Digital Structures": "ليوا للهياكل الرقمية",
+  "Oasis Media Holdings": "واحة الإعلام القابضة",
+  "Al Wathba Media Infrastructure": "الوثبة للبنية التحتية الإعلامية",
+  "Management contract converted to a rental concession at renewal; Gulf Vision Outdoor stayed on as renting operator.": "تحوّل عقد الإدارة إلى امتياز إيجاري عند التجديد؛ واستمرت غلف فيجن للإعلان الخارجي مشغلاً مستأجراً.",
+  "Transfer to the sovereign estate agreed at contract renewal; Emirates Transit Media stays as renting operator.": "اتُفق على النقل إلى الأصول السيادية عند تجديد العقد؛ وتبقى الإمارات لإعلانات النقل مشغلاً مستأجراً.",
+  "Structure sold to Gulf Vision Outdoor under the asset-light program; media rights stay with ADMO.": "بيع الهيكل إلى غلف فيجن للإعلان الخارجي ضمن برنامج تخفيف الأصول؛ وتبقى الحقوق الإعلامية لدى مكتب أبوظبي الإعلامي.",
+  "Bought back from the mall operator; Oasis Media Holdings retained to run the site for a management fee.": "أعيد شراؤه من مشغل المركز التجاري؛ واحتُفظ بواحة الإعلام القابضة لتشغيل الموقع مقابل رسوم إدارة."
 };
 
 const I18nContext = createContext<Translator>((value) => value);
@@ -3600,7 +3649,7 @@ function App() {
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
-          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
+          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} profile={profile} notify={notify} t={t} />}
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings.filter((booking) => !booking.historySeed)} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
@@ -10999,18 +11048,95 @@ const ALLOCATION_PIN: Record<AssetAllocation["status"], string> = {
   "Under maintenance": "#d08400",
 };
 
+// Approval-gated ownership change (operator registry / ownership models):
+// the dialog never mutates the ownership register. Confirming raises a
+// Commercial desk ticket (governed proposal) and the asset shows a Pending
+// state for the session instead of switching instantly.
+function OwnershipChangeDialog({
+  asset,
+  ownership,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  asset: Asset;
+  ownership: AssetOwnership;
+  onCancel: () => void;
+  onConfirm: (toModel: OwnershipModel, note: string) => void;
+  t: (value: string) => string;
+}) {
+  const options = OWNERSHIP_MODELS.filter((model) => model !== ownership.model);
+  const [toModel, setToModel] = useState<OwnershipModel>(options[0]);
+  const [note, setNote] = useState("");
+  const owner = operatorById(ownership.ownerOperatorId);
+  const valid = note.trim().length >= 8;
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog ownership-dialog" role="dialog" aria-modal="true" aria-label={t("Change ownership model")} onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <div>
+            <span>{t("Ownership governance")} · {asset.id}</span>
+            <strong>{t("Change ownership model")}</strong>
+            <small>{t(asset.name)} · {t("Current model")}: {t(OWNERSHIP_MODEL_SHORT[ownership.model])}{owner ? ` · ${t(owner.name)}` : ""}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}><X size={16} /></button>
+        </header>
+        <div className="revision-body">
+          <div className="own-model-block">
+            <span className="own-field-label">{t("New ownership model")}</span>
+            <div className="own-model-grid" role="radiogroup" aria-label={t("New ownership model")}>
+              {options.map((model) => (
+                <button
+                  key={model}
+                  type="button"
+                  role="radio"
+                  aria-checked={toModel === model}
+                  className={toModel === model ? "active" : ""}
+                  onClick={() => setToModel(model)}
+                >
+                  <strong>{t(OWNERSHIP_MODEL_SHORT[model])}</strong>
+                  <small>{t(OWNERSHIP_MODEL_HINTS[model])}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="revision-field">
+            {t("Justification note")}
+            <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("Why the model should change, e.g. renewal terms or a capex transfer")} />
+          </label>
+          <p className="own-dialog-note">{t("Creates a governed proposal for the Commercial desk; nothing changes on the register until it is approved.")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={FileCheck2} disabled={!valid} onClick={() => onConfirm(toModel, note.trim())}>{t("Submit proposal")}</Button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 // Map-based commercial operations dashboard (RFP FIN-601/602/603): per-asset
 // markers colour-coded by allocation status, click -> commercial detail panel.
 function CommercialMapPage({
   auctions,
   schedule,
+  profile,
+  notify,
   t,
 }: {
   auctions: AuctionLot[];
   schedule: ScheduleItem[];
+  profile: Profile | null;
+  notify: (message: string) => void;
   t: (value: string) => string;
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [ownershipDialogAssetId, setOwnershipDialogAssetId] = useState("");
+  const pendingOwnership = usePendingOwnershipChanges();
+  // Internal governance roles only (ADMO Finance / Platform Admin) may
+  // propose an ownership-model change; everyone on this page still sees
+  // the ownership facts.
+  const canProposeOwnership = profile?.id === "finance" || profile?.id === "admin";
 
   const records = useMemo(
     () =>
@@ -11100,6 +11226,57 @@ function CommercialMapPage({
                   <Detail label="Audience" value={t(asset.audience)} />
                   <Detail label="Open faults" value={String(openTickets)} />
                 </div>
+                {(() => {
+                  const ownership = assetOwnership(asset.id);
+                  if (!ownership) return null;
+                  const owner = operatorById(ownership.ownerOperatorId);
+                  const counterparty = ownership.counterpartyId ? operatorById(ownership.counterpartyId) : undefined;
+                  const pending = pendingOwnership[asset.id];
+                  return (
+                    <div className="commercial-popover-ownership">
+                      <strong>{t("Ownership")}</strong>
+                      <div className="cpo-card">
+                        <div className="cpo-head">
+                          <span>
+                            <strong>{owner ? t(owner.name) : ownership.ownerOperatorId}</strong>
+                            <small>{t(ownership.model)} · {t("since")} {ownership.since}</small>
+                          </span>
+                          <StatusPill label={owner?.kind ?? "Private operator"} tone={owner?.kind === "Government" ? "info" : "neutral"} />
+                        </div>
+                        {counterparty ? (
+                          <p className="cpo-counterparty">
+                            {ownership.model === "Under management contract" ? t("Managed by") : t("Rented to")} <strong>{t(counterparty.name)}</strong>
+                          </p>
+                        ) : null}
+                        {ownership.transitions?.length ? (
+                          <div className="cpo-history-wrap">
+                            <em>{t("Ownership history")}</em>
+                            <ul className="cpo-history">
+                              {ownership.transitions.map((transition) => (
+                                <li key={`${transition.on}-${transition.to}`} className={transition.planned ? "planned" : ""}>
+                                  <strong>{t(OWNERSHIP_MODEL_SHORT[transition.from])} → {t(OWNERSHIP_MODEL_SHORT[transition.to])}</strong>
+                                  <small>{transition.planned ? `${t("Planned")} · ${transition.on}` : transition.on} · {t(transition.note)}</small>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {canProposeOwnership ? (
+                          pending ? (
+                            <div className="cpo-pending">
+                              <StatusPill label="Pending approval" tone="warn" />
+                              <small>{t("Proposal")} {pending.ticketId} · {t(OWNERSHIP_MODEL_SHORT[pending.toModel])}</small>
+                            </div>
+                          ) : (
+                            <div className="cpo-actions">
+                              <Button variant="secondary" icon={FileCheck2} onClick={() => setOwnershipDialogAssetId(asset.id)}>{t("Change ownership model")}</Button>
+                            </div>
+                          )
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {lot ? (
                   <div className="commercial-popover-auction">
                     <strong>{t("Live auction")}: {t(lot.lotName)}</strong>
@@ -11159,6 +11336,7 @@ function CommercialMapPage({
               <tr>
                 <th>{t("Asset")}</th>
                 <th>{t("Status")}</th>
+                <th>{t("Owner")}</th>
                 <th>{t("Operator")}</th>
                 <th>{t("Contract")}</th>
                 <th>{t("Window")}</th>
@@ -11171,6 +11349,17 @@ function CommercialMapPage({
                 <tr key={rowAsset.id} className={rowAsset.id === selectedAssetId ? "selected" : ""} onClick={() => setSelectedAssetId(rowAsset.id)}>
                   <td data-label={t("Asset")}><strong>{t(rowAsset.name)}</strong><span>{rowAsset.id} · {t(rowAsset.zone)}</span></td>
                   <td data-label={t("Status")}><StatusPill label={rowAlloc?.status ?? "Available"} tone={ALLOCATION_TONE[rowAlloc?.status ?? "Available"]} /></td>
+                  <td data-label={t("Owner")} className="alloc-owner-cell">{(() => {
+                    const rowOwnership = assetOwnership(rowAsset.id);
+                    if (!rowOwnership) return "-";
+                    const rowOwner = operatorById(rowOwnership.ownerOperatorId);
+                    return (
+                      <>
+                        <strong>{rowOwner ? t(rowOwner.name) : rowOwnership.ownerOperatorId}</strong>
+                        <span>{t(OWNERSHIP_MODEL_SHORT[rowOwnership.model])}</span>
+                      </>
+                    );
+                  })()}</td>
                   <td data-label={t("Operator")}>{rowAlloc?.operator ? t(rowAlloc.operator) : "-"}</td>
                   <td data-label={t("Contract")}>{rowAlloc?.contractRef ?? "-"}</td>
                   <td data-label={t("Window")}>{rowAlloc?.effectiveDate ? `${rowAlloc.effectiveDate} → ${rowAlloc.expiryDate ?? "-"}` : "-"}</td>
@@ -11182,6 +11371,35 @@ function CommercialMapPage({
           </table>
         </div>
       </Panel>
+
+      {ownershipDialogAssetId ? (() => {
+        const dialogAsset = estateAssets.find((item) => item.id === ownershipDialogAssetId);
+        const dialogOwnership = assetOwnership(ownershipDialogAssetId);
+        if (!dialogAsset || !dialogOwnership) return null;
+        return (
+          <OwnershipChangeDialog
+            asset={dialogAsset}
+            ownership={dialogOwnership}
+            onCancel={() => setOwnershipDialogAssetId("")}
+            onConfirm={(toModel, note) => {
+              const actor = profile?.name ?? "ADMO Finance";
+              const ticket = createTicket({
+                title: `Ownership model change proposal - ${dialogAsset.id}`,
+                body: `${dialogAsset.name}: change the ownership model from "${dialogOwnership.model}" to "${toModel}". Justification from ${actor}: ${note}`,
+                object: { kind: "Asset", ref: dialogAsset.id, label: dialogAsset.name },
+                team: "Commercial desk",
+                raisedBy: actor,
+                priority: "Medium",
+                source: "Manual",
+              });
+              registerOwnershipProposal({ assetId: dialogAsset.id, toModel, ticketId: ticket.id, raisedBy: actor });
+              setOwnershipDialogAssetId("");
+              notify(`${dialogAsset.id}: ${t("Ownership proposal sent to the Commercial desk")} (${ticket.id})`);
+            }}
+            t={t}
+          />
+        );
+      })() : null}
     </PageBody>
   );
 }
