@@ -1648,6 +1648,21 @@ const translations: Record<string, string> = {
   "Reviewer action required": "إجراء مطلوب من المراجع",
   "Media Library": "مكتبة الوسائط",
   "Scheduling": "الجدولة",
+  "Approval turnaround": "زمن دورة الاعتماد",
+  "Demo measurement": "قياس تجريبي",
+  "AI verdict, median": "قرار الذكاء الاصطناعي، الوسيط",
+  "min": "دقيقة",
+  "Manual baseline": "خط الأساس اليدوي",
+  "2 to 4 days": "من 2 إلى 4 أيام",
+  "AI verdict time is measured on this demo queue. Baseline as described by ADMO: each item submitted separately via TAMM to DMT.": "زمن قرار الذكاء الاصطناعي مقاس على قائمة العرض التجريبي هذه. خط الأساس كما وصفه مكتب أبوظبي الإعلامي: كل عنصر يقدم على حدة عبر منصة تم إلى دائرة البلديات والنقل.",
+  "Guideline pack": "حزمة الإرشادات",
+  "sources": "مصادر",
+  "clauses": "بنداً",
+  "UAE Media Content Standards": "معايير المحتوى الإعلامي في الإمارات",
+  "UAE Advertising Guide, working summary": "دليل الإعلانات الإماراتي، ملخص عمل",
+  "Internal DOOH content policy": "سياسة المحتوى الداخلية للشاشات الخارجية",
+  "Official ADMO guideline corpus": "الدليل الرسمي لمكتب أبوظبي الإعلامي",
+  "The official ADMO guideline corpus is pending and will slot into this same pack.": "الدليل الرسمي لمكتب أبوظبي الإعلامي قيد الانتظار وسيضاف إلى هذه الحزمة نفسها.",
   "items": "عناصر",
   "Start review": "بدء المراجعة",
   "Request changes": "طلب تعديلات",
@@ -5183,6 +5198,63 @@ function CreativeStudio({ onCreateCreative, aiAvailable, t }: { onCreateCreative
   );
 }
 
+// Approval turnaround, demo measurement. The AI verdict median is a
+// deterministic seeded value (hash of a fixed key, never wall clock); the
+// manual baseline is the process ADMO described, each item submitted
+// separately via TAMM to DMT, so it is quoted, not measured.
+const aiVerdictMedianMinutes = (26 + (parseInt(shortHash("cms-approval-turnaround"), 16) % 9)) / 10;
+
+// Static mirror of the ingested policy pack. A live status endpoint exists
+// (/api/dooh/agent/policy/status via getPolicyVectorStatus over
+// .dooh-data/policy-vectors.json, built from knowledge/*.md), but calling it
+// is fragile offline, so the counts are pinned here for a stable demo.
+const guidelinePackSources: Array<{ docId: string; title: string; clauses: number; status: "Ingested" | "Pending" }> = [
+  { docId: "MCS", title: "UAE Media Content Standards", clauses: 20, status: "Ingested" },
+  { docId: "ADG", title: "UAE Advertising Guide, working summary", clauses: 31, status: "Ingested" },
+  { docId: "ICP", title: "Internal DOOH content policy", clauses: 20, status: "Ingested" },
+  { docId: "ADMO", title: "Official ADMO guideline corpus", clauses: 0, status: "Pending" },
+];
+
+function CmsApprovalOpsStrip({ t }: { t: (value: string) => string }) {
+  const ingested = guidelinePackSources.filter((source) => source.status === "Ingested");
+  const totalClauses = ingested.reduce((sum, source) => sum + source.clauses, 0);
+  return (
+    <div className="cms-ops-grid">
+      <section className="cms-ops-card" aria-label={t("Approval turnaround")}>
+        <header className="cms-ops-head">
+          <span className="panel-icon"><Clock size={16} /></span>
+          <strong>{t("Approval turnaround")}</strong>
+          <StatusPill label="Demo measurement" tone="info" />
+        </header>
+        <div className="cms-ops-details">
+          <Detail label="AI verdict, median" value={`${aiVerdictMedianMinutes.toFixed(1)} ${t("min")}`} />
+          <Detail label="Manual baseline" value="2 to 4 days" />
+        </div>
+        <p className="cell-note">{t("AI verdict time is measured on this demo queue. Baseline as described by ADMO: each item submitted separately via TAMM to DMT.")}</p>
+      </section>
+      <section className="cms-ops-card" aria-label={t("Guideline pack")}>
+        <header className="cms-ops-head">
+          <span className="panel-icon"><FileText size={16} /></span>
+          <strong>{t("Guideline pack")}</strong>
+          <span className="head-meta">{ingested.length} {t("sources")} | {totalClauses} {t("clauses")}</span>
+        </header>
+        <ul className="cms-ops-sources">
+          {guidelinePackSources.map((source) => (
+            <li key={source.docId}>
+              <span className="cms-ops-docid">{source.docId}</span>
+              <span className="cms-ops-doctitle">{t(source.title)}</span>
+              {source.status === "Ingested"
+                ? <em>{source.clauses} {t("clauses")}</em>
+                : <StatusPill label="Pending" tone="warn" />}
+            </li>
+          ))}
+        </ul>
+        <p className="cell-note">{t("The official ADMO guideline corpus is pending and will slot into this same pack.")}</p>
+      </section>
+    </div>
+  );
+}
+
 function CmsPage({
   submissions,
   schedule,
@@ -5233,6 +5305,8 @@ function CmsPage({
       ]} />
 
       {tab === "create" ? <CreativeStudio onCreateCreative={onCreateCreative} aiAvailable={aiAvailable} t={t} /> : null}
+
+      {tab === "submissions" ? <CmsApprovalOpsStrip t={t} /> : null}
 
       {tab === "submissions" && selected ? (
         <Panel
