@@ -132,6 +132,7 @@ import {
 import {
   answerAdvertiserQuery,
   answerAssetCommercialQuery,
+  assetAdvertiserHistory,
   assetEconomics,
   campaignDelivery,
   comparables as assetComparables,
@@ -1959,6 +1960,15 @@ const translations: Record<string, string> = {
   "Fixed slots": "فترات ثابتة",
   "Variable share-of-voice": "حصة ظهور مرنة",
   "Open faults": "الأعطال المفتوحة",
+  "Previous advertisers": "المعلنون السابقون",
+  "Who advertised here before": "من أعلن هنا سابقاً",
+  "Renewed": "تم التجديد",
+  "Converted to annual": "تحول إلى عقد سنوي",
+  "Make-good": "تعويض عرض",
+  "Underdelivered": "تسليم ناقص",
+  "Strong result": "نتيجة قوية",
+  "Delivered": "تم التسليم",
+  "Civic slot, no media fee": "فترة مدنية دون رسوم إعلامية",
   "floor": "الحد الأدنى",
   "week": "أسبوع",
   "Active allocation contracts": "عقود التخصيص النشطة",
@@ -10750,6 +10760,18 @@ function CommercialMapPage({
                 ) : (
                   <p className="cell-note">{t("Next slot")}: {t(asset.nextSlot)}</p>
                 )}
+                <div className="commercial-popover-history">
+                  <strong>{t("Previous advertisers")}</strong>
+                  {assetAdvertiserHistory(asset.id).map((flight) => (
+                    <div key={`${flight.advertiser}-${flight.startDate}`} className="cph-row">
+                      <span>
+                        <strong>{t(flight.advertiser)}</strong>
+                        <small>{flight.startDate} → {flight.endDate} · {t(flight.budgetBand)}</small>
+                      </span>
+                      <StatusPill label={flight.outcomeTag} tone={flight.outcomeTone} />
+                    </div>
+                  ))}
+                </div>
                 <EmbeddedCopilot mode="commercial" assetId={asset.id} actor="Commercial desk" collapsible t={t} />
               </section>
             );
@@ -11797,7 +11819,7 @@ function EmbeddedCopilot({ mode, assetId, campaigns, actor, collapsible, t }: {
   const [q, setQ] = useState("");
   const [drafted, setDrafted] = useState<string[]>([]);
   const chips = mode === "commercial"
-    ? ["How much is left on this contract", "When is it free", "Can I place this campaign elsewhere"]
+    ? ["How much is left on this contract", "When is it free", "Who advertised here before", "Can I place this campaign elsewhere"]
     : ["How much budget is left", "Am I pacing on plan", "Where should I spend 300k"];
 
   function ask(text?: string) {
