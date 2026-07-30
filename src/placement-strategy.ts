@@ -9,6 +9,8 @@ import type {
 export type PlacementZoneClass = 0 | 1 | 2 | 3;
 export type PlacementSize = "Small" | "Medium" | "Large";
 export type RoadSpeedBand = "0-40" | "41-80" | "81-100" | "101-160";
+export type PlacementRoadClass = "Highway" | "Arterial" | "Boulevard" | "Waterfront promenade";
+export type PlacementCarriageway = "Dual" | "Single";
 export type PlacementVerdict = "Compliant" | "Review required" | "Not permitted";
 export type PlacementCheckState = "pass" | "warn" | "block";
 
@@ -67,6 +69,9 @@ export interface PlacementCandidate {
   lng: number;
   zoneClass: PlacementZoneClass;
   roadSpeedKph: number;
+  roadClass?: PlacementRoadClass;
+  carriageway?: PlacementCarriageway;
+  distanceToJunctionM?: number;
   formatId: string;
   widthM: number;
   heightM: number;
@@ -96,6 +101,7 @@ export interface PlacementEvaluation {
   speedBand: RoadSpeedBand;
   minimumClearanceM: number | null;
   nearestAsset: { asset: Asset; distanceM: number } | null;
+  nearbyAssets: Array<{ assetId: string; name: string; distanceM: number }>;
   diameterM: number;
   diameterCount: number;
   diameterLimit: number;
@@ -551,6 +557,19 @@ export const assetPlacementProfiles: AssetPlacementProfile[] = [
   },
 ];
 
+// Display labels for the hand-authored road attributes on candidate sites.
+export const placementRoadClassLabels: Record<PlacementRoadClass, LocalizedText> = {
+  Highway: { en: "Highway", ar: "طريق سريع" },
+  Arterial: { en: "Arterial", ar: "طريق شرياني" },
+  Boulevard: { en: "Boulevard", ar: "شارع رئيسي" },
+  "Waterfront promenade": { en: "Waterfront promenade", ar: "ممشى الواجهة البحرية" },
+};
+
+export const placementCarriagewayLabels: Record<PlacementCarriageway, LocalizedText> = {
+  Dual: { en: "Dual carriageway", ar: "طريق مزدوج" },
+  Single: { en: "Single carriageway", ar: "طريق مفرد" },
+};
+
 export const placementCandidates: PlacementCandidate[] = [
   {
     id: "PLS-CORN-01",
@@ -560,6 +579,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.347,
     zoneClass: 2,
     roadSpeedKph: 60,
+    roadClass: "Waterfront promenade",
+    carriageway: "Dual",
+    distanceToJunctionM: 210,
     formatId: "digital-large-billboard",
     widthM: 14,
     heightM: 6,
@@ -576,6 +598,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.62,
     zoneClass: 3,
     roadSpeedKph: 120,
+    roadClass: "Highway",
+    carriageway: "Dual",
+    distanceToJunctionM: 640,
     formatId: "digital-large-billboard",
     widthM: 16,
     heightM: 8,
@@ -592,6 +617,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.4018796,
     zoneClass: 1,
     roadSpeedKph: 40,
+    roadClass: "Boulevard",
+    carriageway: "Single",
+    distanceToJunctionM: 90,
     formatId: "digital-small-vertical",
     widthM: 1.5,
     heightM: 2.6,
@@ -607,6 +635,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.3889,
     zoneClass: 3,
     roadSpeedKph: 60,
+    roadClass: "Boulevard",
+    carriageway: "Dual",
+    distanceToJunctionM: 140,
     formatId: "digital-medium-horizontal",
     widthM: 6,
     heightM: 3.4,
@@ -623,6 +654,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.3115749,
     zoneClass: 0,
     roadSpeedKph: 40,
+    roadClass: "Arterial",
+    carriageway: "Dual",
+    distanceToJunctionM: 75,
     formatId: "digital-small-vertical",
     widthM: 1.4,
     heightM: 2.4,
@@ -638,6 +672,9 @@ export const placementCandidates: PlacementCandidate[] = [
     lng: 54.4864576,
     zoneClass: 3,
     roadSpeedKph: 100,
+    roadClass: "Arterial",
+    carriageway: "Dual",
+    distanceToJunctionM: 380,
     formatId: "digital-bridge-banner",
     widthM: 11,
     heightM: 3,
@@ -952,6 +989,11 @@ export function evaluatePlacement(candidate: PlacementCandidate): PlacementEvalu
     speedBand,
     minimumClearanceM,
     nearestAsset: nearest ? { asset: nearest.asset, distanceM: nearest.distanceM } : null,
+    nearbyAssets: nearby.slice(0, 3).map((row) => ({
+      assetId: row.asset.id,
+      name: row.asset.name,
+      distanceM: row.distanceM,
+    })),
     diameterM,
     diameterCount,
     diameterLimit,

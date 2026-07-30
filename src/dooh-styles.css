@@ -14052,3 +14052,71 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 .cph-row strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .cph-row small { color: var(--muted); font-size: 10.5px; line-height: 1.45; }
 .cph-row .status-pill { flex: 0 0 auto; }
+
+/* ================================================================
+   PLACEMENT FEED METRICS - richer candidate metrics
+   (road-class and nearest-asset chips on candidate rows, extra road
+   facts in the validator result grid, nearby-placements mini table)
+   ================================================================ */
+.placement-row-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; margin-top: 2px; }
+.placement-row-chips i {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+  font-size: 9.5px;
+  font-style: normal;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Six facts now fill a 3x2 grid in the validator result row. */
+.placement-result-facts span:nth-child(3n) { border-inline-end: 0; }
+.placement-result-facts span:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }
+
+.placement-nearby { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.placement-nearby > strong {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.placement-nearby > small { color: var(--muted); font-size: 10.5px; }
+.placement-nearby-table { display: grid; }
+.placement-nearby-table > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.placement-nearby-table > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.placement-nearby-table > div > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.placement-nearby-table > div > strong {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.placement-nearby-table > div > em {
+  color: var(--ink);
+  font-size: 11px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

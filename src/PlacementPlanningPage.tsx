@@ -34,7 +34,9 @@ import {
   evaluateExistingPlacement,
   evaluatePlacement,
   placementCandidates,
+  placementCarriagewayLabels,
   placementFormat,
+  placementRoadClassLabels,
   placementZonePolicies,
   portfolioMix,
   readPlacementIntakes,
@@ -470,6 +472,17 @@ export function PlacementPlanningPage({ t, isArabic }: PlacementPlanningPageProp
                         {localized(row.candidate.marketArea)} |{" "}
                         {localized(row.evaluation.format.name)}
                       </small>
+                      <span className="placement-row-chips">
+                        {row.candidate.roadClass ? (
+                          <i>{localized(placementRoadClassLabels[row.candidate.roadClass])}</i>
+                        ) : null}
+                        {row.evaluation.nearestAsset ? (
+                          <i>
+                            {row.evaluation.nearestAsset.asset.id} |{" "}
+                            {row.evaluation.nearestAsset.distanceM} {text("m", "م")}
+                          </i>
+                        ) : null}
+                      </span>
                     </span>
                     <em>
                       {text(
@@ -544,6 +557,17 @@ export function PlacementPlanningPage({ t, isArabic }: PlacementPlanningPageProp
                   <small>
                     {row.candidate.id} | {localized(row.candidate.marketArea)}
                   </small>
+                  <span className="placement-row-chips">
+                    {row.candidate.roadClass ? (
+                      <i>{localized(placementRoadClassLabels[row.candidate.roadClass])}</i>
+                    ) : null}
+                    {row.evaluation.nearestAsset ? (
+                      <i>
+                        {row.evaluation.nearestAsset.asset.id} |{" "}
+                        {row.evaluation.nearestAsset.distanceM} {text("m", "م")}
+                      </i>
+                    ) : null}
+                  </span>
                 </span>
               </button>
             ))}
@@ -737,6 +761,54 @@ export function PlacementPlanningPage({ t, isArabic }: PlacementPlanningPageProp
                       {text("per km", "لكل كم")}
                     </strong>
                   </span>
+                  <span>
+                    <small>{text("Road class", "تصنيف الطريق")}</small>
+                    <strong>
+                      {selected.roadClass
+                        ? localized(placementRoadClassLabels[selected.roadClass])
+                        : text("Survey pending", "بانتظار المسح")}
+                    </strong>
+                  </span>
+                  <span>
+                    <small>{text("Carriageway", "نوع المسار")}</small>
+                    <strong>
+                      {selected.carriageway
+                        ? localized(placementCarriagewayLabels[selected.carriageway])
+                        : text("Survey pending", "بانتظار المسح")}
+                    </strong>
+                  </span>
+                  <span>
+                    <small>{text("Junction distance", "المسافة إلى التقاطع")}</small>
+                    <strong>
+                      {selected.distanceToJunctionM != null
+                        ? `${selected.distanceToJunctionM} ${text("m", "م")}`
+                        : text("Survey pending", "بانتظار المسح")}
+                    </strong>
+                  </span>
+                </div>
+
+                <div className="placement-nearby">
+                  <strong>{text("Nearby placements", "المواضع القريبة")}</strong>
+                  {evaluation.nearbyAssets.length ? (
+                    <div className="placement-nearby-table">
+                      {evaluation.nearbyAssets.map((row) => (
+                        <div key={row.assetId}>
+                          <span>{row.assetId}</span>
+                          <strong>{row.name}</strong>
+                          <em>
+                            {row.distanceM} {text("m", "م")}
+                          </em>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <small>
+                      {text(
+                        "No estate assets are registered near this point.",
+                        "لا توجد أصول مسجلة قرب هذه النقطة.",
+                      )}
+                    </small>
+                  )}
                 </div>
 
                 <button
