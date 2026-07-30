@@ -6,12 +6,12 @@ import {
   type PlacementZoneClass,
 } from "../placement-strategy";
 
-export interface GovernedPlacementAnswer {
+export type GovernedPlacementAnswer = {
   answer: string;
   table: string[][];
   suggestedActions: string[];
   summary: string;
-}
+};
 
 const FORMAT_MATCHERS: Array<{ id: string; pattern: RegExp }> = [
   {

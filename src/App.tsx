@@ -6271,7 +6271,7 @@ function AlertsPage({
               <Button icon={ShieldCheck} onClick={() => onAckAlert(selected.id)}>{t("Acknowledge")}</Button>
             </div>
           ) : null}
-          {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {selected.ackBy.map((a) => t(a)).join(", ")}</p> : null}
+          {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {(selected.ackBy ?? []).map((a) => t(a)).join(", ")}</p> : null}
         </section>
       </section>
 
@@ -6405,7 +6405,7 @@ function AlertsPage({
             <Button icon={ShieldCheck} onClick={() => onAckAlert(selected.id)}>{t("Acknowledge")}</Button>
           </div>
         ) : null}
-        {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {selected.ackBy.map((a) => t(a)).join(", ")}</p> : null}
+        {selected.ackBy?.length ? <p className="cell-note">{t("Acknowledged by")}: {(selected.ackBy ?? []).map((a) => t(a)).join(", ")}</p> : null}
 
         <ActionRow>
           {selected.state === "Check required" ? <Button icon={ShieldCheck} onClick={() => onRunChecks(selected.id)}>{t("Run MediaGPT checks")}</Button> : null}
