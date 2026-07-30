@@ -29,6 +29,7 @@ import {
   Maximize2,
   PlugZap,
   Power,
+  Printer,
   RadioTower,
   RefreshCcw,
   PanelLeftClose,
@@ -409,6 +410,14 @@ interface AuctionLot {
 
 type BookingStatus = "Awaiting payment" | "Booked" | "Scheduled" | "Played" | "Billed" | "Paid" | "Released";
 
+type PaymentMethod = "Bank transfer" | "Cheque" | "Corporate card";
+
+interface PaymentCapture {
+  method: PaymentMethod;
+  reference: string;
+  payerEntity: string;
+}
+
 interface BookingRecord {
   id: string;
   lotId: string;
@@ -425,6 +434,9 @@ interface BookingRecord {
   invoiceId?: string;
   submissionId?: string;
   paymentRef?: string;
+  paymentMethod?: PaymentMethod;
+  payerEntity?: string;
+  historySeed?: boolean;
   history: Array<{ status: BookingStatus | "Awarded"; at: string; actor: string; note?: string }>;
 }
 
@@ -442,6 +454,10 @@ interface InvoiceRecord {
   paidAt?: string;
   receiptId?: string;
   voidReason?: string;
+  paymentRef?: string;
+  paymentMethod?: PaymentMethod;
+  payerEntity?: string;
+  historySeed?: boolean;
 }
 
 interface PopRecord {
@@ -1957,6 +1973,56 @@ const translations: Record<string, string> = {
   "Net": "الصافي",
   "VAT 5%": "ضريبة القيمة المضافة 5%",
   "Total": "الإجمالي",
+
+  "Payment capture": "تسجيل الدفع",
+  "Payment method": "طريقة الدفع",
+  "Bank transfer": "تحويل بنكي",
+  "Cheque": "شيك",
+  "Corporate card": "بطاقة شركة",
+  "Wire to the ADMO settlement account": "تحويل إلى حساب التسوية لدى ADMO",
+  "Deposited at the finance counter": "يودع لدى مكتب المالية",
+  "Card settlement via the gateway": "تسوية بالبطاقة عبر البوابة",
+  "Payment reference": "مرجع الدفع",
+  "Payer entity": "الجهة الدافعة",
+  "incl. VAT": "شامل الضريبة",
+  "Recorded on the booking and the VAT invoice; the receipt is issued automatically and scheduling unlocks (FIN-202).": "يسجل على الحجز وفاتورة الضريبة؛ يصدر الإيصال تلقائياً وتفتح الجدولة (FIN-202).",
+  "Tax invoice": "فاتورة ضريبية",
+  "Issued at": "صدرت في",
+  "Paid at": "دفعت في",
+  "Print invoice": "طباعة الفاتورة",
+  "Billed by": "صادرة عن",
+  "ADMO commercial desk": "المكتب التجاري ADMO",
+  "Abu Dhabi, United Arab Emirates": "أبوظبي، الإمارات العربية المتحدة",
+  "Billed to": "فاتورة إلى",
+  "Invoice lines": "بنود الفاتورة",
+  "Subtotal": "المجموع الفرعي",
+  "Total due": "الإجمالي المستحق",
+  "View invoice": "عرض الفاتورة",
+  "Awaiting payment. Scheduling unlocks once the payment is confirmed (FIN-202).": "بانتظار الدفع. تفتح الجدولة بعد تأكيد الدفع (FIN-202).",
+  "Payment failed; booking released": "فشل الدفع؛ أفرج عن الحجز",
+  "Current quarter, live ledger": "الربع الحالي، من السجل المباشر",
+  "Of the AED 29.7M quarter target": "من هدف الربع البالغ 29.7 مليون درهم",
+  "Etihad summer routes": "وجهات الاتحاد الصيفية",
+  "Yas theme parks season": "موسم حدائق ياس الترفيهية",
+  "Downtown Ramadan retail": "تجارة وسط المدينة في رمضان",
+  "5G network summer push": "حملة شبكة الجيل الخامس الصيفية",
+  "Marina mall anniversary": "ذكرى تأسيس مارينا مول",
+  "Corniche fitness season": "موسم الكورنيش الرياضي",
+  "Galleria weekend footfall": "إقبال نهاية الأسبوع في الغاليريا",
+  "Duty-free arrivals push": "حملة السوق الحرة للقادمين",
+  "Etihad Airways": "الاتحاد للطيران",
+  "Marina Retail Group": "مجموعة مارينا للتجزئة",
+  "Active Abu Dhabi": "أبوظبي النشطة",
+  "Gulf Duty Free": "الخليج للسوق الحرة",
+  "Airport arrivals premium - Q2 flight": "وصول المطار المميز - حملة الربع الثاني",
+  "Yas leisure loop - spring season": "حلقة ياس الترفيهية - موسم الربيع",
+  "Downtown retail loop - Ramadan nights": "حلقة تجارة وسط المدينة - ليالي رمضان",
+  "Corniche gateway - May rotation": "بوابة الكورنيش - دورة مايو",
+  "Marina corridor - June weekends": "ممر المارينا - عطلات يونيو",
+  "Corniche promenade - evening loop": "كورنيش المشاة - الحلقة المسائية",
+  "Galleria island loop - weekend": "حلقة جزيرة الغاليريا - نهاية الأسبوع",
+  "Airport arrivals - late summer": "وصول المطار - أواخر الصيف",
+
   "Pipeline": "خط النشر",
   "Scheduling locked until payment": "الجدولة مقفلة حتى الدفع",
   "Slot returned to auction": "أعيدت الفترة إلى المزاد",
@@ -2895,6 +2961,9 @@ function translateArabic(value: string): string {
   if (auctionMatch) return `ينتهي المزاد ${translateArabicDate(auctionMatch[1])}`;
 
   let result = translateArabicDate(value)
+    // Compact ledger figures (computed KPIs): AED 18.4M / AED 320k.
+    .replace(/\bAED\s*(\d+(?:\.\d+)?)M\b/g, "$1 مليون درهم")
+    .replace(/\bAED\s*(\d+(?:\.\d+)?)k\b/g, "$1 ألف درهم")
     .replace(/\bAED\s*([0-9,]+)/g, "$1 درهم")
     .replace(/\b(\d+(?:\.\d+)?)M\s+impressions\s*\/\s*week\b/g, "$1 مليون ظهور أسبوعياً")
     .replace(/\b(\d+(?:\.\d+)?)M\s+weekly\b/g, "$1 مليون أسبوعياً")
@@ -3240,10 +3309,10 @@ function App() {
     if (result) notify(result.lot.status === "Awarded" ? `${result.lot.lotName}: awarded to ${result.lot.awardedTo}` : `${result.lot.lotName}: closed with no fill`);
   }
 
-  async function settleBookingPayment(bookingId: string, outcome: "paid" | "failed") {
+  async function settleBookingPayment(bookingId: string, outcome: "paid" | "failed", capture?: PaymentCapture) {
     const result = await syncMutation<{ state: DoohStatePayload; booking: BookingRecord }>(`bookings/${bookingId}/payment`, {
       actor: profile?.name ?? "ADMO Finance",
-      payload: { outcome },
+      payload: { outcome, method: capture?.method, reference: capture?.reference, payerEntity: capture?.payerEntity },
     });
     if (result) notify(outcome === "paid" ? `${result.booking.campaign}: payment confirmed, creative in review` : `${result.booking.campaign}: payment failed, slot released`);
   }
@@ -3519,7 +3588,7 @@ function App() {
           {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} t={t} />}
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
-          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
+          {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings.filter((booking) => !booking.historySeed)} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "mediaPlanner" && <MediaPlannerPage campaigns={campaigns} t={t} />}
           {page === "planning" && <PlacementPlanningPage t={t} isArabic={lang === "ar"} />}
           {page === "construction" && <ConstructionPage t={t} />}
@@ -11043,6 +11112,19 @@ function CommercialMapPage({
   );
 }
 
+// Financials overview KPIs are computed from the settlement ledger (seeded
+// history + live session records), not hardcoded copy. A booking counts as
+// booked revenue once it clears the payment gate; receivables are the open
+// (issued, unpaid) invoices including VAT.
+const BOOKED_REVENUE_STATUSES = new Set<BookingStatus>(["Booked", "Scheduled", "Played", "Billed", "Paid"]);
+const FIN_QUARTER_TARGET_AED = 29_700_000;
+
+function aedCompact(value: number) {
+  if (value >= 1_000_000) return `AED ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `AED ${Math.round(value / 1_000)}k`;
+  return `AED ${value.toLocaleString("en-US")}`;
+}
+
 const LOT_TONE: Record<AuctionLotStatus, "info" | "good" | "warn"> = { Open: "info", Awarded: "good", "No fill": "warn" };
 const BOOKING_TONE: Record<BookingStatus, "info" | "good" | "warn" | "danger"> = {
   "Awaiting payment": "warn",
@@ -11053,6 +11135,186 @@ const BOOKING_TONE: Record<BookingStatus, "info" | "good" | "warn" | "danger"> =
   Paid: "good",
   Released: "danger",
 };
+
+// Deterministic reference suggestion for the payment capture modal: derived
+// from the booking identity (never the clock or randomness), prefixed by the
+// chosen settlement method.
+function paymentRefSuggestion(booking: BookingRecord, method: PaymentMethod) {
+  let h = 0;
+  const seed = `${booking.id}|${booking.bidder}|${booking.amount}`;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const prefix = method === "Cheque" ? "CHQ" : method === "Corporate card" ? "CRD" : "TRF";
+  return `${prefix}-2026-${String(h % 100000).padStart(5, "0")}`;
+}
+
+const PAYMENT_METHOD_OPTIONS: Array<{ id: PaymentMethod; label: string; hint: string }> = [
+  { id: "Bank transfer", label: "Bank transfer", hint: "Wire to the ADMO settlement account" },
+  { id: "Cheque", label: "Cheque", hint: "Deposited at the finance counter" },
+  { id: "Corporate card", label: "Corporate card", hint: "Card settlement via the gateway" },
+];
+
+function PaymentCaptureDialog({
+  booking,
+  invoice,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  booking: BookingRecord;
+  invoice?: InvoiceRecord;
+  onCancel: () => void;
+  onConfirm: (capture: PaymentCapture) => void;
+  t: (value: string) => string;
+}) {
+  const [method, setMethod] = useState<PaymentMethod>("Bank transfer");
+  const [reference, setReference] = useState(() => paymentRefSuggestion(booking, "Bank transfer"));
+  const [refEdited, setRefEdited] = useState(false);
+  const [payer, setPayer] = useState(booking.bidder);
+  const due = invoice ? invoice.total : booking.amount;
+  const valid = reference.trim().length >= 4 && payer.trim().length >= 2;
+
+  function pickMethod(next: PaymentMethod) {
+    setMethod(next);
+    if (!refEdited) setReference(paymentRefSuggestion(booking, next));
+  }
+
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog pay-capture-dialog" role="dialog" aria-modal="true" aria-label={t("Confirm payment")} onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <div>
+            <span>{t("Payment capture")} · {booking.id}{invoice ? ` · ${invoice.id}` : ""}</span>
+            <strong>{t("Confirm payment")}</strong>
+            <small>{t(booking.campaign)} · {t(booking.bidder)} · {booking.currency} {due.toLocaleString("en-US")} {invoice ? t("incl. VAT") : ""}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}><X size={16} /></button>
+        </header>
+        <div className="revision-body">
+          <div className="pay-method-block">
+            <span className="pay-field-label">{t("Payment method")}</span>
+            <div className="pay-method-grid" role="radiogroup" aria-label={t("Payment method")}>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={method === option.id}
+                  className={method === option.id ? "active" : ""}
+                  onClick={() => pickMethod(option.id)}
+                >
+                  <strong>{t(option.label)}</strong>
+                  <small>{t(option.hint)}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pay-capture-fields">
+            <label className="revision-field">
+              {t("Payment reference")}
+              <input value={reference} onChange={(event) => { setReference(event.target.value); setRefEdited(true); }} />
+            </label>
+            <label className="revision-field">
+              {t("Payer entity")}
+              <input value={payer} onChange={(event) => setPayer(event.target.value)} />
+            </label>
+          </div>
+          <p className="pay-capture-note">{t("Recorded on the booking and the VAT invoice; the receipt is issued automatically and scheduling unlocks (FIN-202).")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={WalletCards} disabled={!valid} onClick={() => onConfirm({ method, reference: reference.trim(), payerEntity: payer.trim() })}>{t("Confirm payment")}</Button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function InvoiceDrawer({
+  invoice,
+  booking,
+  onClose,
+  t,
+}: {
+  invoice: InvoiceRecord;
+  booking?: BookingRecord;
+  onClose: () => void;
+  t: (value: string) => string;
+}) {
+  // Scope flag for the print stylesheet: printing while the drawer is open
+  // renders the invoice alone, in a sober black-on-white layout.
+  useEffect(() => {
+    document.body.classList.add("invoice-print-scope");
+    return () => document.body.classList.remove("invoice-print-scope");
+  }, []);
+  const money = (value: number) => `${invoice.currency} ${value.toLocaleString("en-US")}`;
+  const dt = (iso?: string) => (iso ? iso.replace("T", " ").slice(0, 16) : "-");
+  const tone: Tone = invoice.status === "Paid" ? "good" : invoice.status === "Void" ? "danger" : "warn";
+  return (
+    <>
+      <div className="invoice-scrim" role="presentation" onClick={onClose} />
+      <aside className="invoice-drawer" role="dialog" aria-modal="true" aria-label={`${t("Invoice")} ${invoice.id}`}>
+        <header className="invoice-drawer-head">
+          <div>
+            <span className="invoice-kicker">{t("Tax invoice")}</span>
+            <strong>{invoice.id}</strong>
+            <small>{t("Issued at")} {dt(invoice.issuedAt)}</small>
+          </div>
+          <div className="invoice-head-actions">
+            <StatusPill label={invoice.status} tone={tone} />
+            <button type="button" className="icon-btn" onClick={() => window.print()} aria-label={t("Print invoice")} title={t("Print invoice")}><Printer size={15} /></button>
+            <button type="button" className="icon-btn" onClick={onClose} aria-label={t("Close")}><X size={15} /></button>
+          </div>
+        </header>
+        <div className="invoice-drawer-body">
+          <div className="invoice-parties">
+            <div>
+              <span>{t("Billed by")}</span>
+              <strong>{t("ADMO commercial desk")}</strong>
+              <small>{t("Abu Dhabi, United Arab Emirates")}</small>
+            </div>
+            <div>
+              <span>{t("Billed to")}</span>
+              <strong>{t(invoice.payerEntity ?? invoice.bidder)}</strong>
+              <small>{t(invoice.campaign)}</small>
+            </div>
+          </div>
+          <div className="table-card invoice-lines">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("Invoice lines")}</th>
+                  <th>{t("Amount")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-label={t("Invoice lines")}>
+                    <strong>{t(booking?.lotName ?? invoice.campaign)}</strong>
+                    <span>{booking ? `${booking.id} · ${t(booking.packageName)}` : invoice.bookingId}</span>
+                  </td>
+                  <td data-label={t("Amount")}>{money(invoice.net)}</td>
+                </tr>
+                <tr className="invoice-sumline"><td>{t("Subtotal")}</td><td>{money(invoice.net)}</td></tr>
+                <tr className="invoice-sumline"><td>{t("VAT 5%")}</td><td>{money(invoice.vat)}</td></tr>
+                <tr className="invoice-sumline invoice-total"><td>{t("Total due")}</td><td><strong>{money(invoice.total)}</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="invoice-pay-grid">
+            <Detail label="Payment method" value={invoice.paymentMethod ?? "-"} />
+            <Detail label="Payment reference" value={invoice.paymentRef ?? "-"} />
+            <Detail label="Payer entity" value={invoice.payerEntity ?? invoice.bidder} />
+            <Detail label="Receipt" value={invoice.receiptId ?? "-"} />
+            <Detail label="Paid at" value={dt(invoice.paidAt)} />
+            <Detail label="Booking" value={invoice.bookingId} />
+          </div>
+          {invoice.status === "Issued" ? <p className="invoice-note">{t("Awaiting payment. Scheduling unlocks once the payment is confirmed (FIN-202).")}</p> : null}
+          {invoice.status === "Void" && invoice.voidReason ? <p className="invoice-note void">{t(invoice.voidReason)}</p> : null}
+        </div>
+      </aside>
+    </>
+  );
+}
 
 function AuctionDesk({
   auctions,
@@ -11067,11 +11329,15 @@ function AuctionDesk({
   bookings: BookingRecord[];
   invoices: InvoiceRecord[];
   onCloseAuction: (lotId: string) => void;
-  onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
+  onSettlePayment: (bookingId: string, outcome: "paid" | "failed", capture?: PaymentCapture) => void;
   onReconcile: (bookingId: string, step: "bill" | "settle") => void;
   t: (value: string) => string;
 }) {
   const money = (value: number, currency: string) => `${currency} ${value.toLocaleString("en-US")}`;
+  const [payBookingId, setPayBookingId] = useState<string | null>(null);
+  const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null);
+  const payBooking = payBookingId ? bookings.find((item) => item.id === payBookingId && item.status === "Awaiting payment") ?? null : null;
+  const openInvoice = openInvoiceId ? invoices.find((item) => item.id === openInvoiceId) ?? null : null;
   return (
     <Panel icon={ShoppingBag} title={t("Auction desk")}>
       <div className="table-card">
@@ -11136,7 +11402,7 @@ function AuctionDesk({
                   <td>
                     {booking.status === "Awaiting payment" ? (
                       <div className="row-actions">
-                        <Button onClick={() => onSettlePayment(booking.id, "paid")}>{t("Confirm payment")}</Button>
+                        <Button onClick={() => setPayBookingId(booking.id)}>{t("Confirm payment")}</Button>
                         <Button variant="secondary" onClick={() => onSettlePayment(booking.id, "failed")}>{t("Simulate failure")}</Button>
                       </div>
                     ) : booking.status === "Played" ? (
@@ -11162,21 +11428,56 @@ function AuctionDesk({
                 <th>{t("VAT 5%")}</th>
                 <th>{t("Total")}</th>
                 <th>{t("Status")}</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {invoices.map((invoice) => (
-                <tr key={invoice.id}>
+                <tr
+                  key={invoice.id}
+                  className="invoice-row"
+                  tabIndex={0}
+                  onClick={() => setOpenInvoiceId(invoice.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setOpenInvoiceId(invoice.id);
+                    }
+                  }}
+                >
                   <td data-label={t("Invoice")}><strong>{invoice.id}</strong><span>{t(invoice.campaign)} · {t(invoice.bidder)}{invoice.receiptId ? ` · ${t("Receipt")} ${invoice.receiptId}` : ""}</span></td>
                   <td data-label={t("Net")}>{money(invoice.net, invoice.currency)}</td>
                   <td data-label={t("VAT 5%")}>{money(invoice.vat, invoice.currency)}</td>
                   <td data-label={t("Total")}><strong>{money(invoice.total, invoice.currency)}</strong></td>
                   <td data-label={t("Status")}><StatusPill label={invoice.status} tone={invoice.status === "Paid" ? "good" : invoice.status === "Void" ? "danger" : "warn"} /></td>
+                  <td><span className="cell-note invoice-open-hint">{t("View invoice")}</span></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      ) : null}
+
+      {payBooking ? (
+        <PaymentCaptureDialog
+          booking={payBooking}
+          invoice={invoices.find((item) => item.id === payBooking.invoiceId)}
+          onCancel={() => setPayBookingId(null)}
+          onConfirm={(capture) => {
+            setPayBookingId(null);
+            onSettlePayment(payBooking.id, "paid", capture);
+          }}
+          t={t}
+        />
+      ) : null}
+
+      {openInvoice ? (
+        <InvoiceDrawer
+          invoice={openInvoice}
+          booking={bookings.find((item) => item.id === openInvoice.bookingId)}
+          onClose={() => setOpenInvoiceId(null)}
+          t={t}
+        />
       ) : null}
     </Panel>
   );
@@ -11313,7 +11614,7 @@ function FinancialsPage({
   aiAvailable: boolean;
   onDecision: (id: string, state: FinanceApproval["state"]) => void;
   onCloseAuction: (lotId: string) => void;
-  onSettlePayment: (bookingId: string, outcome: "paid" | "failed") => void;
+  onSettlePayment: (bookingId: string, outcome: "paid" | "failed", capture?: PaymentCapture) => void;
   onReconcile: (bookingId: string, step: "bill" | "settle") => void;
   t: (value: string) => string;
 }) {
@@ -11340,6 +11641,11 @@ function FinancialsPage({
   }
   const projectedRevenue = Math.round(budget * (0.72 + demand / 180) * (1 - discount / 100));
   const pendingApprovals = approvals.filter((approval) => approval.state === "Pending").length;
+  // Computed from the ledger so live activity (close auction, confirm payment,
+  // settle) moves the header cards. Seeded history calibrates the boot values.
+  const bookedRevenue = bookings.reduce((sum, booking) => (BOOKED_REVENUE_STATUSES.has(booking.status) ? sum + booking.amount : sum), 0);
+  const receivables = invoices.reduce((sum, invoice) => (invoice.status === "Issued" ? sum + invoice.total : sum), 0);
+  const consumedPct = Math.min(100, Math.round((bookedRevenue / FIN_QUARTER_TARGET_AED) * 100));
   const financeTabs = [
     { id: "overview", label: "Overview" },
     { id: "approvals", label: "Approvals" },
@@ -11365,9 +11671,9 @@ function FinancialsPage({
   return (
     <PageBody>
       <MetricGrid>
-        <Metric label="Booked revenue" value="AED 18.4M" helper="Current quarter" tone="good" />
-        <Metric label="Budget consumed" value="62%" helper="Against civic and commercial targets" tone="info" />
-        <Metric label="Receivables" value="AED 3.1M" helper="Open invoices" tone="warn" />
+        <Metric label="Booked revenue" value={aedCompact(bookedRevenue)} helper="Current quarter, live ledger" tone="good" />
+        <Metric label="Budget consumed" value={`${consumedPct}%`} helper="Of the AED 29.7M quarter target" tone="info" />
+        <Metric label="Receivables" value={aedCompact(receivables)} helper="Open invoices" tone={receivables ? "warn" : "good"} />
         <Metric label="Pending approvals" value={String(pendingApprovals)} helper="Finance sign-off" tone={pendingApprovals ? "warn" : "good"} />
       </MetricGrid>
 

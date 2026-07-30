@@ -391,9 +391,16 @@ export const Route = createFileRoute("/api/dooh/$")({
           }
 
           if (segments[0] === "bookings" && segments[2] === "payment") {
-            const payload = body.payload as { outcome?: "paid" | "failed" } | undefined;
+            const payload = body.payload as { outcome?: "paid" | "failed"; method?: string; reference?: string; payerEntity?: string } | undefined;
             const outcome = payload?.outcome === "failed" ? "failed" : "paid";
-            return Response.json(await confirmBookingPayment({ bookingId: segments[1], outcome }, actor));
+            const method = payload?.method === "Bank transfer" || payload?.method === "Cheque" || payload?.method === "Corporate card" ? payload.method : undefined;
+            return Response.json(await confirmBookingPayment({
+              bookingId: segments[1],
+              outcome,
+              method,
+              reference: typeof payload?.reference === "string" ? payload.reference : undefined,
+              payerEntity: typeof payload?.payerEntity === "string" ? payload.payerEntity : undefined,
+            }, actor));
           }
 
           if (segments[0] === "bookings" && segments[2] === "reconcile") {

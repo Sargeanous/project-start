@@ -114,6 +114,11 @@ export interface AuctionLot {
 // -> Billed -> Paid (or Released on payment failure).
 export type BookingStatus = "Awaiting payment" | "Booked" | "Scheduled" | "Played" | "Billed" | "Paid" | "Released";
 
+// Payment capture (FIN-401): how a confirmed payment was settled. Recorded on
+// both the booking and its invoice so the finance ledger and the printable
+// invoice agree.
+export type PaymentMethod = "Bank transfer" | "Cheque" | "Corporate card";
+
 export interface BookingRecord {
   id: string;
   lotId: string;
@@ -130,6 +135,11 @@ export interface BookingRecord {
   invoiceId?: string;
   submissionId?: string;
   paymentRef?: string;
+  paymentMethod?: PaymentMethod;
+  payerEntity?: string;
+  // Seeded settlement history rows (prior-quarter ledger); hidden from the
+  // bidder's "my bookings" view, still counted in finance KPIs and reports.
+  historySeed?: boolean;
   history: Array<{ status: BookingStatus | "Awarded"; at: string; actor: string; note?: string }>;
 }
 
@@ -149,6 +159,10 @@ export interface InvoiceRecord {
   paidAt?: string;
   receiptId?: string;
   voidReason?: string;
+  paymentRef?: string;
+  paymentMethod?: PaymentMethod;
+  payerEntity?: string;
+  historySeed?: boolean;
 }
 
 export interface BidRecord {
@@ -422,6 +436,120 @@ const initialVerificationSteps: VerificationStep[] = [
   { label: "Edge cache route", owner: "CMS workflow", state: "Check required" },
 ];
 
+// ---------------------------------------------------------------------------
+// Seeded settlement history (FIN-402). Deterministic prior-quarter ledger so
+// the Financials overview KPIs are computed from real records instead of
+// hardcoded copy. Calibrated to the figures already shown to the client:
+// booked revenue sums to AED 18.41M and open invoices to AED 3.12M at boot.
+// Live session activity (close auction, confirm payment, settle) moves both.
+// IDs use the 90x range so live records (BKG-909+, INV-909+) never collide.
+// ---------------------------------------------------------------------------
+const SEED_ALGORITHM = "First-price sealed ranking: highest valid bid >= floor wins, billed at own bid. Ties break on earliest bid time.";
+
+function seedHistory(entries: Array<[BookingStatus | "Awarded", string, string]>): BookingRecord["history"] {
+  return entries.map(([status, at, note]) => ({ status, at, actor: "ADMO Finance", note }));
+}
+
+const settledBookingSeeds: BookingRecord[] = [
+  {
+    id: "BKG-901", lotId: "LOT-4327", lotName: "Airport arrivals premium - Q2 flight", packageName: "Airport and premium roadside",
+    campaign: "Etihad summer routes", bidder: "Etihad Airways", amount: 4120000, currency: "AED", status: "Paid",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-04-14T09:12:00.000Z", updatedAt: "2026-06-30T10:05:00.000Z",
+    invoiceId: "INV-901", paymentRef: "TRF-2026-88231", paymentMethod: "Bank transfer", payerEntity: "Etihad Airways PJSC", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-04-14T09:12:00.000Z", "Awarded first-price at AED 4,120,000."],
+      ["Booked", "2026-04-18T11:30:00.000Z", "Payment TRF-2026-88231 (Bank transfer) confirmed from Etihad Airways PJSC. Receipt RCT-901."],
+      ["Paid", "2026-06-30T10:05:00.000Z", "Settlement closed against receipt RCT-901; revenue recognised."],
+    ]),
+  },
+  {
+    id: "BKG-902", lotId: "LOT-4331", lotName: "Yas leisure loop - spring season", packageName: "Yas leisure loop",
+    campaign: "Yas theme parks season", bidder: "Yas Tourism", amount: 3650000, currency: "AED", status: "Paid",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-04-22T08:40:00.000Z", updatedAt: "2026-06-28T09:15:00.000Z",
+    invoiceId: "INV-902", paymentRef: "TRF-2026-88962", paymentMethod: "Bank transfer", payerEntity: "Yas Tourism LLC", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-04-22T08:40:00.000Z", "Awarded first-price at AED 3,650,000."],
+      ["Booked", "2026-04-27T13:05:00.000Z", "Payment TRF-2026-88962 (Bank transfer) confirmed from Yas Tourism LLC. Receipt RCT-902."],
+      ["Paid", "2026-06-28T09:15:00.000Z", "Settlement closed against receipt RCT-902; revenue recognised."],
+    ]),
+  },
+  {
+    id: "BKG-903", lotId: "LOT-4298", lotName: "Downtown retail loop - Ramadan nights", packageName: "Downtown retail loop",
+    campaign: "Downtown Ramadan retail", bidder: "Retail Majlis", amount: 2980000, currency: "AED", status: "Paid",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-02-10T10:20:00.000Z", updatedAt: "2026-05-12T14:45:00.000Z",
+    invoiceId: "INV-903", paymentRef: "CHQ-004512", paymentMethod: "Cheque", payerEntity: "Retail Majlis Holding", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-02-10T10:20:00.000Z", "Awarded first-price at AED 2,980,000."],
+      ["Booked", "2026-02-16T09:55:00.000Z", "Payment CHQ-004512 (Cheque) confirmed from Retail Majlis Holding. Receipt RCT-903."],
+      ["Paid", "2026-05-12T14:45:00.000Z", "Settlement closed against receipt RCT-903; revenue recognised."],
+    ]),
+  },
+  {
+    id: "BKG-904", lotId: "LOT-4342", lotName: "Corniche gateway - May rotation", packageName: "Airport and premium roadside",
+    campaign: "5G network summer push", bidder: "e& Telecom", amount: 2760000, currency: "AED", status: "Paid",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-05-03T07:50:00.000Z", updatedAt: "2026-07-02T12:00:00.000Z",
+    invoiceId: "INV-904", paymentRef: "TRF-2026-90114", paymentMethod: "Bank transfer", payerEntity: "e& Telecom PJSC", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-05-03T07:50:00.000Z", "Awarded first-price at AED 2,760,000."],
+      ["Booked", "2026-05-07T15:10:00.000Z", "Payment TRF-2026-90114 (Bank transfer) confirmed from e& Telecom PJSC. Receipt RCT-904."],
+      ["Paid", "2026-07-02T12:00:00.000Z", "Settlement closed against receipt RCT-904; revenue recognised."],
+    ]),
+  },
+  {
+    id: "BKG-905", lotId: "LOT-4351", lotName: "Marina corridor - June weekends", packageName: "Downtown retail loop",
+    campaign: "Marina mall anniversary", bidder: "Marina Retail Group", amount: 1910000, currency: "AED", status: "Billed",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-05-20T09:30:00.000Z", updatedAt: "2026-07-05T10:40:00.000Z",
+    invoiceId: "INV-905", paymentRef: "TRF-2026-90881", paymentMethod: "Bank transfer", payerEntity: "Marina Retail Group LLC", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-05-20T09:30:00.000Z", "Awarded first-price at AED 1,910,000."],
+      ["Booked", "2026-05-24T11:00:00.000Z", "Payment TRF-2026-90881 (Bank transfer) confirmed from Marina Retail Group LLC. Receipt RCT-905."],
+      ["Billed", "2026-07-05T10:40:00.000Z", "Delivery reconciled against hash-chained PoP records; settlement close pending."],
+    ]),
+  },
+  {
+    id: "BKG-906", lotId: "LOT-4356", lotName: "Corniche promenade - evening loop", packageName: "Airport and premium roadside",
+    campaign: "Corniche fitness season", bidder: "Active Abu Dhabi", amount: 2990000, currency: "AED", status: "Paid",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-06-01T08:05:00.000Z", updatedAt: "2026-07-10T09:25:00.000Z",
+    invoiceId: "INV-906", paymentRef: "TRF-2026-91773", paymentMethod: "Bank transfer", payerEntity: "Active Abu Dhabi Events LLC", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-06-01T08:05:00.000Z", "Awarded first-price at AED 2,990,000."],
+      ["Booked", "2026-06-04T10:15:00.000Z", "Payment TRF-2026-91773 (Bank transfer) confirmed from Active Abu Dhabi Events LLC. Receipt RCT-906."],
+      ["Paid", "2026-07-10T09:25:00.000Z", "Settlement closed against receipt RCT-906; revenue recognised."],
+    ]),
+  },
+  {
+    id: "BKG-907", lotId: "LOT-4361", lotName: "Galleria island loop - weekend", packageName: "Downtown retail loop",
+    campaign: "Galleria weekend footfall", bidder: "Retail Majlis", amount: 1880000, currency: "AED", status: "Awaiting payment",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-07-24T09:00:00.000Z", updatedAt: "2026-07-24T09:00:00.000Z",
+    invoiceId: "INV-907", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-07-24T09:00:00.000Z", "Awarded first-price at AED 1,880,000."],
+      ["Awaiting payment", "2026-07-24T09:00:00.000Z", "Scheduling access is granted only after payment confirmation (FIN-202)."],
+    ]),
+  },
+  {
+    id: "BKG-908", lotId: "LOT-4363", lotName: "Airport arrivals - late summer", packageName: "Airport and premium roadside",
+    campaign: "Duty-free arrivals push", bidder: "Gulf Duty Free", amount: 1090000, currency: "AED", status: "Awaiting payment",
+    algorithm: SEED_ALGORITHM, awardedAt: "2026-07-26T10:30:00.000Z", updatedAt: "2026-07-26T10:30:00.000Z",
+    invoiceId: "INV-908", historySeed: true,
+    history: seedHistory([
+      ["Awarded", "2026-07-26T10:30:00.000Z", "Awarded first-price at AED 1,090,000."],
+      ["Awaiting payment", "2026-07-26T10:30:00.000Z", "Scheduling access is granted only after payment confirmation (FIN-202)."],
+    ]),
+  },
+];
+
+const settledInvoiceSeeds: InvoiceRecord[] = [
+  { id: "INV-901", bookingId: "BKG-901", campaign: "Etihad summer routes", bidder: "Etihad Airways", net: 4120000, vat: 206000, total: 4326000, currency: "AED", status: "Paid", issuedAt: "2026-04-14T09:12:00.000Z", paidAt: "2026-04-18T11:30:00.000Z", receiptId: "RCT-901", paymentRef: "TRF-2026-88231", paymentMethod: "Bank transfer", payerEntity: "Etihad Airways PJSC", historySeed: true },
+  { id: "INV-902", bookingId: "BKG-902", campaign: "Yas theme parks season", bidder: "Yas Tourism", net: 3650000, vat: 182500, total: 3832500, currency: "AED", status: "Paid", issuedAt: "2026-04-22T08:40:00.000Z", paidAt: "2026-04-27T13:05:00.000Z", receiptId: "RCT-902", paymentRef: "TRF-2026-88962", paymentMethod: "Bank transfer", payerEntity: "Yas Tourism LLC", historySeed: true },
+  { id: "INV-903", bookingId: "BKG-903", campaign: "Downtown Ramadan retail", bidder: "Retail Majlis", net: 2980000, vat: 149000, total: 3129000, currency: "AED", status: "Paid", issuedAt: "2026-02-10T10:20:00.000Z", paidAt: "2026-02-16T09:55:00.000Z", receiptId: "RCT-903", paymentRef: "CHQ-004512", paymentMethod: "Cheque", payerEntity: "Retail Majlis Holding", historySeed: true },
+  { id: "INV-904", bookingId: "BKG-904", campaign: "5G network summer push", bidder: "e& Telecom", net: 2760000, vat: 138000, total: 2898000, currency: "AED", status: "Paid", issuedAt: "2026-05-03T07:50:00.000Z", paidAt: "2026-05-07T15:10:00.000Z", receiptId: "RCT-904", paymentRef: "TRF-2026-90114", paymentMethod: "Bank transfer", payerEntity: "e& Telecom PJSC", historySeed: true },
+  { id: "INV-905", bookingId: "BKG-905", campaign: "Marina mall anniversary", bidder: "Marina Retail Group", net: 1910000, vat: 95500, total: 2005500, currency: "AED", status: "Paid", issuedAt: "2026-05-20T09:30:00.000Z", paidAt: "2026-05-24T11:00:00.000Z", receiptId: "RCT-905", paymentRef: "TRF-2026-90881", paymentMethod: "Bank transfer", payerEntity: "Marina Retail Group LLC", historySeed: true },
+  { id: "INV-906", bookingId: "BKG-906", campaign: "Corniche fitness season", bidder: "Active Abu Dhabi", net: 2990000, vat: 149500, total: 3139500, currency: "AED", status: "Paid", issuedAt: "2026-06-01T08:05:00.000Z", paidAt: "2026-06-04T10:15:00.000Z", receiptId: "RCT-906", paymentRef: "TRF-2026-91773", paymentMethod: "Bank transfer", payerEntity: "Active Abu Dhabi Events LLC", historySeed: true },
+  { id: "INV-907", bookingId: "BKG-907", campaign: "Galleria weekend footfall", bidder: "Retail Majlis", net: 1880000, vat: 94000, total: 1974000, currency: "AED", status: "Issued", issuedAt: "2026-07-24T09:00:00.000Z", historySeed: true },
+  { id: "INV-908", bookingId: "BKG-908", campaign: "Duty-free arrivals push", bidder: "Gulf Duty Free", net: 1090000, vat: 54500, total: 1144500, currency: "AED", status: "Issued", issuedAt: "2026-07-26T10:30:00.000Z", historySeed: true },
+];
+
 const initialState: DoohState = {
   submissions: [
     {
@@ -664,8 +792,8 @@ const initialState: DoohState = {
     },
   ],
   bids: [],
-  bookings: [],
-  invoices: [],
+  bookings: [...settledBookingSeeds],
+  invoices: [...settledInvoiceSeeds],
   enforcementEvents: [],
   killedAssetIds: [],
   radiusBroadcasts: [],
@@ -851,12 +979,20 @@ function normalizeSubmissions(persisted: Submission[], sweepTestData: boolean): 
   return [...missingSeeds, ...kept];
 }
 
+// Backfill the seeded settlement history into persisted states that predate
+// it (idempotent: only ids that are missing are appended, after live records).
+function withLedgerSeeds<T extends { id: string }>(existing: T[], seeds: T[]): T[] {
+  const ids = new Set(existing.map((item) => item.id));
+  const missing = seeds.filter((seed) => !ids.has(seed.id));
+  return missing.length ? [...existing, ...(JSON.parse(JSON.stringify(missing)) as T[])] : existing;
+}
+
 function normalizeState(state: DoohState, opts?: { sweepTestData?: boolean }): DoohState {
   return {
     ...state,
     bidderMessages: state.bidderMessages ?? [],
-    bookings: state.bookings ?? [],
-    invoices: state.invoices ?? [],
+    bookings: withLedgerSeeds(state.bookings ?? [], settledBookingSeeds),
+    invoices: withLedgerSeeds(state.invoices ?? [], settledInvoiceSeeds),
     popLedger: state.popLedger ?? [],
     enforcementEvents: state.enforcementEvents ?? [],
     killedAssetIds: state.killedAssetIds ?? [],
@@ -1490,13 +1626,26 @@ export async function closeAuction(payload: { lotId: string }, actor: string): P
   return { state, lot, booking };
 }
 
+// Deterministic fallback reference when the capture modal sends none (older
+// clients, API callers): derived from the booking identity, never the clock.
+function fallbackPaymentRef(booking: BookingRecord): string {
+  let h = 0;
+  const seed = `${booking.id}|${booking.bidder}|${booking.amount}`;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return `PAY-${booking.id.replace(/\D/g, "")}-${String(h % 100000).padStart(5, "0")}`;
+}
+
+const PAYMENT_METHODS: PaymentMethod[] = ["Bank transfer", "Cheque", "Corporate card"];
+
 /**
  * Payment confirmation gate (RFP FIN-202/401/402). Success books the slot,
- * marks the invoice paid with a receipt, and hands the winning creative into
+ * marks the invoice paid with a receipt plus the captured payment details
+ * (method, reference, payer entity), and hands the winning creative into
  * the governed CMS pipeline (no auction win skips content governance, FIN-502).
  * Failure voids the invoice and releases the slot back to the pool.
+ * The capture fields are optional so pre-existing callers keep working.
  */
-export async function confirmBookingPayment(payload: { bookingId: string; outcome: "paid" | "failed" }, actor: string): Promise<{ state: DoohState; booking: BookingRecord }> {
+export async function confirmBookingPayment(payload: { bookingId: string; outcome: "paid" | "failed"; method?: PaymentMethod; reference?: string; payerEntity?: string }, actor: string): Promise<{ state: DoohState; booking: BookingRecord }> {
   let booking!: BookingRecord;
   const state = await commit((draft) => {
     const target = draft.bookings.find((item) => item.id === payload.bookingId);
@@ -1533,12 +1682,20 @@ export async function confirmBookingPayment(payload: { bookingId: string; outcom
       return;
     }
 
+    const method: PaymentMethod = payload.method && PAYMENT_METHODS.includes(payload.method) ? payload.method : "Bank transfer";
+    const reference = payload.reference?.trim() || fallbackPaymentRef(target);
+    const payerEntity = payload.payerEntity?.trim() || target.bidder;
     target.status = "Booked";
-    target.paymentRef = `PAY-${Date.now().toString().slice(-8)}`;
+    target.paymentRef = reference;
+    target.paymentMethod = method;
+    target.payerEntity = payerEntity;
     if (invoice) {
       invoice.status = "Paid";
       invoice.paidAt = now;
       invoice.receiptId = `RCT-${invoice.id.replace("INV-", "")}`;
+      invoice.paymentRef = reference;
+      invoice.paymentMethod = method;
+      invoice.payerEntity = payerEntity;
     }
 
     // Governed publishing handoff: the winning creative enters the CMS pipeline
@@ -1569,7 +1726,7 @@ export async function confirmBookingPayment(payload: { bookingId: string; outcom
     target.submissionId = submission.id;
     target.history = [
       ...target.history,
-      { status: "Booked", at: now, actor, note: `Payment ${target.paymentRef} confirmed. Receipt ${invoice?.receiptId ?? ""}. Creative handed to CMS as ${submission.id}.` },
+      { status: "Booked", at: now, actor, note: `Payment ${reference} (${method}) confirmed from ${payerEntity}. Receipt ${invoice?.receiptId ?? ""}. Creative handed to CMS as ${submission.id}.` },
     ];
     draft.campaigns = draft.campaigns.map((campaign) =>
       campaign.campaign === target.campaign
