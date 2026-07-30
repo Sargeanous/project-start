@@ -14257,3 +14257,58 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
   color: var(--ink-2);
   font-size: 12px;
 }
+
+/* ================================================================
+   COMMERCIAL MAP - audience by time band inside the popover
+   (per-band share of daily reach, stacked demographic split bar,
+   content category mix chips; modeled demo data note)
+   ================================================================ */
+.commercial-popover-audience { display: grid; gap: 7px; }
+.commercial-popover-audience > strong {
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cpa-band {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.cpa-band-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cpa-band-head > span { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.cpa-band-head strong { color: var(--ink); font-size: 12px; white-space: nowrap; }
+.cpa-band-head small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.cpa-band-head em { flex: 0 0 auto; font-style: normal; color: var(--ink-2); font-size: 10.5px; font-weight: 600; }
+.cpa-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.cpa-bar i { display: block; height: 100%; }
+.cpa-seg-0 { background: color-mix(in srgb, var(--primary) 72%, var(--surface)); }
+.cpa-seg-1 { background: color-mix(in srgb, var(--blue) 72%, var(--surface)); }
+.cpa-seg-2 { background: color-mix(in srgb, var(--amber) 72%, var(--surface)); }
+.cpa-seg-3 { background: color-mix(in srgb, var(--ink) 38%, var(--surface)); }
+.cpa-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.cpa-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); font-size: 10.5px; }
+.cpa-legend i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.cpa-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.cpa-chips span {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.commercial-popover-audience .cell-note { margin: 0; }

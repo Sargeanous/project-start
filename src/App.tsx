@@ -148,6 +148,7 @@ import {
   type MediaPlan,
   type TargetViewsPlan,
 } from "./advisor-data";
+import { assetAudienceBands } from "./audience-data";
 import {
   useTickets,
   createTicket,
@@ -1991,6 +1992,25 @@ const translations: Record<string, string> = {
   "Open faults": "الأعطال المفتوحة",
   "Previous advertisers": "المعلنون السابقون",
   "Who advertised here before": "من أعلن هنا سابقاً",
+  "Audience by time band": "الجمهور حسب الفترة الزمنية",
+  "Morning commute": "التنقل الصباحي",
+  "Late night": "أواخر الليل",
+  "of daily reach": "من الوصول اليومي",
+  "Modeled audience mix, demo data; depth pending client data confirmation.": "مزيج جمهور نموذجي، بيانات تجريبية؛ التفاصيل بانتظار تأكيد بيانات العميل.",
+  "Commuters": "المتنقلون",
+  "Residents": "السكان",
+  "Tourists": "السياح",
+  "Shoppers": "المتسوقون",
+  "Youth": "الشباب",
+  "Leisure": "الترفيه",
+  "Logistics": "اللوجستيات",
+  "Fleet drivers": "سائقو الأساطيل",
+  "Retail and FMCG": "التجزئة والسلع الاستهلاكية",
+  "Food and beverage": "الأغذية والمشروبات",
+  "Tourism and leisure": "السياحة والترفيه",
+  "Finance and real estate": "التمويل والعقارات",
+  "Telecom and tech": "الاتصالات والتقنية",
+  "Public service": "الخدمة العامة",
   "Renewed": "تم التجديد",
   "Converted to annual": "تحول إلى عقد سنوي",
   "Make-good": "تعويض عرض",
@@ -10823,6 +10843,31 @@ function CommercialMapPage({
                       <StatusPill label={flight.outcomeTag} tone={flight.outcomeTone} />
                     </div>
                   ))}
+                </div>
+                <div className="commercial-popover-audience">
+                  <strong>{t("Audience by time band")}</strong>
+                  {assetAudienceBands(asset.id).map((band) => (
+                    <div key={band.band} className="cpa-band">
+                      <div className="cpa-band-head">
+                        <span><strong>{t(band.band)}</strong><small>{band.window}</small></span>
+                        <em>{band.sharePct}% {t("of daily reach")}</em>
+                      </div>
+                      <div className="cpa-bar" role="img" aria-label={band.demographics.map((d) => `${t(d.label)} ${d.pct}%`).join(", ")}>
+                        {band.demographics.map((d, i) => (
+                          <i key={d.label} className={`cpa-seg-${i % 4}`} style={{ width: `${d.pct}%` }} />
+                        ))}
+                      </div>
+                      <div className="cpa-legend">
+                        {band.demographics.map((d, i) => (
+                          <span key={d.label}><i className={`cpa-seg-${i % 4}`} />{t(d.label)} {d.pct}%</span>
+                        ))}
+                      </div>
+                      <div className="cpa-chips">
+                        {band.categories.map((c) => <span key={c.label}>{t(c.label)} · {c.pct}%</span>)}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="cell-note">{t("Modeled audience mix, demo data; depth pending client data confirmation.")}</p>
                 </div>
                 <EmbeddedCopilot mode="commercial" assetId={asset.id} actor="Commercial desk" collapsible t={t} />
               </section>
