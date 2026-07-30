@@ -57,6 +57,17 @@ export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
 
+// Normalized daypart matching: UI composers emit labels like
+// "Morning commute (07:00-10:00)" while rules name the daypart alone
+// ("Morning commute"), so compare case-insensitively and accept a prefix or
+// containment match instead of exact string equality.
+export function daypartMatches(contextDaypart: string | undefined, ruleDaypart: string): boolean {
+  const ctx = (contextDaypart ?? "").trim().toLowerCase();
+  const rule = ruleDaypart.trim().toLowerCase();
+  if (!ctx || !rule) return false;
+  return ctx === rule || ctx.startsWith(rule) || ctx.includes(rule);
+}
+
 function resolveCoords(context: RuleContext): Array<{ id: string; lat: number; lng: number }> {
   const out: Array<{ id: string; lat: number; lng: number }> = [];
   if (context.assetIds?.length) {
@@ -99,10 +110,19 @@ export function evaluateRules(context: RuleContext): RuleVerdict {
 
   // 2. Zone / content-category / time-window rules.
   const category = (context.category ?? "").toLowerCase();
+  // Zone-scoped rules also cover explicitly targeted screens: each targeted
+  // asset contributes its own zone, so per-screen previews (radius preflight,
+  // bulk apply) agree with zone-wide booking checks. Coordinates are NOT
+  // expanded to the zone, so proximity flags stay per-screen.
+  const contextZones = new Set((context.zones ?? []).map((z) => z.toLowerCase()));
+  for (const id of context.assetIds ?? []) {
+    const asset = assets.find((a) => a.id === id);
+    if (asset) contextZones.add(asset.zone.toLowerCase());
+  }
   for (const rule of zoneContentRules) {
-    if (rule.zone && !(context.zones ?? []).some((z) => z.toLowerCase() === rule.zone!.toLowerCase())) continue;
+    if (rule.zone && !contextZones.has(rule.zone.toLowerCase())) continue;
     const categoryHit = rule.blockedCategories?.some((c) => category.includes(c.toLowerCase())) ?? false;
-    const daypartHit = rule.restrictedDayparts?.some((d) => (context.daypart ?? "").toLowerCase() === d.toLowerCase()) ?? false;
+    const daypartHit = rule.restrictedDayparts?.some((d) => daypartMatches(context.daypart, d)) ?? false;
     // A rule with both category and daypart fires only when both match; a
     // category-only rule fires on category; a daypart-only rule on daypart.
     const bothRequired = rule.blockedCategories && rule.restrictedDayparts;

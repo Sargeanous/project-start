@@ -174,7 +174,7 @@ import {
   type TicketObjectKind,
 } from "./tickets-data";
 import { sensitiveSites, zoneContentRules, type OverrideTier, type SensitiveKind } from "./rules-data";
-import { distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
+import { daypartMatches, distanceM, evaluateRules, type RuleVerdict } from "./rules-engine";
 import {
   demoScenarios,
   doohOntology,
@@ -2078,6 +2078,20 @@ const translations: Record<string, string> = {
   "PROHIBITED_CATEGORY": "فئة محظورة",
   "SCHOOL_DAYPART_RESTRICTED": "قيود ساعات الدراسة",
   "SENSITIVE_ZONE_POLITICAL": "منطقة حساسة سياسياً",
+  "School-hours restriction": "قيود ساعات الدراسة",
+  "Age-sensitive category restricted near schools during the morning commute (ADG-4.x).": "فئة حساسة للأعمار مقيّدة قرب المدارس خلال فترة الذروة الصباحية (ADG-4.x).",
+  "School run": "فترة الدوام المدرسي",
+  "Prime evening": "ذروة المساء",
+  "Full day rotation": "تناوب طوال اليوم",
+  "Weekend leisure": "ترفيه نهاية الأسبوع",
+  "Civic safety notice": "إشعار سلامة مدني",
+  "Retail promotion": "ترويج تجزئة",
+  "Fast food promotion": "ترويج وجبات سريعة",
+  "Energy drink promotion": "ترويج مشروبات الطاقة",
+  "Zone day-parting policy": "سياسة الفترات الزمنية حسب المنطقة",
+  "Civic only": "مدني فقط",
+  "Commercial allowed": "التجاري مسموح",
+  "Time windows pending ADMO confirmation.": "النوافذ الزمنية بانتظار تأكيد المكتب الإعلامي لحكومة أبوظبي.",
   "NCEMA CAP alerts": "تنبيهات NCEMA (CAP)",
   "Ingest CAP alert": "استيراد تنبيه CAP",
   "CAP identifier": "معرّف CAP",
@@ -4160,6 +4174,34 @@ interface SelectionScreen {
   conflictLevel?: "hard" | "soft";
 }
 
+// Daypart choices shared by the composers (brief wizard targeting, radius
+// broadcast, bulk apply). Names align with the rule daypart vocabulary in
+// rules-data.ts (RULE-ZON-002) so normalized matching can fire from the UI;
+// the time windows stay in the label for humans.
+const composerDayparts = [
+  { name: "Prime evening", window: "17:00-22:00" },
+  { name: "Morning commute", window: "07:00-10:00" },
+  { name: "School run", window: "13:00-15:30" },
+  { name: "Full day rotation", window: "" },
+  { name: "Weekend leisure", window: "" },
+] as const;
+
+function daypartValue(choice: (typeof composerDayparts)[number]): string {
+  return choice.window ? `${choice.name} (${choice.window})` : choice.name;
+}
+
+function DaypartOptions({ t }: { t: (value: string) => string }) {
+  return (
+    <>
+      {composerDayparts.map((choice) => (
+        <option key={choice.name} value={daypartValue(choice)}>
+          {choice.window ? `${t(choice.name)} (${choice.window})` : t(choice.name)}
+        </option>
+      ))}
+    </>
+  );
+}
+
 // Bulk action for a marquee/Ctrl selection: previews per-screen rule checks
 // and existing-commitment overlaps, then queues a governed pending action.
 function SelectionActionDialog({
@@ -4181,7 +4223,7 @@ function SelectionActionDialog({
   const [campaign, setCampaign] = useState(actionKind === "schedule" ? "Reem Island evening rotation" : "Immediate civic takeover");
   const [messageEn, setMessageEn] = useState(actionKind === "schedule" ? "Visit Abu Dhabi this weekend" : "Road safety update: reduce speed and keep distance");
   const [messageAr, setMessageAr] = useState(actionKind === "schedule" ? "اكتشف أبوظبي هذا الأسبوع" : "تحديث السلامة المرورية: خفف السرعة واترك مسافة آمنة");
-  const [scheduleWindow, setScheduleWindow] = useState("Today 18:00 - 22:00");
+  const [scheduleWindow, setScheduleWindow] = useState("Prime evening (17:00-22:00)");
   const [visualMode, setVisualMode] = useState<"library" | "upload" | "generate" | null>(null);
   const [selectedLibraryId, setSelectedLibraryId] = useState("MED-008");
   const [visualUrl, setVisualUrl] = useState("");
@@ -4199,14 +4241,14 @@ function SelectionActionDialog({
         const res = await fetch("/api/dooh/mediagpt/selection/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetIds }),
+          body: JSON.stringify({ assetIds, daypart: actionKind === "schedule" ? scheduleWindow : undefined }),
         });
         const data = await res.json().catch(() => null);
         if (!cancelled && res.ok && data) setScreens(data.screens);
       } catch { /* offline: leave preview empty */ }
     })();
     return () => { cancelled = true; };
-  }, [assetIds]);
+  }, [assetIds, actionKind, scheduleWindow]);
 
   const conflicts = (screens ?? []).filter((s) => s.conflict);
   const hardConflicts = conflicts.filter((s) => s.conflictLevel === "hard");
@@ -4295,6 +4337,7 @@ function SelectionActionDialog({
           messageAr,
           actionKind,
           scheduleWindow: actionKind === "schedule" ? scheduleWindow : undefined,
+          daypart: actionKind === "schedule" ? scheduleWindow : undefined,
           overlapPolicy,
           creativeId: visualMode === "library" ? selectedLibraryCreativeId : "selection-custom",
           creativeUrl: visualMode === "library" ? undefined : selectedVisual,
@@ -4363,7 +4406,9 @@ function SelectionActionDialog({
               {actionKind === "schedule" ? (
                 <label className="bc-field">
                   <span>{t("Schedule window")}</span>
-                  <input value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)} />
+                  <select value={scheduleWindow} onChange={(e) => setScheduleWindow(e.target.value)}>
+                    <DaypartOptions t={t} />
+                  </select>
                 </label>
               ) : null}
               <div className="bc-message-row">
@@ -5171,7 +5216,12 @@ function CmsPage({
       ) : null}
 
       {tab === "library" && <MediaLibrary t={t} />}
-      {tab === "scheduling" && <SchedulingBoard schedule={schedule} onPlayNow={onPlaySchedule} t={t} />}
+      {tab === "scheduling" && (
+        <>
+          <SchedulingBoard schedule={schedule} onPlayNow={onPlaySchedule} t={t} />
+          <ZoneDaypartingPanel t={t} />
+        </>
+      )}
     </PageBody>
   );
 }
@@ -5988,6 +6038,70 @@ function SchedulingBoard({
           </article>
         ))}
       </div>
+    </Panel>
+  );
+}
+
+// Zone day-parting policy grid (CMS Scheduling tab). Deterministic: derived
+// from zoneContentRules in rules-data.ts, so the board and the rules engine
+// always agree on which windows are civic-only or tier-limited.
+const zdpColumns = [
+  { name: "Morning commute", window: "07:00-10:00" },
+  { name: "School run", window: "13:00-15:30" },
+  { name: "Prime evening", window: "17:00-22:00" },
+  { name: "Overnight", window: "22:00-06:00" },
+];
+const zdpZones = ["Corniche", "Downtown", "Yas Island", "Al Ain gateways", "Airport road", "Reem Island", "Residential belt"];
+
+type ZdpPolicy = "civic" | "limited" | "commercial";
+
+function zoneDaypartPolicy(zone: string, daypartName: string): ZdpPolicy {
+  let policy: ZdpPolicy = "commercial";
+  for (const rule of zoneContentRules) {
+    if (!rule.zone || rule.zone.toLowerCase() !== zone.toLowerCase()) continue;
+    if (rule.restrictedDayparts) {
+      if (rule.restrictedDayparts.some((d) => daypartMatches(daypartName, d))) return "civic";
+    } else if (rule.blockedCategories?.length) {
+      policy = "limited";
+    }
+  }
+  return policy;
+}
+
+const ZDP_LABEL: Record<ZdpPolicy, string> = { civic: "Civic only", limited: "Limited", commercial: "Commercial allowed" };
+const ZDP_TONE: Record<ZdpPolicy, Tone> = { civic: "info", limited: "warn", commercial: "good" };
+
+function ZoneDaypartingPanel({ t }: { t: (value: string) => string }) {
+  return (
+    <Panel icon={Clock} title={t("Zone day-parting policy")} action={<span className="head-meta">RULE-ZON-002 · RULE-ZON-004</span>}>
+      <div className="zdp-grid-wrap">
+        <table className="zdp-grid">
+          <thead>
+            <tr>
+              <th>{t("Zone")}</th>
+              {zdpColumns.map((col) => (
+                <th key={col.name}><span>{t(col.name)}</span><small>{col.window}</small></th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {zdpZones.map((zone) => (
+              <tr key={zone}>
+                <th scope="row">{t(zone)}</th>
+                {zdpColumns.map((col) => {
+                  const policy = zoneDaypartPolicy(zone, col.name);
+                  return (
+                    <td key={col.name}>
+                      <StatusPill label={ZDP_LABEL[policy]} tone={ZDP_TONE[policy]} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="cell-note zdp-note">{t("Time windows pending ADMO confirmation.")}</p>
     </Panel>
   );
 }
@@ -9536,12 +9650,18 @@ const RADIUS_PRESETS = [
 
 type RadiusScreen = { id: string; name: string; zone: string; distanceM: number; status: "clear" | "flagged"; flagLabel?: string; flagDetail?: string };
 
+// Content categories for the radius preflight; the restricted ones exercise
+// RULE-ZON-001/002 vocabulary (matched by containment, case-insensitive).
+const radiusCategories = ["Civic safety notice", "Retail promotion", "Fast food promotion", "Energy drink promotion"];
+
 function RadiusBroadcastPage({ aiAvailable, notify, t }: { aiAvailable: boolean; notify: (message: string) => void; t: (value: string) => string }) {
   const [center, setCenter] = useState({ lat: 24.485, lng: 54.360 });
   const [centerLabel, setCenterLabel] = useState("Downtown Abu Dhabi");
   const [radiusKm, setRadiusKm] = useState(3.5);
   const [campaign, setCampaign] = useState("Strong wind safety notice");
   const [brief, setBrief] = useState("Reduce speed, strong winds this evening. Calm, official tone.");
+  const [category, setCategory] = useState(radiusCategories[0]);
+  const [daypart, setDaypart] = useState("Full day rotation");
   const [messageEn, setMessageEn] = useState("");
   const [messageAr, setMessageAr] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -9553,11 +9673,11 @@ function RadiusBroadcastPage({ aiAvailable, notify, t }: { aiAvailable: boolean;
       .filter((row) => row.d <= radiusM)
       .sort((x, y) => x.d - y.d)
       .map(({ a, d }) => {
-        const verdict = evaluateRules({ kind: "scheduling", assetIds: [a.id] });
+        const verdict = evaluateRules({ kind: "scheduling", assetIds: [a.id], category, daypart });
         const flag = verdict.hits[0] ?? verdict.warnings[0];
         return { id: a.id, name: a.name, zone: a.zone, distanceM: d, status: flag ? "flagged" : "clear", flagLabel: flag?.label, flagDetail: flag?.detail };
       });
-  }, [center.lat, center.lng, radiusM]);
+  }, [center.lat, center.lng, radiusM, category, daypart]);
 
   const insideIds = screens.map((s) => s.id);
   const flaggedIds = screens.filter((s) => s.status === "flagged").map((s) => s.id);
@@ -9605,6 +9725,19 @@ function RadiusBroadcastPage({ aiAvailable, notify, t }: { aiAvailable: boolean;
           <label className="radius-slider">
             {t("Radius")}: <strong>{radiusKm.toFixed(1)} km</strong>
             <input type="range" min={1} max={8} step={0.5} value={radiusKm} onChange={(event) => { setRadiusKm(Number(event.target.value)); }} />
+          </label>
+        </div>
+
+        <div className="radius-rules-row">
+          <label><span>{t("Content category")}</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              {radiusCategories.map((option) => <option key={option} value={option}>{t(option)}</option>)}
+            </select>
+          </label>
+          <label><span>{t("Daypart")}</span>
+            <select value={daypart} onChange={(event) => setDaypart(event.target.value)}>
+              <DaypartOptions t={t} />
+            </select>
           </label>
         </div>
 
@@ -12953,11 +13086,12 @@ function NewCampaignWizard({
 
   // Deterministic zone-policy preview: the same evaluateRules the booking
   // path uses, filtered to zone-content rules (RULE-ZON-*) so per-screen
-  // proximity checks stay out of the brief-level note.
+  // proximity checks stay out of the brief-level note. Daypart is included
+  // so time-window rules (RULE-ZON-002 school hours) fire live as well.
   const zonePolicyHits = useMemo(() => {
-    const verdict = evaluateRules({ kind: "booking", zones: data.targetZones, category: data.vertical });
+    const verdict = evaluateRules({ kind: "booking", zones: data.targetZones, category: data.vertical, daypart: data.daypart });
     return [...verdict.hits, ...verdict.warnings].filter((hit) => hit.ruleId.startsWith("RULE-ZON"));
-  }, [data.targetZones, data.vertical]);
+  }, [data.targetZones, data.vertical, data.daypart]);
 
   function update<K extends keyof BriefPayload>(key: K, value: BriefPayload[K]) {
     setData((d) => ({ ...d, [key]: value }));
@@ -13031,7 +13165,7 @@ function NewCampaignWizard({
               <label><span>{t("Brand")}</span><input value={data.brand} onChange={(e) => update("brand", e.target.value)} placeholder={t("Advertiser")} /></label>
               <label><span>{t("Vertical")}</span>
                 <select value={data.vertical} onChange={(e) => update("vertical", e.target.value)}>
-                  <option>Retail</option><option>Tourism</option><option>Government</option><option>Finance</option><option>Automotive</option><option>Real estate</option>
+                  <option>Retail</option><option>Tourism</option><option>Government</option><option>Finance</option><option>Automotive</option><option>Real estate</option><option>Fast food</option><option>Energy drink</option>
                 </select>
               </label>
               <label><span>{t("Primary objective")}</span>
@@ -13119,7 +13253,7 @@ function NewCampaignWizard({
               ) : null}
               <label><span>{t("Daypart")}</span>
                 <select value={data.daypart} onChange={(e) => update("daypart", e.target.value)}>
-                  <option>Prime evening (17:00-22:00)</option><option>Morning commute (07:00-10:00)</option><option>Full day rotation</option><option>Weekend leisure</option>
+                  <DaypartOptions t={t} />
                 </select>
               </label>
               <label><span>{t("Expected weekly impressions")}</span><input type="number" min={1} step={1000} value={data.reach} onChange={(e) => update("reach", e.target.value)} /></label>
