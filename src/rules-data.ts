@@ -29,11 +29,11 @@ export interface SensitiveSite {
 // Placed deliberately near the 5 real asset coordinates so proximity checks
 // actually fire in the demo.
 export const sensitiveSites: SensitiveSite[] = [
-  { id: "SS-01", name: "Sheikh Downtown Mosque", kind: "mosque", lat: 24.4964, lng: 54.3762, radiusM: 250 }, // ~110m from AD-DWT-011 (Downtown Mall)
+  { id: "SS-01", name: "Al Zahiyah Mosque", kind: "mosque", lat: 24.4962, lng: 54.3832, radiusM: 250 }, // ~80m from AD-DWT-011 (Abu Dhabi Mall)
   { id: "SS-02", name: "Yas International School", kind: "school", lat: 24.4894, lng: 54.6041, radiusM: 300 }, // ~130m from AD-BUS-022 (Yas bus stop)
-  { id: "SS-03", name: "Corniche Diplomatic Mission", kind: "embassy", lat: 24.4672, lng: 54.3179, radiusM: 200 }, // ~120m from AD-HWY-001 (Corniche)
-  { id: "SS-04", name: "Al Ain Gateway Military Post", kind: "military", lat: 24.2244, lng: 55.7612, radiusM: 400 }, // ~150m from AD-HWY-009 (Al Ain)
-  { id: "SS-05", name: "Mussafah Community Hospital", kind: "hospital", lat: 24.3625, lng: 54.5098, radiusM: 250 }, // ~120m from AD-BRG-014 (Mussafah)
+  { id: "SS-03", name: "Corniche Diplomatic Mission", kind: "embassy", lat: 24.4674, lng: 54.3343, radiusM: 200 }, // ~90m from AD-HWY-001 (Corniche)
+  { id: "SS-04", name: "Al Ain Industrial Security Post", kind: "military", lat: 24.0788, lng: 55.6657, radiusM: 400 }, // ~85m from AD-HWY-009 (Al Ain Truck Road)
+  { id: "SS-05", name: "Rabdan Community Hospital", kind: "hospital", lat: 24.3977, lng: 54.4926, radiusM: 250 }, // ~100m from AD-BRG-014 (Mussafah corridor)
 ];
 
 // Zone + content-category + time-window restrictions.

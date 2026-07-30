@@ -1,4 +1,4 @@
-type AISource = "openai" | "offline";
+type AISource = "openai" | "offline" | "rules";
 
 export type AIEnvelope<T> = T & {
   ok?: boolean;

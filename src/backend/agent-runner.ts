@@ -12,6 +12,7 @@ import { detectPromptInjection, delimitUntrusted, redactPII, safeSummary } from 
 import { callOpenAI, callOpenAITools, hasOpenAIKey, moderateInput, type OpenAIChatMessage } from "./openai";
 import { getState } from "./dooh-store";
 import { citationsFromPolicyResults, formatPolicyContext, retrievePolicy, type PolicySearchResult } from "./policy-rag";
+import { answerPlacementQuestion } from "./placement-query";
 
 export interface AgentToolTrace {
   tool: string;
@@ -32,7 +33,7 @@ export interface AgentRunResponse {
   reply: string;
   proposedActions: PendingAgentAction[];
   toolTrace: AgentToolTrace[];
-  source: "openai" | "offline";
+  source: "openai" | "offline" | "rules";
   reason?: string;
 }
 
@@ -87,6 +88,33 @@ export async function agentRun(payload: AgentRunPayload): Promise<AgentRunRespon
       toolTrace,
       source: "offline",
       reason: guard.reason || "guard_blocked",
+    };
+  }
+
+  const placementAnswer = answerPlacementQuestion(
+    payload.message,
+    /[\u0600-\u06ff]/.test(payload.message) ? "ar" : "en",
+  );
+  if (placementAnswer) {
+    await appendAgentAudit({
+      actor,
+      role,
+      kind: "tool_read",
+      tool: "placementRules",
+      args: { query: guard.redacted },
+      resultSummary: placementAnswer.summary,
+      threadId,
+    });
+    return {
+      reply: placementAnswer.answer,
+      proposedActions,
+      toolTrace: [{
+        tool: "placementRules",
+        kind: "read",
+        status: "executed",
+        summary: placementAnswer.summary,
+      }],
+      source: "rules",
     };
   }
 

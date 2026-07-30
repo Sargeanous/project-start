@@ -104,8 +104,8 @@ export const planningZones: PlanningZone[] = [
     name: "Corniche & Marina",
     district: "Abu Dhabi City",
     tone: "prime",
-    center: { lat: 24.466, lng: 54.32 },
-    polygon: box(24.466, 54.32, 0.018, 0.03),
+    center: { lat: 24.469, lng: 54.338 },
+    polygon: box(24.469, 54.338, 0.014, 0.022),
     areaSqKm: 6.2,
     demographics: {
       ageBands: [
@@ -253,8 +253,8 @@ export const planningZones: PlanningZone[] = [
     name: "Saadiyat cultural",
     district: "Abu Dhabi City",
     tone: "emerging",
-    center: { lat: 24.54, lng: 54.435 },
-    polygon: box(24.54, 54.435, 0.016, 0.022),
+    center: { lat: 24.535, lng: 54.41 },
+    polygon: box(24.535, 54.41, 0.015, 0.02),
     areaSqKm: 5.0,
     demographics: {
       ageBands: [
@@ -392,8 +392,8 @@ export const planningZones: PlanningZone[] = [
     name: "Airport corridor",
     district: "Abu Dhabi City",
     tone: "emerging",
-    center: { lat: 24.433, lng: 54.645 },
-    polygon: box(24.433, 54.645, 0.02, 0.03),
+    center: { lat: 24.434, lng: 54.625 },
+    polygon: box(24.434, 54.625, 0.016, 0.022),
     areaSqKm: 8.1,
     demographics: {
       ageBands: [
@@ -909,8 +909,8 @@ const BUILD_SPECS: BuildSpec[] = [
     district: "Abu Dhabi City",
     zoneId: "ZN-DTWN",
     type: "Highway gantry",
-    lat: 24.4931,
-    lng: 54.3699,
+    lat: 24.489,
+    lng: 54.362,
     phaseIndex: 2,
     progress: 28,
     plannedStart: "18 Jun 2026",
@@ -943,7 +943,7 @@ const BUILD_SPECS: BuildSpec[] = [
     zoneId: "ZN-ARPT",
     type: "Highway gantry",
     lat: 24.4338,
-    lng: 54.6421,
+    lng: 54.625,
     phaseIndex: 1,
     progress: 15,
     plannedStart: "01 Jul 2026",
@@ -967,8 +967,8 @@ const BUILD_SPECS: BuildSpec[] = [
     district: "Abu Dhabi City",
     zoneId: "ZN-SAAD",
     type: "Landmark spectacular",
-    lat: 24.5384,
-    lng: 54.4361,
+    lat: 24.5368283,
+    lng: 54.411748,
     phaseIndex: 0,
     progress: 6,
     plannedStart: "08 Jul 2026",

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { assets, campaigns, fieldTasks, historicalBids, historicalCampaigns, historicalRuns, proofRecords, tickets } from "../../../data";
 import { callOpenAI, generateImage, hasOpenAIKey } from "../../../backend/openai";
+import { answerPlacementQuestion } from "../../../backend/placement-query";
 import { INTER_600_WOFF2, INTER_700_WOFF2, NOTO_ARABIC_700_WOFF2 } from "../../../backend/creative-fonts";
 import { delimitUntrusted } from "../../../backend/agent-security";
 import {
@@ -702,6 +703,17 @@ async function handleAiEndpoint(endpoint: string | undefined, request: Request) 
     const locale = stringValue(body.locale, "en");
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     if (!query) return Response.json({ ...fallbackAsk(""), ok: false, source: "offline", reason: "empty_query" });
+    const placementAnswer = answerPlacementQuestion(query, locale);
+    if (placementAnswer) {
+      return Response.json({
+        answer: placementAnswer.answer,
+        table: placementAnswer.table,
+        suggestedActions: placementAnswer.suggestedActions,
+        ok: true,
+        source: "rules",
+        model: "ADMO-placement-rules-v1",
+      });
+    }
     const result = await callOpenAI({
       system: aiSystem("Return strict JSON only: {\"answer\":\"...\",\"table\":[[\"...\"]],\"chart\":{\"type\":\"bar|line\",\"title\":\"...\",\"xKey\":\"month\",\"yKey\":\"revenue\",\"data\":[{\"month\":\"Jan\",\"revenue\":210000}]},\"suggestedActions\":[\"...\"]}. The table, chart and suggestedActions keys are optional. Use chart only when the user asks for a chart, graph, plot, trend, month-on-month view, revenue series, uptime series, alarms by zone or similar visual analysis. Use the requested locale if it is Arabic, otherwise answer in English. Keep answers operational and grounded in the supplied platform state."),
       user: [
@@ -866,6 +878,26 @@ function buildPlatformContext(state: Awaited<ReturnType<typeof getState>>) {
         { month: "May", revenue: 352000 },
         { month: "Jun", revenue: 346000 },
       ],
+    },
+    placementStrategy: {
+      source: "ADMO OOH Framework Placement Strategy | 23 Jul 2026",
+      interpretation: "An empty format-by-speed cell means that combination is prohibited.",
+      targetPortfolio: { totalAssets: 800, smallPct: 75, mediumPct: 15, largePct: 10 },
+      roadSpeedMatrix: [
+        { format: "Small vertical", allowed: ["0-40 km/h | 150 m", "41-80 km/h | 300 m"] },
+        { format: "Bus shelter", allowed: ["0-40 km/h | 150 m", "41-80 km/h | 300 m", "81-100 km/h | 300 m"] },
+        { format: "Medium vertical", allowed: ["41-80 km/h | 300 m", "81-100 km/h | 300 m"] },
+        { format: "Medium horizontal", allowed: ["41-80 km/h | 300 m", "81-100 km/h | 300 m"] },
+        { format: "Bridge banner", allowed: ["81-100 km/h | 500 m", "101-160 km/h | 500 m"] },
+        { format: "Large billboard", allowed: ["101-160 km/h | 500 m"] },
+      ],
+      zoneDensityPerKm: {
+        zone0: { small: 0, medium: 0, large: 0 },
+        zone1: { small: 2, medium: 1, large: 0 },
+        zone2: { small: 2, medium: 2, large: 1 },
+        zone3: { small: 6, medium: 3, large: 2 },
+      },
+      governance: "MediaGPT recommends and cites sources. A named ADMO or DMT user approves before construction.",
     },
   });
 }
@@ -1049,6 +1081,8 @@ function fallbackYieldExplanation(budget: number, demand: number, discount: numb
 
 function fallbackAsk(query: string) {
   const normalized = query.toLowerCase();
+  const placementAnswer = answerPlacementQuestion(query);
+  if (placementAnswer) return placementAnswer;
   if (/chart|graph|barplot|plot|trend|month|monthly|revenue/.test(normalized) && /reem|financial|finance|revenue|income|sales/.test(normalized)) {
     return {
       answer: "Month-on-month revenue for Reem Island shows a steady Q1 build-up, a stronger April and May driven by retail and leisure demand, then a June normalization as premium inventory shifts to Yas and Airport routes.",

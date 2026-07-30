@@ -87,7 +87,18 @@ import {
   Ticket,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, FormEvent, Fragment, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  FormEvent,
+  Fragment,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   alerts,
@@ -207,6 +218,18 @@ import {
   type TicketDraft,
 } from "./ai-client";
 import { ClientOnlyBillboardTwin } from "./ClientOnlyBillboardTwin";
+import { PlacementPlanningPage } from "./PlacementPlanningPage";
+import {
+  placementCatalogueRules,
+  placementKnowledgeSources,
+  placementRuleSimulationContexts,
+  digitalPlacementFormats,
+  evaluatePlacement,
+  readPlacementIntakes,
+  subscribePlacementIntakes,
+  updatePlacementIntakeStatus,
+  type PlacementIntake,
+} from "./placement-strategy";
 import admoLogo from "./assets/admo-logo.png";
 import origenGreenIcon from "./assets/origen-green-icon.png";
 import "./dooh-styles.css";
@@ -950,6 +973,7 @@ const marketplacePackages = [
     reach: "1.4M weekly impressions",
     price: "From AED 380,000",
     assets: "Airport, Corniche, Yas",
+    placement: "ADMO Zones 2-3 | approved inventory",
     creativeId: "etihad-retail",
   },
   {
@@ -958,6 +982,7 @@ const marketplacePackages = [
     reach: "790k weekly impressions",
     price: "From AED 150,000",
     assets: "Malls, parking, urban panels",
+    placement: "ADMO Zone 3 | approved inventory",
     creativeId: "mall-footfall",
   },
   {
@@ -966,6 +991,7 @@ const marketplacePackages = [
     reach: "620k weekly impressions",
     price: "From AED 210,000",
     assets: "Yas, airport route, hotels",
+    placement: "ADMO Zone 3 | approved inventory",
     creativeId: "yas-tourism",
   },
 ];
@@ -1530,6 +1556,23 @@ const translations: Record<string, string> = {
   "Access & Roles": "الصلاحيات والأدوار",
   "Audit Log": "سجل التدقيق",
   "Edge & Compute": "الحافة والحوسبة",
+  "Project lifecycle": "دورة حياة المشروع",
+  "Planning": "التخطيط",
+  "Construction": "الإنشاء",
+  "Tickets": "التذاكر",
+  "Radius Broadcast": "البث ضمن نطاق",
+  "Yield Advisor": "مستشار العائد",
+  "Planning handoff": "تسليم من التخطيط",
+  "approved site intake": "ملف موقع معتمد",
+  "approved site intakes": "ملفات مواقع معتمدة",
+  "Validated against the ADMO placement strategy": "تم التحقق وفق استراتيجية مواضع ADMO",
+  "Start design": "بدء التصميم",
+  "Open tracker": "فتح المتابعة",
+  "Site approval": "اعتماد الموقع",
+  "Design development": "تطوير التصميم",
+  "Promoted to build": "تمت الإحالة للإنشاء",
+  "ADMO Zones 2-3 | approved inventory": "مناطق ADMO 2-3 | مخزون معتمد",
+  "ADMO Zone 3 | approved inventory": "منطقة ADMO 3 | مخزون معتمد",
 
   "Assets live": "الأصول النشطة",
   "Screens currently playing": "الشاشات التي تعمل الآن",
@@ -1556,6 +1599,7 @@ const translations: Record<string, string> = {
   "Warning": "تحذير",
   "Offline": "غير متصل",
   "Maintenance": "صيانة",
+  "Temperature sensor threshold breach": "تجاوز مستشعر الحرارة للحد المسموح",
   "Resolved": "مغلق",
   "Open": "مفتوح",
   "Acknowledged": "تمت المتابعة",
@@ -1855,6 +1899,7 @@ const translations: Record<string, string> = {
 
   "Ask MediaGPT": "اسأل MediaGPT",
   "Live AI": "ذكاء اصطناعي مباشر",
+  "Governed rule engine": "محرك قواعد محكوم",
   "Offline fallback": "إجابة احتياطية دون اتصال",
   "Auction desk": "مكتب المزادات",
   "Close auction": "إغلاق المزاد",
@@ -2785,9 +2830,9 @@ function localized(value: LocalizedText | string, t: Translator) {
 }
 
 const ontologyCatalogue = [...doohOntology, ...extendedDoohOntology];
-const knowledgeSourceCatalogue = [...seedKnowledgeSources, ...extendedKnowledgeSources];
-const ruleCatalogue = [...seedDoohRules, ...extendedDoohRules];
-const simulationCatalogue = [...ruleSimulationContexts, ...extendedRuleSimulationContexts];
+const knowledgeSourceCatalogue = [...seedKnowledgeSources, ...extendedKnowledgeSources, ...placementKnowledgeSources];
+const ruleCatalogue = [...seedDoohRules, ...extendedDoohRules, ...placementCatalogueRules];
+const simulationCatalogue = [...ruleSimulationContexts, ...extendedRuleSimulationContexts, ...placementRuleSimulationContexts];
 const scenarioCatalogue = [...demoScenarios, ...extendedDemoScenarios];
 
 function sourceById(id: string) {
@@ -2900,7 +2945,20 @@ function App() {
   const [aiAvailable, setAiAvailable] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(defaultNotificationPreferences);
 
-  const t = (value: string) => (lang === "ar" ? translateArabic(value) : value);
+  const t = useCallback(
+    (value: string) => (lang === "ar" ? translateArabic(value) : value),
+    [lang],
+  );
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 700px)");
+    const collapseForMobile = (event: MediaQueryListEvent | MediaQueryList) => {
+      if (event.matches) setSidebarCollapsed(true);
+    };
+    collapseForMobile(mobile);
+    mobile.addEventListener("change", collapseForMobile);
+    return () => mobile.removeEventListener("change", collapseForMobile);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -3369,7 +3427,7 @@ function App() {
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
           {page === "mediaPlanner" && <MediaPlannerPage campaigns={campaigns} t={t} />}
-          {page === "planning" && <PlanningPage t={t} />}
+          {page === "planning" && <PlacementPlanningPage t={t} isArabic={lang === "ar"} />}
           {page === "construction" && <ConstructionPage t={t} />}
           {page === "tickets" && <TicketsPage t={t} />}
         </main>
@@ -6841,6 +6899,12 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
   const [bomStatus, setBomStatus] = useState("all");
   const [bomBuild, setBomBuild] = useState("all");
   const [bomPage, setBomPage] = useState(0);
+  const [placementIntakes, setPlacementIntakes] = useState<PlacementIntake[]>([]);
+
+  useEffect(() => {
+    setPlacementIntakes(readPlacementIntakes());
+    return subscribePlacementIntakes(setPlacementIntakes);
+  }, []);
 
   const summary = constructionSummary();
   const selectedBuild: ConstructionRecord = constructionRecords.find((r) => r.id === selectedBuildId) ?? constructionRecords[0];
@@ -6925,6 +6989,35 @@ function ConstructionPage({ t }: { t: (value: string) => string }) {
 
       {consTab === "programme" ? (
         <section className="cons-programme" aria-label={t("Rollout programme")}>
+          {placementIntakes.length ? (
+            <div className="cons-placement-intakes">
+              <header>
+                <div>
+                  <span>{t("Planning handoff")}</span>
+                  <strong>{placementIntakes.length} {t(placementIntakes.length === 1 ? "approved site intake" : "approved site intakes")}</strong>
+                </div>
+                <small>{t("Validated against the ADMO placement strategy")}</small>
+              </header>
+              <div>
+                {placementIntakes.slice(0, 4).map((intake) => (
+                  <article key={intake.id}>
+                    <span>
+                      <strong>{intake.candidateName}</strong>
+                      <small>{intake.id} | {intake.marketArea} | {intake.formatName}</small>
+                    </span>
+                    <em>{t(intake.status)}</em>
+                    {intake.status === "Site approval" ? (
+                      <button type="button" onClick={() => setPlacementIntakes(updatePlacementIntakeStatus(intake.id, "Design development"))}>
+                        {t("Start design")}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setConsTab("tracker")}>{t("Open tracker")}</button>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="cons-monitor">
             <span className="cons-monitor-icon"><Sparkles size={16} /></span>
             <div>
@@ -8476,6 +8569,58 @@ const mediaGptAgents: AgentSpec[] = [
         notes: ["Governance check pending", "Requires named approver before push"],
         primaryAction: "Queue for approval",
         primaryTone: "warn",
+      };
+    },
+  },
+  {
+    id: "placement-advisor",
+    family: "Command",
+    name: "MediaGPT Placement Advisor",
+    icon: MapPinned,
+    tagline: "Tests candidate sites against ADMO format, speed, buffer, density and zone rules.",
+    boundary: "Recommend",
+    fields: [
+      { key: "zone", kind: "select", label: "ADMO zone", options: ["Zone 0", "Zone 1", "Zone 2", "Zone 3"], defaultValue: "Zone 2" },
+      { key: "speed", kind: "select", label: "Road speed", options: ["40 km/h", "60 km/h", "80 km/h", "100 km/h", "120 km/h"], defaultValue: "60 km/h" },
+      { key: "format", kind: "select", label: "Format", options: digitalPlacementFormats.map((format) => format.name.en), defaultValue: "Large billboard" },
+    ],
+    run: (input) => {
+      const format = digitalPlacementFormats.find((row) => row.name.en === input.format) ?? digitalPlacementFormats[0];
+      const widthM = format.maxWidthM ?? 6;
+      const heightM = format.maxHeightM ?? 3;
+      const zoneClass = Number(input.zone.replace(/\D/g, "")) as 0 | 1 | 2 | 3;
+      const roadSpeedKph = Number(input.speed.replace(/\D/g, "")) || 60;
+      const result = evaluatePlacement({
+        id: "MEDIAGPT-PLACEMENT",
+        name: { en: "MediaGPT candidate", ar: "موقع مقترح من MediaGPT" },
+        marketArea: { en: "Scenario point", ar: "نقطة سيناريو" },
+        lat: 24.491,
+        lng: 54.62,
+        zoneClass,
+        roadSpeedKph,
+        formatId: format.id,
+        widthM,
+        heightM,
+        groundClearanceM: format.groundClearanceM,
+        bridgeSpanM: format.id === "digital-bridge-banner" ? Math.max(15, widthM / 0.8) : undefined,
+        projectedWeeklyReach: 300_000,
+        estimatedCapexAed: 1_200_000,
+        status: "Draft",
+      });
+      return {
+        summary: `${result.verdict}: ${result.recommendation.en}`,
+        columns: ["Check", "Result", "Evidence"],
+        rows: result.checks.map((item) => [
+          item.label.en,
+          item.state === "pass" ? "Pass" : item.state === "warn" ? "Review" : "Blocked",
+          item.source.split("|").at(-1)?.trim() ?? "ADMO strategy",
+        ]),
+        notes: [
+          `${format.name.en} | ${roadSpeedKph} km/h | Zone ${zoneClass}`,
+          "Named ADMO or DMT approval remains required before construction.",
+        ],
+        primaryAction: result.verdict === "Compliant" ? "Open Planning" : "Apply compliant alternative",
+        primaryTone: result.verdict === "Compliant" ? "good" : "warn",
       };
     },
   },
@@ -11502,6 +11647,7 @@ function MarketplacePage({
                   <strong>{t(item.name)}</strong>
                   <span>{t(item.reach)}</span>
                   <small>{t(item.assets)}</small>
+                  <small className="marketplace-placement"><ShieldCheck size={12} />{t(item.placement)}</small>
                   <em>{t(item.price)}</em>
                 </button>
               ))}
@@ -11848,6 +11994,9 @@ function MediaGptChatbot({ profile, t }: { profile: Profile; t: (value: string) 
           <article key={`${message.role}-${index}`} className={message.role}>
             {message.role === "assistant" && message.source === "openai" ? (
               <small className="chat-source live">{t("Live AI")}</small>
+            ) : null}
+            {message.role === "assistant" && message.source === "rules" ? (
+              <small className="chat-source live">{t("Governed rule engine")}</small>
             ) : null}
             {message.role === "assistant" ? <MarkdownLite text={t(message.body)} /> : <p>{t(message.body)}</p>}
             {message.table ? (
