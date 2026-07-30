@@ -857,8 +857,8 @@ export function PlacementPlanningPage({ t, isArabic }: PlacementPlanningPageProp
                     <strong>{PLACEMENT_STRATEGY_SOURCE}</strong>
                     <span>
                       {text(
-                        "Rules PLC-001 to PLC-006 | Evidence retained with the approval record",
-                        "القواعد PLC-001 إلى PLC-006 | تحفظ الأدلة مع سجل الاعتماد",
+                        "Rules PLC-001 to PLC-006 plus sensitive frontage exclusions (RULE-PROX, exact distances pending ADMO confirmation) | Evidence retained with the approval record",
+                        "القواعد PLC-001 إلى PLC-006 مع استبعادات الواجهات الحساسة (RULE-PROX، والمسافات الدقيقة بانتظار تأكيد ADMO) | تحفظ الأدلة مع سجل الاعتماد",
                       )}
                     </span>
                   </div>

@@ -8,6 +8,7 @@ import {
   type PlacementZoneClass,
   type RegulatoryZoneShape,
 } from "./placement-strategy";
+import { sensitiveSites } from "./rules-data";
 
 type PlacementComplianceMapProps = {
   zones: RegulatoryZoneShape[];
@@ -76,6 +77,8 @@ export function PlacementComplianceMap({
   const candidateLayerRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bufferLayersRef = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sensitiveLayersRef = useRef<any[]>([]);
   const candidateRef = useRef(candidate);
   const relocationRef = useRef(relocationMode);
   const moveRef = useRef(onMoveCandidate);
@@ -192,6 +195,44 @@ export function PlacementComplianceMap({
       assetLayersRef.current.push(marker);
     });
   }, [mapReady, onSelectEstateAsset, showEstate]);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    sensitiveLayersRef.current.forEach((layer) => layer.remove());
+    sensitiveLayersRef.current = [];
+    if (!showBuffers) return;
+
+    sensitiveSites.forEach((site) => {
+      const exclusion = L.circle([site.lat, site.lng], {
+        radius: site.radiusM,
+        color: "#d94a43",
+        weight: 1.4,
+        dashArray: "5 6",
+        fillColor: "#d94a43",
+        fillOpacity: 0.05,
+      })
+        .addTo(map)
+        .bindTooltip(`<strong>${site.name}</strong><br/>${site.radiusM} m sensitive-site exclusion`, {
+          sticky: true,
+          direction: "top",
+        });
+      const marker = L.circleMarker([site.lat, site.lng], {
+        radius: 4,
+        color: "#ffffff",
+        weight: 1.5,
+        fillColor: "#d94a43",
+        fillOpacity: 1,
+      })
+        .addTo(map)
+        .bindTooltip(`<strong>${site.name}</strong><br/>${site.radiusM} m sensitive-site exclusion`, {
+          direction: "top",
+        });
+      sensitiveLayersRef.current.push(exclusion, marker);
+    });
+  }, [mapReady, showBuffers]);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,6 +5,7 @@ import type {
   LocalizedText,
   RuleSimulationContext,
 } from "./intelligence-content";
+import { sensitiveSites } from "./rules-data";
 
 export type PlacementZoneClass = 0 | 1 | 2 | 3;
 export type PlacementSize = "Small" | "Medium" | "Large";
@@ -125,6 +126,12 @@ export interface PlacementIntake {
 }
 
 export const PLACEMENT_STRATEGY_SOURCE = "ADMO OOH Framework Placement Strategy | 23 Jul 2026";
+
+// Sensitive frontage is enforced from the ADMO rule catalogue (the same
+// exclusions the broadcast rules engine applies), not from the placement
+// strategy pages. Exact distances are pending ADMO confirmation.
+export const SENSITIVE_FRONTAGE_SOURCE =
+  "ADMO rule catalogue, sensitive frontage exclusions, exact distances pending ADMO confirmation | RULE-PROX";
 
 export const digitalPlacementFormats: PlacementFormatSpec[] = [
   {
@@ -896,6 +903,39 @@ export function evaluatePlacement(candidate: PlacementCandidate): PlacementEvalu
       4,
     ),
   );
+
+  // Sensitive-site frontage. The broadcast eligibility rules already exclude
+  // these radii for content; placement candidates must respect the same
+  // exclusions so a site inside a mosque or diplomatic radius cannot read
+  // Compliant here.
+  const nearestSensitive =
+    sensitiveSites
+      .map((site) => ({ site, distanceM: distanceM(candidate, site) }))
+      .sort((a, b) => a.distanceM - b.distanceM)[0] ?? null;
+  const sensitiveBreach =
+    nearestSensitive && nearestSensitive.distanceM <= nearestSensitive.site.radiusM
+      ? nearestSensitive
+      : null;
+  checks.push({
+    id: "sensitive-proximity",
+    label: { en: "Sensitive-site proximity", ar: "القرب من المواقع الحساسة" },
+    state: sensitiveBreach ? "block" : "pass",
+    detail: sensitiveBreach
+      ? {
+          en: `${sensitiveBreach.site.name} at ${sensitiveBreach.distanceM} m, limit ${sensitiveBreach.site.radiusM} m.`,
+          ar: `يقع ${sensitiveBreach.site.name} على بعد ${sensitiveBreach.distanceM} م، والحد المطلوب ${sensitiveBreach.site.radiusM} م.`,
+        }
+      : nearestSensitive
+        ? {
+            en: `Nearest sensitive site is ${nearestSensitive.site.name} at ${nearestSensitive.distanceM} m, outside its ${nearestSensitive.site.radiusM} m exclusion.`,
+            ar: `أقرب موقع حساس هو ${nearestSensitive.site.name} على بعد ${nearestSensitive.distanceM} م، خارج نطاق الاستبعاد البالغ ${nearestSensitive.site.radiusM} م.`,
+          }
+        : {
+            en: "No sensitive site is registered near this point.",
+            ar: "لا يوجد موقع حساس مسجل قرب هذه النقطة.",
+          },
+    source: SENSITIVE_FRONTAGE_SOURCE,
+  });
 
   const diameterM = DIAMETER_BY_SIZE[format.size];
   const diameterLimit = DIAMETER_LIMIT_BY_SIZE[format.size];
