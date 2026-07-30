@@ -14120,3 +14120,95 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ==================== LOCAL ADVERTISER TIER (marketplace toggle + brief wizard zone-policy note) ==================== */
+
+.local-tier-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.local-tier-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.local-tier-toggle input {
+  accent-color: var(--primary);
+}
+
+.local-tier-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.package-grid button.local-tier-locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.package-grid button.local-tier-locked:hover {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.package-grid button.local-tier-open:not(.selected) {
+  border-color: var(--primary);
+}
+
+.local-tier-flag {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.package-grid button.local-tier-open .local-tier-flag {
+  color: var(--primary);
+}
+
+/* Zone-policy note inside the brief wizard targeting step */
+.wizard-rules-note {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+}
+
+.wizard-rules-note p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.wizard-rules-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--amber);
+}
+
+.wizard-rules-note strong {
+  color: var(--ink);
+}
+
+.wizard-rules-note em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}

@@ -71,6 +71,19 @@ export const zoneContentRules: ZoneContentRule[] = [
     blockedCategories: ["political", "religious campaign"],
     message: "Political or religious-campaign content requires competent-authority approval (MCS-02/07).",
   },
+  {
+    // Residential belt policy (local advertiser tier): national commercial
+    // categories are held back in the Zone 2 residential belt unless the
+    // buyer books through the local advertiser tier (business within 5 km,
+    // demo policy). No asset carries this market zone yet, so the rule only
+    // fires where the zone is explicitly targeted (simulator, brief wizard).
+    ruleId: "RULE-ZON-004",
+    reasonCode: "RESIDENTIAL_LOCAL_TIER",
+    tier: "Regulatory",
+    zone: "Residential belt",
+    blockedCategories: ["national brand", "retail", "tourism", "automotive", "finance", "telecom"],
+    message: "National commercial categories are limited to the local advertiser tier (business within 5 km) in the residential belt.",
+  },
 ];
 
 // Which override tier a requester acts under, by context.

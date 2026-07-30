@@ -110,6 +110,11 @@ export const creativeCatalog: Record<string, CreativeSpec> = {
     kicker: "BRAND STUDIO | REFERENCE", titleEn: "BRAND GUIDELINES", titleAr: "دليل الهوية البصرية",
     brand: "CREATIVE STANDARDS", motif: "doc",
   },
+  "community-local": {
+    from: "#4a3413", to: "#8a6a2f", ink: "#ffffff", accent: "#ffe3a8",
+    kicker: "RESIDENTIAL BELT | LOCAL TIER", titleEn: "SUPPORT LOCAL BUSINESS", titleAr: "ادعم الأعمال المحلية",
+    brand: "COMMUNITY COMMERCE | ZONE 2", motif: "bag",
+  },
 };
 
 const demoCreativeBackgrounds: Record<string, string> = {

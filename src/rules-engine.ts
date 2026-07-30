@@ -113,7 +113,7 @@ export function evaluateRules(context: RuleContext): RuleVerdict {
         reasonCode: rule.reasonCode,
         tier: rule.tier,
         severity: "block",
-        label: rule.reasonCode === "PROHIBITED_CATEGORY" ? "Prohibited category" : rule.reasonCode === "SCHOOL_DAYPART_RESTRICTED" ? "School-hours restriction" : "Sensitive content",
+        label: rule.reasonCode === "PROHIBITED_CATEGORY" ? "Prohibited category" : rule.reasonCode === "SCHOOL_DAYPART_RESTRICTED" ? "School-hours restriction" : rule.reasonCode === "RESIDENTIAL_LOCAL_TIER" ? "Residential belt policy" : "Sensitive content",
         detail: rule.message,
       });
     }

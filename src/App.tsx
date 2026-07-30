@@ -995,6 +995,17 @@ const marketplacePackages = [
     placement: "ADMO Zone 3 | approved inventory",
     creativeId: "yas-tourism",
   },
+  {
+    // Local advertiser tier: unlocked in the marketplace by the
+    // "Local advertiser" toggle (demo eligibility policy).
+    id: "community",
+    name: "Community and local businesses",
+    reach: "150k weekly impressions",
+    price: "From AED 25,000",
+    assets: "Community high streets, bus stops, local panels",
+    placement: "Residential belt | local advertiser tier",
+    creativeId: "community-local",
+  },
 ];
 
 type Translator = (value: string) => string;
@@ -1840,6 +1851,21 @@ const translations: Record<string, string> = {
   "From AED 380,000": "ابتداءً من 380,000 درهم",
   "From AED 150,000": "ابتداءً من 150,000 درهم",
   "From AED 210,000": "ابتداءً من 210,000 درهم",
+  "From AED 25,000": "ابتداءً من 25,000 درهم",
+
+  "Community and local businesses": "المجتمع والأعمال المحلية",
+  "150k weekly impressions": "150 ألف ظهور أسبوعياً",
+  "Community high streets, bus stops, local panels": "الشوارع المجتمعية، محطات الحافلات، اللوحات المحلية",
+  "Residential belt | local advertiser tier": "الحزام السكني | فئة المعلن المحلي",
+  "Local advertiser": "معلن محلي",
+  "Local rate card, business within 5 km of the screen, demo policy": "تعرفة محلية، نشاط تجاري ضمن 5 كم من الشاشة، سياسة تجريبية",
+  "Turn on to unlock the community and local businesses package": "فعّل الخيار لفتح باقة المجتمع والأعمال المحلية",
+  "Local advertiser tier required": "يتطلب فئة المعلن المحلي",
+  "Local tier unlocked": "الفئة المحلية مفتوحة",
+  "Residential belt": "الحزام السكني",
+  "National brand": "علامة تجارية وطنية",
+  "Residential belt policy": "سياسة الحزام السكني",
+  "National commercial categories are limited to the local advertiser tier (business within 5 km) in the residential belt.": "تقتصر الفئات التجارية الوطنية على فئة المعلن المحلي (نشاط ضمن 5 كم) في الحزام السكني.",
 
   "Open auctions": "المزادات المفتوحة",
   "Fixed-rate packages": "الباقات بسعر ثابت",
@@ -9354,8 +9380,8 @@ function emptyRuleDraft(): DoohRule {
 
 const ENFORCEMENT_TONE: Record<EnforcementEvent["outcome"], Tone> = { blocked: "danger", overridden: "info", warned: "warn", cleared: "good" };
 const SENSITIVE_LABEL: Record<SensitiveKind, string> = { mosque: "Mosque", school: "School", embassy: "Diplomatic site", military: "Military site", hospital: "Hospital" };
-const RULE_ZONES = ["Abu Dhabi City", "Yas Island", "Industrial Zone", "Al Ain", "Downtown"];
-const RULE_CATEGORIES = ["Retail", "Tourism", "Alcohol", "Gambling", "Energy drink", "Political", "Civic notice"];
+const RULE_ZONES = ["Abu Dhabi City", "Yas Island", "Industrial Zone", "Al Ain", "Downtown", "Residential belt"];
+const RULE_CATEGORIES = ["Retail", "Tourism", "Alcohol", "Gambling", "Energy drink", "Political", "Civic notice", "National brand"];
 const RULE_TIERS: OverrideTier[] = ["Commercial", "Regulatory", "Civic", "Public Safety", "Emergency"];
 
 function RulesEnforcementPanel({ enforcementEvents, t }: { enforcementEvents: EnforcementEvent[]; t: (value: string) => string }) {
@@ -11557,6 +11583,7 @@ function MarketplacePage({
   const [campaign, setCampaign] = useState("Airport retail launch");
   const [budget, setBudget] = useState("AED 420,000");
   const [mode, setMode] = useState<"auction" | "fixed">("auction");
+  const [localAdvertiser, setLocalAdvertiser] = useState(false);
   const [creativeUrl, setCreativeUrl] = useState("");
   const [creativeName, setCreativeName] = useState("");
   const creativeRef = useRef<HTMLInputElement | null>(null);
@@ -11662,17 +11689,48 @@ function MarketplacePage({
         </>
       ) : (
         <Panel icon={ShoppingBag} title={t("Fixed-rate packages")}>
+            <div className="local-tier-bar">
+              <label className="local-tier-toggle">
+                <input
+                  type="checkbox"
+                  checked={localAdvertiser}
+                  onChange={(event) => {
+                    const on = event.target.checked;
+                    setLocalAdvertiser(on);
+                    if (!on && selected.id === "community") setSelected(marketplacePackages[0]);
+                  }}
+                />
+                <span>{t("Local advertiser")}</span>
+              </label>
+              <small className="local-tier-note">
+                {localAdvertiser
+                  ? t("Local rate card, business within 5 km of the screen, demo policy")
+                  : t("Turn on to unlock the community and local businesses package")}
+              </small>
+            </div>
             <div className="package-grid">
-              {marketplacePackages.map((item) => (
-                <button key={item.id} className={selected.id === item.id ? "selected" : ""} type="button" onClick={() => setSelected(item)}>
-                  <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
-                  <strong>{t(item.name)}</strong>
-                  <span>{t(item.reach)}</span>
-                  <small>{t(item.assets)}</small>
-                  <small className="marketplace-placement"><ShieldCheck size={12} />{t(item.placement)}</small>
-                  <em>{t(item.price)}</em>
-                </button>
-              ))}
+              {marketplacePackages.map((item) => {
+                const lockedLocal = item.id === "community" && !localAdvertiser;
+                return (
+                  <button
+                    key={item.id}
+                    className={`${selected.id === item.id ? "selected" : ""}${item.id === "community" ? (localAdvertiser ? " local-tier-open" : " local-tier-locked") : ""}`}
+                    type="button"
+                    disabled={lockedLocal}
+                    onClick={() => setSelected(item)}
+                  >
+                    <div className="creative-frame" style={{ backgroundImage: `url("${creativeBackground(item.creativeId)}")` }} />
+                    <strong>{t(item.name)}</strong>
+                    <span>{t(item.reach)}</span>
+                    <small>{t(item.assets)}</small>
+                    <small className="marketplace-placement"><ShieldCheck size={12} />{t(item.placement)}</small>
+                    {item.id === "community" ? (
+                      <small className="local-tier-flag">{lockedLocal ? t("Local advertiser tier required") : t("Local tier unlocked")}</small>
+                    ) : null}
+                    <em>{t(item.price)}</em>
+                  </button>
+                );
+              })}
             </div>
           <LinkedDetail icon={FileText} title={t("Submit campaign")} action={<span className="head-meta">{t(selected.name)}</span>}>
             <form className="stack-form" onSubmit={submit}>
@@ -12709,7 +12767,7 @@ const wizardCreativeIds = [
   "holiday-notice",
   "live-slate",
 ];
-const wizardZones = ["Corniche", "Downtown", "Yas Island", "Al Ain gateways", "Airport road", "Reem Island"];
+const wizardZones = ["Corniche", "Downtown", "Yas Island", "Al Ain gateways", "Airport road", "Reem Island", "Residential belt"];
 const wizardObjectives = ["Awareness", "Footfall", "Sales activation", "Tourism visitation", "Public information", "Event attendance"];
 
 function NewCampaignWizard({
@@ -12755,6 +12813,14 @@ function NewCampaignWizard({
     t("Compliance"),
     t("Review"),
   ];
+
+  // Deterministic zone-policy preview: the same evaluateRules the booking
+  // path uses, filtered to zone-content rules (RULE-ZON-*) so per-screen
+  // proximity checks stay out of the brief-level note.
+  const zonePolicyHits = useMemo(() => {
+    const verdict = evaluateRules({ kind: "booking", zones: data.targetZones, category: data.vertical });
+    return [...verdict.hits, ...verdict.warnings].filter((hit) => hit.ruleId.startsWith("RULE-ZON"));
+  }, [data.targetZones, data.vertical]);
 
   function update<K extends keyof BriefPayload>(key: K, value: BriefPayload[K]) {
     setData((d) => ({ ...d, [key]: value }));
@@ -12904,6 +12970,16 @@ function NewCampaignWizard({
                   ))}
                 </div>
               </div>
+              {zonePolicyHits.length ? (
+                <div className="wizard-rules-note wizard-full">
+                  {zonePolicyHits.map((hit) => (
+                    <p key={hit.ruleId}>
+                      <ShieldAlert size={13} />
+                      <span><strong>{t(hit.label)}</strong> {t(hit.detail)} <em>{hit.ruleId}</em></span>
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               <label><span>{t("Daypart")}</span>
                 <select value={data.daypart} onChange={(e) => update("daypart", e.target.value)}>
                   <option>Prime evening (17:00-22:00)</option><option>Morning commute (07:00-10:00)</option><option>Full day rotation</option><option>Weekend leisure</option>
