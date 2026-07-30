@@ -221,6 +221,137 @@ export function mediaPlan(budgetAed: number, goalRaw: string, category?: string)
   return { budgetAed, goal, lines, dayparts: GOAL_DAYPARTS[goal] ?? GOAL_DAYPARTS.awareness, totalImpressions, avgCpm, summary };
 }
 
+/* ========================= objective-based buying modes ========================= */
+/* Three plan modes layered on the same advertiser-safe inputs as mediaPlan
+ * (availability, audience, rate cards, aggregate demand). Deterministic over
+ * the seeded estate; no clock dependence beyond assetEconomics itself. */
+
+function buildPlanLine(eco: AssetEconomics, lineBudgetAed: number, zoneFit: number, reason: string): PlanLine {
+  const weeksAffordable = Math.max(1, Math.floor(lineBudgetAed / eco.rateCardWeekAed));
+  const bookableWeeks = Math.min(weeksAffordable, Math.max(1, eco.unsoldWeeksNext12));
+  const projectedImpressions = Math.round(eco.audienceWeekly * bookableWeeks * zoneFit);
+  const spend = Math.min(lineBudgetAed, eco.rateCardWeekAed * bookableWeeks);
+  const cpm = projectedImpressions ? Math.round((spend / projectedImpressions) * 1000 * 100) / 100 : 0;
+  return {
+    assetId: eco.asset.id, name: eco.asset.name, zone: eco.asset.zone, type: eco.asset.type,
+    audienceWeekly: eco.audienceWeekly, weeksAffordable: bookableWeeks, projectedImpressions,
+    cpm, rateCardWeekAed: eco.rateCardWeekAed, demand: eco.demand, availability: eco.nextFreeLabel, reason,
+  };
+}
+
+export interface CoveragePlan extends MediaPlan {
+  zonesCovered: number;
+  zonesTotal: number;
+  missingZones: string[];
+}
+
+/** Citywide coverage: one anchor screen per zone (strongest goal-fitted reach)
+ *  so every zone is represented, with the budget split evenly across anchors. */
+export function planCitywideCoverage(budgetAed: number, goalRaw: string): CoveragePlan {
+  const goal = (goalRaw || "awareness").toLowerCase();
+  const fit = GOAL_ZONE_FIT[goal] ?? GOAL_ZONE_FIT.awareness;
+  const zones = [...new Set(assets.map((a) => a.zone))].sort();
+  const anchors = zones
+    .map((zone) => assets
+      .filter((a) => a.zone === zone)
+      .map((a) => assetEconomics(a.id))
+      .filter((e): e is AssetEconomics => Boolean(e && e.bookable && e.audienceWeekly > 0))
+      .sort((a, b) => b.audienceWeekly * (fit[b.asset.zone] ?? 1) - a.audienceWeekly * (fit[a.asset.zone] ?? 1) || a.rateCardWeekAed - b.rateCardWeekAed)[0])
+    .filter((e): e is AssetEconomics => Boolean(e));
+  const missingZones = zones.filter((z) => !anchors.some((e) => e.asset.zone === z));
+  const shareAed = anchors.length ? budgetAed / anchors.length : 0;
+
+  const lines = anchors
+    .map((eco) => {
+      const zoneFit = fit[eco.asset.zone] ?? 1;
+      const weeks = Math.min(Math.max(1, Math.floor(shareAed / eco.rateCardWeekAed)), Math.max(1, eco.unsoldWeeksNext12));
+      const reason = [
+        `${eco.asset.zone} anchor, fit x${zoneFit.toFixed(2)}`,
+        `${(eco.audienceWeekly / 1000).toFixed(0)}k weekly reach`,
+        `${weeks} wk on a ${money(shareAed)} zone share at ${money(eco.rateCardWeekAed)}/wk`,
+        eco.nextFreeLabel.toLowerCase(),
+      ].join(", ");
+      return buildPlanLine(eco, shareAed, zoneFit, reason);
+    })
+    .sort((a, b) => b.projectedImpressions - a.projectedImpressions);
+
+  const totalImpressions = lines.reduce((s, l) => s + l.projectedImpressions, 0);
+  const totalSpend = lines.reduce((s, l) => s + Math.min(shareAed, l.rateCardWeekAed * l.weeksAffordable), 0);
+  const avgCpm = totalImpressions ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0;
+  const goalLabel = (PLAN_GOALS.find((g) => g.value === goal)?.label ?? goal).toLowerCase();
+  const summary = lines.length
+    ? `Citywide coverage on ${money(budgetAed)} for ${goalLabel}: ${lines.length} of ${zones.length} zones anchored with one screen each, projecting ${(totalImpressions / 1_000_000).toFixed(1)}M impressions at an average CPM of AED ${avgCpm.toFixed(2)}.${missingZones.length ? ` No bookable screen right now in ${missingZones.join(", ")}.` : ""}`
+    : "No bookable screens are open in any zone right now.";
+  return {
+    budgetAed, goal, lines, dayparts: GOAL_DAYPARTS[goal] ?? GOAL_DAYPARTS.awareness,
+    totalImpressions, avgCpm, summary, zonesCovered: lines.length, zonesTotal: zones.length, missingZones,
+  };
+}
+
+export interface TargetViewsPlan {
+  viewsTarget: number;
+  requiredBudgetAed: number;
+  achievable: boolean;
+  plan: MediaPlan;
+  summary: string;
+}
+
+const TARGET_VIEWS_MIN_K = 50; // AED 50k search floor
+const TARGET_VIEWS_MAX_K = 2000; // AED 2M search ceiling
+
+/** Target views: binary-search the smallest budget (1k granularity, AED 50k
+ *  to 2M) whose mediaPlan projects at least the impressions target. */
+export function planForTargetViews(viewsTarget: number, goalRaw: string): TargetViewsPlan {
+  const goal = (goalRaw || "awareness").toLowerCase();
+  const impressionsAtK = (k: number) => mediaPlan(k * 1000, goal).totalImpressions;
+  const achievable = impressionsAtK(TARGET_VIEWS_MAX_K) >= viewsTarget;
+  let lo = TARGET_VIEWS_MIN_K;
+  let hi = TARGET_VIEWS_MAX_K;
+  if (achievable) {
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (impressionsAtK(mid) >= viewsTarget) hi = mid; else lo = mid + 1;
+    }
+  }
+  const requiredBudgetAed = hi * 1000;
+  const plan = mediaPlan(requiredBudgetAed, goal);
+  const goalLabel = (PLAN_GOALS.find((g) => g.value === goal)?.label ?? goal).toLowerCase();
+  const targetM = (viewsTarget / 1_000_000).toFixed(1);
+  const projectedM = (plan.totalImpressions / 1_000_000).toFixed(1);
+  const summary = achievable
+    ? `Reaching ${targetM}M impressions for ${goalLabel} needs about ${money(requiredBudgetAed)}: the ${plan.lines.length}-screen plan projects ${projectedM}M at an average CPM of AED ${plan.avgCpm.toFixed(2)}.`
+    : `Even at the ${money(TARGET_VIEWS_MAX_K * 1000)} search ceiling this goal projects ${projectedM}M impressions, short of the ${targetM}M target. Book the ceiling plan or relax the target.`;
+  return { viewsTarget, requiredBudgetAed, achievable, plan, summary };
+}
+
+/** Traffic corridors: ranks screens purely by weekly audience as the
+ *  corridor-traffic proxy; the summary labels the proxy honestly. */
+export function planTrafficCorridors(budgetAed: number): MediaPlan {
+  const lines = assets
+    .map((a) => assetEconomics(a.id))
+    .filter((e): e is AssetEconomics => Boolean(e && e.bookable && e.audienceWeekly > 0))
+    .sort((a, b) => b.audienceWeekly - a.audienceWeekly)
+    .slice(0, 5)
+    .map((eco, index) => {
+      const weeks = Math.min(Math.max(1, Math.floor(budgetAed / eco.rateCardWeekAed)), Math.max(1, eco.unsoldWeeksNext12));
+      const reason = [
+        `Corridor rank ${index + 1} by weekly audience (traffic proxy)`,
+        `${(eco.audienceWeekly / 1000).toFixed(0)}k weekly on the ${eco.asset.zone} corridor`,
+        `${weeks} wk within budget at ${money(eco.rateCardWeekAed)}/wk`,
+        eco.nextFreeLabel.toLowerCase(),
+      ].join(", ");
+      return buildPlanLine(eco, budgetAed, 1, reason);
+    });
+
+  const totalImpressions = lines.reduce((s, l) => s + l.projectedImpressions, 0);
+  const totalSpend = lines.reduce((s, l) => s + Math.min(budgetAed, l.rateCardWeekAed * l.weeksAffordable), 0);
+  const avgCpm = totalImpressions ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0;
+  const summary = lines.length
+    ? `Corridors are ranked by weekly audience as a proxy for corridor traffic, measured traffic counts are not ingested yet. ${lines[0].name} (${lines[0].zone}) leads at ${(lines[0].audienceWeekly / 1000).toFixed(0)}k weekly; the top ${lines.length} project ${(totalImpressions / 1_000_000).toFixed(1)}M impressions at an average CPM of AED ${avgCpm.toFixed(2)}.`
+    : "No bookable screens fit this budget.";
+  return { budgetAed, goal: "corridors", lines, dayparts: GOAL_DAYPARTS.awareness, totalImpressions, avgCpm, summary };
+}
+
 /* ========================= campaign delivery KPIs ========================= */
 
 export interface CampaignDelivery {

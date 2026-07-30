@@ -137,11 +137,16 @@ import {
   campaignDelivery,
   comparables as assetComparables,
   mediaPlan,
+  planCitywideCoverage,
+  planForTargetViews,
+  planTrafficCorridors,
   PLAN_CATEGORIES,
   PLAN_GOALS,
   type CampaignDelivery,
   type Comparable,
+  type CoveragePlan,
   type MediaPlan,
+  type TargetViewsPlan,
 } from "./advisor-data";
 import {
   useTickets,
@@ -1399,7 +1404,6 @@ const translations: Record<string, string> = {
   "min ago": "دقيقة مضت",
   "Handle": "معالجة",
   "More": "المزيد",
-  "Now": "الآن",
   "Queue": "قائمة الانتظار",
   "Start time": "وقت البدء",
   "End time": "وقت الانتهاء",
@@ -1530,7 +1534,6 @@ const translations: Record<string, string> = {
   "Alerts and Emergencies": "التنبيهات والطوارئ",
   "Network and Devices": "الشبكة والأجهزة",
   "MediaGPT Suite": "حزمة MediaGPT",
-  "MediaGPT": "MediaGPT",
   "Financials": "الماليات",
   "Campaigns": "الحملات",
   "Marketplace": "السوق",
@@ -2538,7 +2541,6 @@ const translations: Record<string, string> = {
   "Recommendation with citations": "توصية مع استشهادات",
   "Capability": "القدرة",
   "Used by": "يستخدم بواسطة",
-  "Governance": "الحوكمة",
   "Policy-aware analysis": "تحليل واع بالسياسات",
   "MediaGPT agents": "وكلاء MediaGPT",
   "Cites Knowledge and Rules": "يستشهد بالمعرفة والقواعد",
@@ -2755,7 +2757,29 @@ const translations: Record<string, string> = {
   "Museum exhibition flight targeting the cultural district and Corniche panels.": "حملة معرض متحفي تستهدف شاشات المنطقة الثقافية والكورنيش.",
   "Telecom bundle creative; CTA legibility under review for highway variants.": "إعلان باقة اتصالات؛ وضوح عبارة الحث قيد المراجعة لنسخ الطرق السريعة.",
   "Arabic copy revision requested; imagery approved by CMS review.": "طُلب تعديل النص العربي؛ تمت الموافقة على الصور من مراجعة نظام المحتوى.",
-  "Civic awareness rotation live across community panels.": "دورة توعية مدنية تعمل على الشاشات المجتمعية."
+  "Civic awareness rotation live across community panels.": "دورة توعية مدنية تعمل على الشاشات المجتمعية.",
+  // Media planner buying modes
+  "Budget plan": "خطة الميزانية",
+  "Citywide coverage": "تغطية على مستوى المدينة",
+  "Target views": "المشاهدات المستهدفة",
+  "Traffic corridors": "الممرات المرورية",
+  "Buying mode": "وضع الشراء",
+  "Views target": "هدف المشاهدات",
+  "Budget required": "الميزانية المطلوبة",
+  "Busiest corridor": "الممر الأكثر ازدحامًا",
+  "One anchor screen per zone": "شاشة مرساة واحدة لكل منطقة",
+  "Smallest budget for the target": "أصغر ميزانية للهدف",
+  "Smallest budget that clears the target": "أصغر ميزانية تحقق الهدف",
+  "Target above the AED 2M search ceiling": "الهدف يتجاوز سقف البحث البالغ 2 مليون درهم",
+  "Audience-based traffic proxy": "مؤشر مروري قائم على الجمهور",
+  "Ranked by weekly audience, a traffic proxy": "مرتبة حسب الجمهور الأسبوعي، كمؤشر بديل لحركة المرور",
+  "Corridor ranking by audience": "ترتيب الممرات حسب الجمهور",
+  "Traffic proxy": "المؤشر المروري البديل",
+  "Weekly audience stands in for corridor traffic counts": "الجمهور الأسبوعي يحل محل عدادات حركة المرور في الممرات",
+  "Set the inputs and build": "حدد المدخلات وابنِ الخطة",
+  "Set a budget and MediaGPT anchors the strongest screen in every zone, so the whole emirate sees the campaign.": "حدد ميزانية وسيرسي MediaGPT أقوى شاشة في كل منطقة، لتشاهد الإمارة كلها الحملة.",
+  "Set an impressions target and MediaGPT searches for the smallest budget that reaches it.": "حدد هدفًا من المشاهدات وسيبحث MediaGPT عن أصغر ميزانية تصل إليه.",
+  "Set a budget and MediaGPT ranks the busiest corridors by weekly audience, our proxy for corridor traffic.": "حدد ميزانية وسيرتب MediaGPT الممرات الأكثر ازدحامًا حسب الجمهور الأسبوعي، مؤشرنا البديل لحركة المرور."
 };
 
 const I18nContext = createContext<Translator>((value) => value);
@@ -6387,11 +6411,12 @@ function AlertsPage({
           {assist ? (
             <div className="emg-assist-body">
               <div className="emg-assist-row">
-                <StatusPill label={assist.parity ? t("Translation parity OK") : t("Parity issues")} tone={assist.parity ? "good" : "warn"} />
-                {assist.parityIssues?.length ? <span className="cell-note">{assist.parityIssues.join("; ")}</span> : null}
+                {/* Optional access: this legacy branch is unreachable (behind `false`), so TS applies no narrowing inside it. */}
+                <StatusPill label={assist?.parity ? t("Translation parity OK") : t("Parity issues")} tone={assist?.parity ? "good" : "warn"} />
+                {assist?.parityIssues?.length ? <span className="cell-note">{assist?.parityIssues?.join("; ")}</span> : null}
               </div>
-              <p className="cell-note"><strong>{t("Routing")}:</strong> {assist.routeRationale} ({assist.proposedAssets?.length ?? 0} {t("assets")})</p>
-              <p className="cell-note"><strong>{t("Layout")}:</strong> {assist.layoutNote}</p>
+              <p className="cell-note"><strong>{t("Routing")}:</strong> {assist?.routeRationale} ({assist?.proposedAssets?.length ?? 0} {t("assets")})</p>
+              <p className="cell-note"><strong>{t("Layout")}:</strong> {assist?.layoutNote}</p>
             </div>
           ) : <p className="cell-note">{t("AI proposes targets, checks EN/AR parity, and suggests layout. It never edits the alert content.")}</p>}
         </div>
@@ -6436,7 +6461,8 @@ function AlertsPage({
 
         {selected.state === "Broadcasting" && selected.deadlineAt ? (
           <div className="emg-live">
-            <CountdownBadge deadlineAt={selected.deadlineAt} t={t} />
+            {/* Nullish fallback: this legacy branch is unreachable (behind `false`), so TS applies no narrowing inside it. */}
+            <CountdownBadge deadlineAt={selected.deadlineAt ?? ""} t={t} />
             <span className="cell-note">{t("Preempting content on")} {selected.targetAssets?.length ?? 0} {t("assets")} · {t("CAP")} {selected.capIdentifier}</span>
             <Button icon={ShieldCheck} onClick={() => onAckAlert(selected.id)}>{t("Acknowledge")}</Button>
           </div>
@@ -11341,44 +11367,108 @@ function FinancialsPage({
 // Advertiser media planner: budget + objective -> ranked plan with CPM and
 // reasoning. Advertiser-safe data only (availability, audience, rate cards,
 // aggregate demand); booking still flows through bidding and approval.
+// Four buying modes: budget plan, citywide coverage, target views, corridors.
+type PlannerMode = "budget" | "coverage" | "views" | "corridors";
+
+const PLANNER_MODES: Array<{ id: PlannerMode; label: string; helper: string }> = [
+  { id: "budget", label: "Budget plan", helper: "Where your budget works hardest" },
+  { id: "coverage", label: "Citywide coverage", helper: "One anchor screen per zone" },
+  { id: "views", label: "Target views", helper: "Smallest budget for the target" },
+  { id: "corridors", label: "Traffic corridors", helper: "Audience-based traffic proxy" },
+];
+
 function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (value: string) => string }) {
+  const [mode, setMode] = useState<PlannerMode>("budget");
   const [budget, setBudget] = useState("250000");
+  const [views, setViews] = useState("10000000");
   const [goal, setGoal] = useState("retail");
   const [category, setCategory] = useState(PLAN_CATEGORIES[0]);
   const [plan, setPlan] = useState<MediaPlan | null>(null);
+  const [coverage, setCoverage] = useState<CoveragePlan | null>(null);
+  const [viewsPlan, setViewsPlan] = useState<TargetViewsPlan | null>(null);
+  const [corridorPlan, setCorridorPlan] = useState<MediaPlan | null>(null);
 
   const inFlight = campaigns.filter((c) => c.status === "Published" || c.status === "Scheduled").length;
   const budgetAed = Number(budget.replace(/[^\d]/g, "")) || 0;
-  const maxImpr = plan ? Math.max(...plan.lines.map((l) => l.projectedImpressions), 1) : 1;
+  const viewsTarget = Number(views.replace(/[^\d]/g, "")) || 0;
+  const modeMeta = PLANNER_MODES.find((m) => m.id === mode) ?? PLANNER_MODES[0];
+  const active: MediaPlan | null =
+    mode === "budget" ? plan
+    : mode === "coverage" ? coverage
+    : mode === "views" ? viewsPlan?.plan ?? null
+    : corridorPlan;
+  const summary = mode === "views" ? viewsPlan?.summary : active?.summary;
+  const maxImpr = active ? Math.max(...active.lines.map((l) => l.projectedImpressions), 1) : 1;
+
+  const buildPlan = () => {
+    if (mode === "budget") setPlan(mediaPlan(budgetAed, goal, category));
+    else if (mode === "coverage") setCoverage(planCitywideCoverage(budgetAed, goal));
+    else if (mode === "views") setViewsPlan(planForTargetViews(viewsTarget, goal));
+    else setCorridorPlan(planTrafficCorridors(budgetAed));
+  };
+
+  const hero =
+    mode === "coverage" && coverage ? { label: "Zones covered", value: `${coverage.zonesCovered} ${t("of")} ${coverage.zonesTotal}`, note: t("One anchor screen per zone") }
+    : mode === "views" && viewsPlan ? { label: "Budget required", value: `AED ${viewsPlan.requiredBudgetAed.toLocaleString("en-US")}`, note: viewsPlan.achievable ? t("Smallest budget that clears the target") : t("Target above the AED 2M search ceiling") }
+    : mode === "corridors" && corridorPlan?.lines.length ? { label: "Busiest corridor", value: t(corridorPlan.lines[0].name), note: t("Ranked by weekly audience, a traffic proxy") }
+    : null;
+
+  const emptyText =
+    mode === "coverage" ? "Set a budget and MediaGPT anchors the strongest screen in every zone, so the whole emirate sees the campaign."
+    : mode === "views" ? "Set an impressions target and MediaGPT searches for the smallest budget that reaches it."
+    : mode === "corridors" ? "Set a budget and MediaGPT ranks the busiest corridors by weekly audience, our proxy for corridor traffic."
+    : "Set a budget, pick an objective, and MediaGPT ranks the screens where your money buys the most audience, with the reasoning.";
 
   return (
     <PageBody>
       <MetricGrid>
         <Metric label="Your campaigns" value={String(campaigns.length)} helper={`${inFlight} ${t("in flight")}`} tone="info" />
-        <Metric label="Working budget" value={`AED ${budgetAed.toLocaleString("en-US")}`} helper={t(PLAN_GOALS.find((g) => g.value === goal)?.label ?? "Retail sales")} tone="neutral" />
-        <Metric label="Creative category" value={t(category.split(" and ")[0])} helper={t("Guides the fit notes")} tone="neutral" />
-        <Metric label="Plan status" value={plan ? `${plan.lines.length} ${t("placements")}` : t("Not built")} helper={plan ? `${(plan.totalImpressions / 1_000_000).toFixed(1)}M ${t("impressions")}` : t("Set a budget and build")} tone={plan ? "good" : "neutral"} />
+        {mode === "views"
+          ? <Metric label="Views target" value={`${(viewsTarget / 1_000_000).toFixed(1)}M`} helper={t(PLAN_GOALS.find((g) => g.value === goal)?.label ?? "Retail sales")} tone="neutral" />
+          : <Metric label="Working budget" value={`AED ${budgetAed.toLocaleString("en-US")}`} helper={mode === "corridors" ? t("Corridor ranking by audience") : t(PLAN_GOALS.find((g) => g.value === goal)?.label ?? "Retail sales")} tone="neutral" />}
+        {mode === "budget"
+          ? <Metric label="Creative category" value={t(category.split(" and ")[0])} helper={t("Guides the fit notes")} tone="neutral" />
+          : <Metric label="Buying mode" value={t(modeMeta.label)} helper={t(modeMeta.helper)} tone="info" />}
+        <Metric label="Plan status" value={active ? `${active.lines.length} ${t("placements")}` : t("Not built")} helper={active ? `${(active.totalImpressions / 1_000_000).toFixed(1)}M ${t("impressions")}` : t("Set the inputs and build")} tone={active ? "good" : "neutral"} />
       </MetricGrid>
       <div className="split-grid wide-left">
-        <Panel icon={Target} title={t("Media planner")} action={<StatusPill label={t("Where your budget works hardest")} tone="good" />}>
-          <div className="yield-form">
-            <label><span>{t("Budget")} (AED)</span><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="numeric" /></label>
-            <label><span>{t("Objective")}</span><select value={goal} onChange={(event) => setGoal(event.target.value)}>{PLAN_GOALS.map((g) => <option key={g.value} value={g.value}>{t(g.label)}</option>)}</select></label>
-            <label><span>{t("Creative")}</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{PLAN_CATEGORIES.map((c) => <option key={c} value={c}>{t(c)}</option>)}</select></label>
-            <Button icon={Sparkles} onClick={() => setPlan(mediaPlan(budgetAed, goal, category))} disabled={!budgetAed}>{t("Build my plan")}</Button>
+        <Panel icon={Target} title={t("Media planner")} action={<StatusPill label={t(modeMeta.helper)} tone="good" />}>
+          <div className="planner-modes">
+            <Segmented value={mode} onChange={setMode} items={PLANNER_MODES.map((m) => ({ id: m.id, label: t(m.label) }))} />
           </div>
-          {plan ? (
+          <div className="yield-form">
+            {mode === "views"
+              ? <label><span>{t("Target views")}</span><input value={views} onChange={(event) => setViews(event.target.value)} inputMode="numeric" /></label>
+              : <label><span>{t("Budget")} (AED)</span><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="numeric" /></label>}
+            {mode !== "corridors" ? (
+              <label><span>{t("Objective")}</span><select value={goal} onChange={(event) => setGoal(event.target.value)}>{PLAN_GOALS.map((g) => <option key={g.value} value={g.value}>{t(g.label)}</option>)}</select></label>
+            ) : null}
+            {mode === "budget" ? (
+              <label><span>{t("Creative")}</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{PLAN_CATEGORIES.map((c) => <option key={c} value={c}>{t(c)}</option>)}</select></label>
+            ) : null}
+            <Button icon={Sparkles} onClick={buildPlan} disabled={mode === "views" ? !viewsTarget : !budgetAed}>{t("Build my plan")}</Button>
+          </div>
+          {active ? (
             <div className="linked-detail">
+              {hero ? (
+                <div className="planner-hero">
+                  <div>
+                    <span>{t(hero.label)}</span>
+                    <strong>{hero.value}</strong>
+                  </div>
+                  <small>{hero.note}</small>
+                </div>
+              ) : null}
               <section className="ai-mini-panel">
                 <div>
                   <span>{t("MediaGPT plan")}</span>
-                  <strong>{plan.summary}</strong>
-                  <small>{t("Recommended dayparts")}: {plan.dayparts.map((d) => t(d)).join(" · ")}</small>
+                  <strong>{summary}</strong>
+                  <small>{t("Recommended dayparts")}: {active.dayparts.map((d) => t(d)).join(" · ")}</small>
                 </div>
                 <StatusPill label="MediaGPT" tone="good" />
               </section>
               <div className="yield-list">
-                {plan.lines.map((line, index) => (
+                {active.lines.map((line, index) => (
                   <div key={line.assetId} className="yield-row">
                     <span className="yield-rank">{index + 1}</span>
                     <span className="yield-main">
@@ -11396,13 +11486,15 @@ function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (v
               </div>
             </div>
           ) : (
-            <p className="cell-note">{t("Set a budget, pick an objective, and MediaGPT ranks the screens where your money buys the most audience, with the reasoning.")}</p>
+            <p className="cell-note">{t(emptyText)}</p>
           )}
         </Panel>
         <Panel icon={Sparkles} title={t("How this plan is built")}>
           <div className="detail-cards yield-factors">
             <Detail label={t("Audience per dirham")} value={t("Weekly reach against the weekly rate card")} />
-            <Detail label={t("Objective fit")} value={t("Zones weighted for your campaign goal")} />
+            {mode === "corridors"
+              ? <Detail label={t("Traffic proxy")} value={t("Weekly audience stands in for corridor traffic counts")} />
+              : <Detail label={t("Objective fit")} value={t("Zones weighted for your campaign goal")} />}
             <Detail label={t("Availability")} value={t("Only weeks a screen can actually take")} />
             <Detail label={t("Demand")} value={t("Aggregate pressure on each location")} />
           </div>
