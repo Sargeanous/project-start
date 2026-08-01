@@ -155,6 +155,7 @@ import {
   type TargetViewsPlan,
 } from "./advisor-data";
 import { assetAudienceBands } from "./audience-data";
+import { assetLoops, LOOP_BIDDERS, LOOP_SLOT_COUNT, LOOP_SLOT_SECONDS, type LoopSlot } from "./loop-data";
 import {
   assetOwnership,
   assetsOwnedBy,
@@ -2162,6 +2163,21 @@ const translations: Record<string, string> = {
   "Late night": "أواخر الليل",
   "of daily reach": "من الوصول اليومي",
   "Modeled audience mix, demo data; depth pending client data confirmation.": "مزيج جمهور نموذجي، بيانات تجريبية؛ التفاصيل بانتظار تأكيد بيانات العميل.",
+  "Loop and slots": "حلقة العرض والفترات",
+  "Civic reserve": "الاحتياطي المدني",
+  "Sold": "مباع",
+  "Reserved pending approval": "محجوز بانتظار الاعتماد",
+  "Slot": "الفترة",
+  "open": "متاحة",
+  "No media fee": "بدون رسوم إعلامية",
+  "Sell this slot": "بيع هذه الفترة",
+  "Slot governance": "حوكمة الفترات",
+  "Campaign label": "اسم الحملة",
+  "e.g. Summer awareness flight": "مثال: حملة توعية صيفية",
+  "Raises a pending finance approval in the existing chain; the slot books only after finance signs off and the invoice issues.": "ينشئ موافقة مالية معلقة ضمن السلسلة القائمة؛ ولا تُحجز الفترة إلا بعد اعتماد المالية وإصدار الفاتورة.",
+  "Reserve and send to finance": "حجز وإرسال إلى المالية",
+  "Demo loop model; loop policy and slot lengths pending operator integration.": "نموذج حلقة تجريبي؛ سياسة الحلقة وأطوال الفترات بانتظار التكامل مع المشغلين.",
+  "Slot reserved, pending finance approval": "تم حجز الفترة بانتظار الموافقة المالية",
   "Commuters": "المتنقلون",
   "Residents": "السكان",
   "Tourists": "السياح",
@@ -3454,6 +3470,19 @@ function App() {
     if (result) notify(`Bid placed on ${result.bid.lotName}`);
   }
 
+  // Slot-based selling: reserving one loop slot raises a pending finance
+  // approval through the same backend chain as bids and submissions. Returns
+  // the approval id so the Commercial Map can hold the slot for the session.
+  async function sellLoopSlot(payload: { assetId: string; assetName: string; daypart: string; slotIndex: number; advertiser: string; campaign: string; priceWeekAed: number }): Promise<string | null> {
+    const result = await syncMutation<{ state: DoohStatePayload; approval: FinanceApproval }>("loop/sell", {
+      actor: profile?.name ?? "ADMO Finance",
+      payload,
+    });
+    if (!result) return null;
+    notify(`${payload.assetId}: ${t("Slot reserved, pending finance approval")} (${result.approval.id})`);
+    return result.approval.id;
+  }
+
   async function closeAuctionLot(lotId: string) {
     const result = await syncMutation<{ state: DoohStatePayload; lot: AuctionLot; booking: BookingRecord | null }>(`auctions/${lotId}/close`, {
       actor: profile?.name ?? "ADMO Finance",
@@ -3738,7 +3767,7 @@ function App() {
           {page === "auditLog" && <AuditLogPage t={t} />}
           {page === "edgeCompute" && <EdgeComputePage t={t} />}
           {page === "financials" && <FinancialsPage approvals={financeApprovals} auctions={auctions} bookings={bookings} invoices={invoices} popLedger={popLedger} aiAvailable={aiAvailable} onDecision={decideFinance} onCloseAuction={closeAuctionLot} onSettlePayment={settleBookingPayment} onReconcile={reconcileBookingChain} t={t} />}
-          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} profile={profile} assetScope={assetScope} notify={notify} t={t} />}
+          {page === "allocations" && <CommercialMapPage auctions={auctions} schedule={schedule} profile={profile} assetScope={assetScope} notify={notify} onSellSlot={sellLoopSlot} t={t} />}
           {page === "reports" && <ReportsPage submissions={submissions} bookings={bookings} invoices={invoices} popLedger={popLedger} enforcementEvents={enforcementEvents} alerts={alerts} auctions={auctions} t={t} />}
           {page === "campaigns" && <CampaignsPage campaigns={campaigns} bidderMessages={bidderMessages} submissions={submissions} onNewBrief={() => setWizardOpen(true)} onResubmit={resubmitSubmissionAction} t={t} />}
           {page === "marketplace" && <MarketplacePage onSubmit={submitMarketplaceCampaign} onBid={placeBid} auctions={auctions} bookings={bookings.filter((booking) => !booking.historySeed)} invoices={invoices} onNewBrief={() => setWizardOpen(true)} t={t} />}
@@ -11301,6 +11330,60 @@ function AssetTransferDialog({
   );
 }
 
+// Slot-based selling (client loop policy: 16 spots of 8 seconds): the dialog
+// never books the slot directly. Confirming raises a pending finance approval
+// through the existing money chain (Financials approvals queue) and the slot
+// shows Reserved pending approval for the session.
+function SellSlotDialog({
+  context,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  context: { assetId: string; assetName: string; daypart: string; slot: LoopSlot };
+  onCancel: () => void;
+  onConfirm: (advertiser: string, campaign: string) => void;
+  t: (value: string) => string;
+}) {
+  const [advertiser, setAdvertiser] = useState(LOOP_BIDDERS[0] ?? "");
+  const [campaign, setCampaign] = useState("");
+  const valid = advertiser.trim().length > 0 && campaign.trim().length >= 4;
+  const money = (value: number) => `AED ${value.toLocaleString("en-US")}`;
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog sell-slot-dialog" role="dialog" aria-modal="true" aria-label={t("Sell this slot")} onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <div>
+            <span>{t("Slot governance")} · {context.assetId}</span>
+            <strong>{t("Sell this slot")}</strong>
+            <small>{t(context.assetName)} · {t(context.daypart)} · {t("Slot")} {context.slot.index} {t("of")} {LOOP_SLOT_COUNT} · {LOOP_SLOT_SECONDS}s · {money(context.slot.priceWeekAed)} / {t("week")}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}><X size={16} /></button>
+        </header>
+        <div className="revision-body">
+          <label className="revision-field">
+            {t("Advertiser")}
+            <select value={advertiser} onChange={(event) => setAdvertiser(event.target.value)}>
+              {LOOP_BIDDERS.map((name) => (
+                <option key={name} value={name}>{t(name)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="revision-field">
+            {t("Campaign label")}
+            <input value={campaign} onChange={(event) => setCampaign(event.target.value)} placeholder={t("e.g. Summer awareness flight")} />
+          </label>
+          <p className="own-dialog-note">{t("Raises a pending finance approval in the existing chain; the slot books only after finance signs off and the invoice issues.")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={FileCheck2} disabled={!valid} onClick={() => onConfirm(advertiser, campaign.trim())}>{t("Reserve and send to finance")}</Button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 // Map-based commercial operations dashboard (RFP FIN-601/602/603): per-asset
 // markers colour-coded by allocation status, click -> commercial detail panel.
 function CommercialMapPage({
@@ -11309,6 +11392,7 @@ function CommercialMapPage({
   profile,
   assetScope,
   notify,
+  onSellSlot,
   t,
 }: {
   auctions: AuctionLot[];
@@ -11316,17 +11400,26 @@ function CommercialMapPage({
   profile: Profile | null;
   assetScope: Set<string> | null;
   notify: (message: string) => void;
+  onSellSlot: (payload: { assetId: string; assetName: string; daypart: string; slotIndex: number; advertiser: string; campaign: string; priceWeekAed: number }) => Promise<string | null>;
   t: (value: string) => string;
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [ownershipDialogAssetId, setOwnershipDialogAssetId] = useState("");
   const [transferDialogAssetId, setTransferDialogAssetId] = useState("");
+  // Session holds on loop slots: reserving raises the finance approval, the
+  // slot renders Reserved pending approval until the page reloads (the seed
+  // loop model stays deterministic underneath).
+  const [sellSlotContext, setSellSlotContext] = useState<{ assetId: string; assetName: string; daypart: string; slot: LoopSlot } | null>(null);
+  const [slotHolds, setSlotHolds] = useState<Record<string, { advertiser: string; approvalId: string }>>({});
   const pendingOwnership = usePendingOwnershipChanges();
   const pendingTransfers = usePendingAssetTransfers();
   // Internal governance roles only (ADMO Finance / Platform Admin) may
   // propose an ownership-model change; everyone on this page still sees
   // the ownership facts.
   const canProposeOwnership = profile?.id === "finance" || profile?.id === "admin";
+  // Selling loop slots is an internal commercial action (ADMO Finance /
+  // Platform Admin); operator logins still see the loop occupancy facts.
+  const canSellSlots = profile?.id === "finance" || profile?.id === "admin";
   // Cross-operator pool: operator logins see the entries where their
   // company is the owner or the selling partner, with the role labeled.
   // Initiating a transfer stays internal (ADMO roles only).
@@ -11523,6 +11616,56 @@ function CommercialMapPage({
                   ))}
                   <p className="cell-note">{t("Modeled audience mix, demo data; depth pending client data confirmation.")}</p>
                 </div>
+                <div className="commercial-popover-loop">
+                  <strong>{t("Loop and slots")}</strong>
+                  <div className="cpl-legend">
+                    <span><i className="civic" />{t("Civic reserve")}</span>
+                    <span><i className="sold" />{t("Sold")}</span>
+                    <span><i className="open" />{t("Open")}</span>
+                    <span><i className="reserved" />{t("Reserved pending approval")}</span>
+                  </div>
+                  {assetLoops(asset.id).map((loop) => {
+                    const heldInLoop = loop.slots.filter((slot) => slotHolds[`${asset.id}|${loop.daypart}|${slot.index}`]).length;
+                    const openLeft = loop.openCount - heldInLoop;
+                    return (
+                      <div key={loop.daypart} className="cpl-loop">
+                        <div className="cpl-head">
+                          <span><strong>{t(loop.daypart)}</strong><small>{loop.window} · {LOOP_SLOT_COUNT} x {LOOP_SLOT_SECONDS}s</small></span>
+                          <em>{openLeft} {t("of")} {LOOP_SLOT_COUNT} {t("open")} · {money(loop.slotPriceWeekAed)} / {t("week")}</em>
+                        </div>
+                        <div className="cpl-strip">
+                          {loop.slots.map((slot) => {
+                            const hold = slotHolds[`${asset.id}|${loop.daypart}|${slot.index}`];
+                            const cellState = hold ? "reserved" : slot.state;
+                            const detail = hold
+                              ? `${t("Reserved pending approval")} · ${t(hold.advertiser)} (${hold.approvalId})`
+                              : slot.state === "civic"
+                                ? `${t("Civic reserve")} · ${slot.occupant ? t(slot.occupant) : "ADMO"}`
+                                : slot.state === "sold"
+                                  ? `${t("Sold")} · ${slot.occupant ? t(slot.occupant) : ""}${slot.campaign ? ` (${t(slot.campaign)})` : ""}`
+                                  : t("Open");
+                            const title = `${t("Slot")} ${slot.index} ${t("of")} ${LOOP_SLOT_COUNT} · ${LOOP_SLOT_SECONDS}s · ${slot.priceWeekAed ? `${money(slot.priceWeekAed)} / ${t("week")}` : t("No media fee")} · ${detail}`;
+                            return cellState === "open" && canSellSlots ? (
+                              <button
+                                key={slot.index}
+                                type="button"
+                                className="cpl-slot open sellable"
+                                title={`${title} · ${t("Sell this slot")}`}
+                                aria-label={`${t("Sell this slot")}: ${title}`}
+                                onClick={() => setSellSlotContext({ assetId: asset.id, assetName: asset.name, daypart: loop.daypart, slot })}
+                              >
+                                {slot.index}
+                              </button>
+                            ) : (
+                              <span key={slot.index} className={`cpl-slot ${cellState}`} title={title}>{slot.index}</span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <p className="cell-note">{t("Demo loop model; loop policy and slot lengths pending operator integration.")}</p>
+                </div>
                 <EmbeddedCopilot mode="commercial" assetId={asset.id} actor="Commercial desk" collapsible t={t} />
               </section>
             );
@@ -11690,6 +11833,30 @@ function CommercialMapPage({
           />
         );
       })() : null}
+
+      {sellSlotContext ? (
+        <SellSlotDialog
+          context={sellSlotContext}
+          onCancel={() => setSellSlotContext(null)}
+          onConfirm={async (advertiser, campaign) => {
+            const ctx = sellSlotContext;
+            const approvalId = await onSellSlot({
+              assetId: ctx.assetId,
+              assetName: ctx.assetName,
+              daypart: ctx.daypart,
+              slotIndex: ctx.slot.index,
+              advertiser,
+              campaign,
+              priceWeekAed: ctx.slot.priceWeekAed,
+            });
+            if (approvalId) {
+              setSlotHolds((previous) => ({ ...previous, [`${ctx.assetId}|${ctx.daypart}|${ctx.slot.index}`]: { advertiser, approvalId } }));
+              setSellSlotContext(null);
+            }
+          }}
+          t={t}
+        />
+      ) : null}
     </PageBody>
   );
 }

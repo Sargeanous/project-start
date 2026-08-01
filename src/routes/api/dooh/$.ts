@@ -44,6 +44,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   placeBid,
+  sellLoopSlot,
   closeAuction,
   confirmBookingPayment,
   reconcileBooking,
@@ -384,6 +385,30 @@ export const Route = createFileRoute("/api/dooh/$")({
               return jsonError("Lot, campaign and amount are required", 422);
             }
             return Response.json(await placeBid({ lotId: payload.lotId, campaign: payload.campaign, amount: payload.amount }, actor));
+          }
+
+          if (segments[0] === "loop" && segments[1] === "sell") {
+            const payload = body.payload as {
+              assetId?: string;
+              assetName?: string;
+              daypart?: string;
+              slotIndex?: number;
+              advertiser?: string;
+              campaign?: string;
+              priceWeekAed?: number;
+            } | undefined;
+            if (!payload?.assetId || !payload.daypart || !payload.advertiser || typeof payload.slotIndex !== "number") {
+              return jsonError("Asset, daypart, slot and advertiser are required", 422);
+            }
+            return Response.json(await sellLoopSlot({
+              assetId: payload.assetId,
+              assetName: typeof payload.assetName === "string" ? payload.assetName : undefined,
+              daypart: payload.daypart,
+              slotIndex: payload.slotIndex,
+              advertiser: payload.advertiser,
+              campaign: stringValue(payload.campaign, ""),
+              priceWeekAed: typeof payload.priceWeekAed === "number" ? payload.priceWeekAed : 0,
+            }, actor));
           }
 
           if (segments[0] === "auctions" && segments[2] === "close") {

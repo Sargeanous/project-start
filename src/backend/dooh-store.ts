@@ -1302,6 +1302,68 @@ export async function placeBid(payload: { lotId: string; amount: number; campaig
   return { state, bid };
 }
 
+/* ---- Loop slot sales (slot-based selling granularity) ---- */
+
+export interface LoopSlotSalePayload {
+  assetId: string;
+  assetName?: string;
+  /** Daypart band name from the audience-data vocabulary. */
+  daypart: string;
+  /** 1-based slot position in the 16-slot loop. */
+  slotIndex: number;
+  advertiser: string;
+  campaign: string;
+  priceWeekAed: number;
+}
+
+/**
+ * Sell one loop slot (16 x 8s loop per daypart). The sale enters the SAME
+ * governed money chain as campaign submissions and auction bids: it raises a
+ * pending FinanceApproval that finance decides on the Financials approvals
+ * queue (decideFinanceApproval), with the usual notifications and audit
+ * activity. Invoicing follows finance sign-off exactly as it does for the
+ * other booking paths; nothing here bypasses that gate.
+ */
+export async function sellLoopSlot(payload: LoopSlotSalePayload, actor: string): Promise<{ state: DoohState; approval: FinanceApproval }> {
+  let approval!: FinanceApproval;
+  const state = await commit((draft) => {
+    const assetId = payload.assetId.trim();
+    const daypart = payload.daypart.trim();
+    const advertiser = payload.advertiser.trim();
+    if (!assetId || !daypart || !advertiser) throw new Error("Asset, daypart and advertiser are required");
+    if (!Number.isInteger(payload.slotIndex) || payload.slotIndex < 1 || payload.slotIndex > 16) {
+      throw new Error("Slot index must be between 1 and 16");
+    }
+    const packageName = `Loop slot ${payload.slotIndex}/16 | ${daypart} | ${assetId}`;
+    if (draft.financeApprovals.some((item) => item.packageName === packageName && item.state === "Pending")) {
+      throw new Error(`${packageName} already has a pending finance approval`);
+    }
+    const campaign = payload.campaign.trim() || `${advertiser} slot buy`;
+    const price = Number.isFinite(payload.priceWeekAed) && payload.priceWeekAed > 0 ? Math.round(payload.priceWeekAed) : 0;
+    approval = {
+      id: nextId("FIN", draft.financeApprovals),
+      campaign,
+      bidder: advertiser,
+      packageName,
+      amount: price ? `AED ${price.toLocaleString("en-US")} / week` : "Rate card pending",
+      margin: "Rate card",
+      risk: "Low",
+      state: "Pending",
+    };
+    draft.financeApprovals = [approval, ...draft.financeApprovals];
+    addNotification(draft, {
+      title: "Loop slot sale pending approval",
+      body: `${advertiser} reserved slot ${payload.slotIndex} of 16 (${daypart}) on ${payload.assetName || assetId} at ${approval.amount}. Finance sign-off required before invoicing.`,
+      subject: campaign,
+      recipients: ["finance", "admin"],
+      page: "financials",
+      tone: "action",
+    });
+    addActivity(draft, actor, "Reserved loop slot for sale", `${assetId} ${daypart} slot ${payload.slotIndex}`);
+  });
+  return { state, approval };
+}
+
 /* ---- Submission governance: content hash, journal, named approvers ---- */
 
 // Hash only the stable content fields (never stage/version), so the hash

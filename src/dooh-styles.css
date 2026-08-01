@@ -14713,3 +14713,85 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 @media (max-width: 720px) {
   .fw-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* ================================================================
+   LOOP AND SLOTS (Commercial Map popover, slot-based selling)
+   16-slot x 8-second loop strip per daypart: numbered cells colour-
+   coded by occupancy (civic reserve / sold / open / session-reserved),
+   price + occupant tooltips, legend, and the sell-slot dialog note.
+   Shared tokens keep both themes correct; the grid and logical
+   properties keep RTL correct.
+   ================================================================ */
+.commercial-popover-loop { display: grid; gap: 7px; }
+.commercial-popover-loop > strong {
+  font-size: 9.5px;
+  font-weight: 680;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cpl-loop {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.cpl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cpl-head > span { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.cpl-head strong { color: var(--ink); font-size: 12px; white-space: nowrap; }
+.cpl-head small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.cpl-head em { flex: 0 0 auto; font-style: normal; color: var(--ink-2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.cpl-strip { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
+.cpl-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+.cpl-slot.civic {
+  background: color-mix(in srgb, var(--blue) 24%, var(--surface));
+  border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
+  color: var(--ink);
+}
+.cpl-slot.sold {
+  background: color-mix(in srgb, var(--primary) 26%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--line));
+  color: var(--ink);
+}
+.cpl-slot.open {
+  background: var(--surface-input);
+  border-style: dashed;
+  color: var(--ink-2);
+}
+.cpl-slot.reserved {
+  background: color-mix(in srgb, var(--amber) 28%, var(--surface));
+  border-color: color-mix(in srgb, var(--amber) 60%, var(--line));
+  color: var(--ink);
+}
+button.cpl-slot.sellable { cursor: pointer; }
+button.cpl-slot.sellable:hover,
+button.cpl-slot.sellable:focus-visible {
+  border-color: var(--primary);
+  color: var(--primary);
+  border-style: solid;
+}
+.cpl-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.cpl-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); font-size: 10px; }
+.cpl-legend i { flex: none; width: 8px; height: 8px; border-radius: 3px; border: 1px solid var(--line); }
+.cpl-legend i.civic { background: color-mix(in srgb, var(--blue) 24%, var(--surface)); border-color: color-mix(in srgb, var(--blue) 55%, var(--line)); }
+.cpl-legend i.sold { background: color-mix(in srgb, var(--primary) 26%, var(--surface)); border-color: color-mix(in srgb, var(--primary) 55%, var(--line)); }
+.cpl-legend i.open { background: var(--surface-input); border-style: dashed; }
+.cpl-legend i.reserved { background: color-mix(in srgb, var(--amber) 28%, var(--surface)); border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); }
+.commercial-popover-loop .cell-note { margin: 0; }
+.sell-slot-dialog { max-width: 420px; }
