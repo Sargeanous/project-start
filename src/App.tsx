@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowLeftRight,
   BarChart3,
   Bell,
   Bot,
@@ -153,14 +154,22 @@ import { assetAudienceBands } from "./audience-data";
 import {
   assetOwnership,
   assetsOwnedBy,
+  crossOperatorPool,
   operatorById,
+  operators,
   OWNERSHIP_MODELS,
   OWNERSHIP_MODEL_SHORT,
   OWNERSHIP_MODEL_HINTS,
+  pooledAssetsFor,
+  poolRoleFor,
+  registerAssetTransferProposal,
   registerOwnershipProposal,
+  usePendingAssetTransfers,
   usePendingOwnershipChanges,
   type AssetOwnership,
   type OwnershipModel,
+  type PooledAsset,
+  type PoolStatus,
 } from "./operators-data";
 import {
   useTickets,
@@ -2105,6 +2114,26 @@ const translations: Record<string, string> = {
   "In bidding": "قيد المزايدة",
   "Under maintenance": "قيد الصيانة",
   "Allocation register": "سجل التخصيصات",
+  "Cross-operator pool": "مجمع الأصول المشترك بين المشغلين",
+  "Operators collaborate and monetize screens they do not own; every reassignment is approval-gated.": "يتعاون المشغلون ويحققون عوائد من شاشات لا يملكونها، وكل إعادة تخصيص تخضع للاعتماد.",
+  "Selling partner": "الشريك البائع",
+  "Split": "التقاسم",
+  "Since": "منذ",
+  "Role": "الدور",
+  "owner share first": "حصة المالك أولاً",
+  "Active": "نشط",
+  "Onboarding": "قيد التأهيل",
+  "Transfer pending approval": "النقل بانتظار الاعتماد",
+  "Initiate transfer": "بدء النقل",
+  "Initiate asset transfer": "بدء نقل الأصل",
+  "Transfer governance": "حوكمة النقل",
+  "Receiving operator": "المشغل المستلم",
+  "Reason for transfer": "سبب النقل",
+  "Current owner": "المالك الحالي",
+  "Actions": "إجراءات",
+  "Transfer proposal sent to the Commercial desk": "أُرسل مقترح النقل إلى المكتب التجاري",
+  "Why the asset should move, e.g. a sale agreement or portfolio consolidation": "لماذا يجب نقل الأصل، مثل اتفاقية بيع أو دمج المحفظة",
+  "Creates a governed transfer proposal for the Commercial desk; ownership does not move until it is approved.": "ينشئ مقترح نقل خاضعاً للحوكمة لدى المكتب التجاري، ولا تنتقل الملكية حتى يُعتمد.",
   "Contracted value": "القيمة المتعاقد عليها",
   "Allocated assets": "الأصول المخصصة",
   "Available now": "متاح الآن",
@@ -11194,6 +11223,71 @@ function OwnershipChangeDialog({
   );
 }
 
+// Cross-operator pool: statuses and tones for the pool table. A session
+// transfer proposal overrides the seed status to Transfer pending approval.
+const POOL_STATUS_TONE: Record<PoolStatus, Tone> = {
+  Active: "good",
+  Onboarding: "info",
+  "Transfer pending approval": "warn",
+};
+
+// Approval-gated asset transfer (cross-operator pool): the dialog never
+// mutates the pool register. Confirming raises a Commercial desk ticket
+// (governed proposal) and the row shows Transfer pending approval for
+// the session instead of moving instantly.
+function AssetTransferDialog({
+  asset,
+  entry,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  asset: Asset;
+  entry: PooledAsset;
+  onCancel: () => void;
+  onConfirm: (toOperatorId: string, reason: string) => void;
+  t: (value: string) => string;
+}) {
+  const owner = operatorById(entry.ownerOperatorId);
+  const options = operators.filter((op) => op.id !== entry.ownerOperatorId);
+  const [toOperatorId, setToOperatorId] = useState(entry.sellerOperatorId);
+  const [reason, setReason] = useState("");
+  const valid = reason.trim().length >= 8;
+  return (
+    <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
+      <section className="revision-dialog transfer-dialog" role="dialog" aria-modal="true" aria-label={t("Initiate asset transfer")} onClick={(event) => event.stopPropagation()}>
+        <header className="revision-header">
+          <div>
+            <span>{t("Transfer governance")} · {asset.id}</span>
+            <strong>{t("Initiate asset transfer")}</strong>
+            <small>{t(asset.name)} · {t("Current owner")}: {owner ? t(owner.name) : entry.ownerOperatorId}</small>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel} aria-label={t("Close")}><X size={16} /></button>
+        </header>
+        <div className="revision-body">
+          <label className="revision-field">
+            {t("Receiving operator")}
+            <select value={toOperatorId} onChange={(event) => setToOperatorId(event.target.value)}>
+              {options.map((op) => (
+                <option key={op.id} value={op.id}>{t(op.name)} ({t(op.kind)})</option>
+              ))}
+            </select>
+          </label>
+          <label className="revision-field">
+            {t("Reason for transfer")}
+            <textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("Why the asset should move, e.g. a sale agreement or portfolio consolidation")} />
+          </label>
+          <p className="own-dialog-note">{t("Creates a governed transfer proposal for the Commercial desk; ownership does not move until it is approved.")}</p>
+        </div>
+        <footer className="revision-footer">
+          <Button variant="secondary" onClick={onCancel}>{t("Cancel")}</Button>
+          <Button icon={FileCheck2} disabled={!valid} onClick={() => onConfirm(toOperatorId, reason.trim())}>{t("Submit proposal")}</Button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 // Map-based commercial operations dashboard (RFP FIN-601/602/603): per-asset
 // markers colour-coded by allocation status, click -> commercial detail panel.
 function CommercialMapPage({
@@ -11213,11 +11307,21 @@ function CommercialMapPage({
 }) {
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [ownershipDialogAssetId, setOwnershipDialogAssetId] = useState("");
+  const [transferDialogAssetId, setTransferDialogAssetId] = useState("");
   const pendingOwnership = usePendingOwnershipChanges();
+  const pendingTransfers = usePendingAssetTransfers();
   // Internal governance roles only (ADMO Finance / Platform Admin) may
   // propose an ownership-model change; everyone on this page still sees
   // the ownership facts.
   const canProposeOwnership = profile?.id === "finance" || profile?.id === "admin";
+  // Cross-operator pool: operator logins see the entries where their
+  // company is the owner or the selling partner, with the role labeled.
+  // Initiating a transfer stays internal (ADMO roles only).
+  const canInitiateTransfer = !!profile && !profile.operatorId;
+  const poolEntries = useMemo(
+    () => (profile?.operatorId ? pooledAssetsFor(profile.operatorId) : crossOperatorPool),
+    [profile],
+  );
 
   // Operator logins: pins, KPIs and the allocation register cover only the
   // assets their company owns; ADMO roles keep the full estate (scope null).
@@ -11456,6 +11560,64 @@ function CommercialMapPage({
         </div>
       </Panel>
 
+      <Panel icon={ArrowLeftRight} title={t("Cross-operator pool")}>
+        <p className="cell-note">{t("Operators collaborate and monetize screens they do not own; every reassignment is approval-gated.")}</p>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("Asset")}</th>
+                <th>{t("Owner")}</th>
+                <th>{t("Selling partner")}</th>
+                <th>{t("Split")}</th>
+                <th>{t("Since")}</th>
+                {profile?.operatorId ? <th>{t("Role")}</th> : null}
+                <th>{t("Status")}</th>
+                {canInitiateTransfer ? <th>{t("Actions")}</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {poolEntries.map((entry) => {
+                const poolAsset = estateAssets.find((item) => item.id === entry.assetId);
+                if (!poolAsset) return null;
+                const poolOwner = operatorById(entry.ownerOperatorId);
+                const poolSeller = operatorById(entry.sellerOperatorId);
+                const pendingTransfer = pendingTransfers[entry.assetId];
+                const poolStatus: PoolStatus = pendingTransfer ? "Transfer pending approval" : entry.status;
+                const poolRole = profile?.operatorId ? poolRoleFor(entry, profile.operatorId) : null;
+                return (
+                  <tr key={entry.assetId} className={entry.assetId === selectedAssetId ? "selected" : ""} onClick={() => setSelectedAssetId(entry.assetId)}>
+                    <td data-label={t("Asset")}><strong>{t(poolAsset.name)}</strong><span>{poolAsset.id} · {t(poolAsset.zone)}</span></td>
+                    <td data-label={t("Owner")}>{poolOwner ? t(poolOwner.name) : entry.ownerOperatorId}</td>
+                    <td data-label={t("Selling partner")}>{poolSeller ? t(poolSeller.name) : entry.sellerOperatorId}</td>
+                    <td data-label={t("Split")}><strong>{entry.revenueSplit.ownerPct} / {entry.revenueSplit.sellerPct}</strong><span>{t("owner share first")}</span></td>
+                    <td data-label={t("Since")}>{entry.since}</td>
+                    {profile?.operatorId ? (
+                      <td data-label={t("Role")}>{poolRole ? <StatusPill label={poolRole} tone={poolRole === "Owner" ? "info" : "neutral"} /> : "-"}</td>
+                    ) : null}
+                    <td data-label={t("Status")}>
+                      <StatusPill label={poolStatus} tone={POOL_STATUS_TONE[poolStatus]} />
+                      {pendingTransfer ? (
+                        <span className="cell-note">
+                          {pendingTransfer.ticketId} · {(() => { const to = operatorById(pendingTransfer.toOperatorId); return to ? t(to.name) : pendingTransfer.toOperatorId; })()}
+                        </span>
+                      ) : null}
+                    </td>
+                    {canInitiateTransfer ? (
+                      <td data-label={t("Actions")} onClick={(event) => event.stopPropagation()}>
+                        {!pendingTransfer ? (
+                          <Button variant="secondary" icon={ArrowLeftRight} onClick={() => setTransferDialogAssetId(entry.assetId)}>{t("Initiate transfer")}</Button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
       {ownershipDialogAssetId ? (() => {
         const dialogAsset = estateAssets.find((item) => item.id === ownershipDialogAssetId);
         const dialogOwnership = assetOwnership(ownershipDialogAssetId);
@@ -11479,6 +11641,37 @@ function CommercialMapPage({
               registerOwnershipProposal({ assetId: dialogAsset.id, toModel, ticketId: ticket.id, raisedBy: actor });
               setOwnershipDialogAssetId("");
               notify(`${dialogAsset.id}: ${t("Ownership proposal sent to the Commercial desk")} (${ticket.id})`);
+            }}
+            t={t}
+          />
+        );
+      })() : null}
+
+      {transferDialogAssetId ? (() => {
+        const dialogAsset = estateAssets.find((item) => item.id === transferDialogAssetId);
+        const dialogEntry = crossOperatorPool.find((item) => item.assetId === transferDialogAssetId);
+        if (!dialogAsset || !dialogEntry) return null;
+        return (
+          <AssetTransferDialog
+            asset={dialogAsset}
+            entry={dialogEntry}
+            onCancel={() => setTransferDialogAssetId("")}
+            onConfirm={(toOperatorId, reason) => {
+              const actor = profile?.name ?? "ADMO Finance";
+              const toOperator = operatorById(toOperatorId);
+              const fromOperator = operatorById(dialogEntry.ownerOperatorId);
+              const ticket = createTicket({
+                title: `Asset transfer proposal - ${dialogAsset.id}`,
+                body: `${dialogAsset.name}: transfer ownership from "${fromOperator?.name ?? dialogEntry.ownerOperatorId}" to "${toOperator?.name ?? toOperatorId}". Reason from ${actor}: ${reason}`,
+                object: { kind: "Asset", ref: dialogAsset.id, label: dialogAsset.name },
+                team: "Commercial desk",
+                raisedBy: actor,
+                priority: "Medium",
+                source: "Manual",
+              });
+              registerAssetTransferProposal({ assetId: dialogAsset.id, toOperatorId, ticketId: ticket.id, raisedBy: actor });
+              setTransferDialogAssetId("");
+              notify(`${dialogAsset.id}: ${t("Transfer proposal sent to the Commercial desk")} (${ticket.id})`);
             }}
             t={t}
           />

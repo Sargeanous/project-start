@@ -273,3 +273,115 @@ export function registerOwnershipProposal(change: PendingOwnershipChange) {
   pendingChanges = { ...pendingChanges, [change.assetId]: change };
   pendingListeners.forEach((fn) => fn());
 }
+
+/* -------- Cross-operator asset pool -------- *\
+   Operators collaborate and monetize screens they do not own: a pooled
+   asset keeps its owner (consistent with the ownership register above)
+   while a DIFFERENT company sells its media under an agreed revenue
+   split, owner share first (70/30 style). Hand-authored and fully
+   deterministic. Reassigning a pooled asset is approval-gated: the UI
+   raises a Commercial desk ticket and only tracks the session-scoped
+   pending state here (same pattern as ownership proposals).
+\* ------------------------------------------- */
+
+export type PoolSeedStatus = "Active" | "Onboarding";
+export type PoolStatus = PoolSeedStatus | "Transfer pending approval";
+
+export interface PooledAsset {
+  assetId: string;
+  /** The company that owns the structure (matches the ownership register). */
+  ownerOperatorId: string;
+  /** The DIFFERENT company selling the media on it. */
+  sellerOperatorId: string;
+  /** Agreed media revenue share, owner share first. */
+  revenueSplit: { ownerPct: number; sellerPct: number };
+  /** Seed status; a session transfer proposal overrides it in the UI. */
+  status: PoolSeedStatus;
+  /** When the pooling agreement took effect. */
+  since: string;
+}
+
+export const crossOperatorPool: PooledAsset[] = [
+  {
+    assetId: "AD-YAS-005",
+    ownerOperatorId: "OP-OMH",
+    sellerOperatorId: "OP-GVO",
+    revenueSplit: { ownerPct: 70, sellerPct: 30 },
+    status: "Active",
+    since: "2025-09-01",
+  },
+  {
+    assetId: "AD-BUS-022",
+    ownerOperatorId: "OP-ETM",
+    sellerOperatorId: "OP-OMH",
+    revenueSplit: { ownerPct: 65, sellerPct: 35 },
+    status: "Active",
+    since: "2025-11-15",
+  },
+  {
+    assetId: "AD-MSF-007",
+    ownerOperatorId: "OP-AWI",
+    sellerOperatorId: "OP-ETM",
+    revenueSplit: { ownerPct: 70, sellerPct: 30 },
+    status: "Active",
+    since: "2026-02-01",
+  },
+  {
+    assetId: "AD-ARP-006",
+    ownerOperatorId: "OP-GVO",
+    sellerOperatorId: "OP-AWI",
+    revenueSplit: { ownerPct: 60, sellerPct: 40 },
+    status: "Onboarding",
+    since: "2026-06-10",
+  },
+];
+
+/** Pool entries where the company is the owner OR the selling partner. */
+export function pooledAssetsFor(operatorId: string): PooledAsset[] {
+  return crossOperatorPool.filter(
+    (entry) => entry.ownerOperatorId === operatorId || entry.sellerOperatorId === operatorId,
+  );
+}
+
+export type PoolRole = "Owner" | "Selling partner";
+
+export function poolRoleFor(entry: PooledAsset, operatorId: string): PoolRole | null {
+  if (entry.ownerOperatorId === operatorId) return "Owner";
+  if (entry.sellerOperatorId === operatorId) return "Selling partner";
+  return null;
+}
+
+/* -------- Session-scoped pending asset-transfer proposals -------- *\
+   Initiating a transfer never mutates the pool register. The caller
+   raises a Commercial desk ticket (tickets-data createTicket) and
+   registers the pending proposal here so the row shows Transfer
+   pending approval for the session. In-memory, resets on reload.
+\* ------------------------------------------------------------------ */
+
+export interface PendingAssetTransfer {
+  assetId: string;
+  toOperatorId: string;
+  ticketId: string;
+  raisedBy: string;
+}
+
+let pendingTransfers: Record<string, PendingAssetTransfer> = {};
+const transferListeners = new Set<() => void>();
+
+function getPendingAssetTransfers(): Record<string, PendingAssetTransfer> {
+  return pendingTransfers;
+}
+
+function subscribeTransfers(fn: () => void): () => void {
+  transferListeners.add(fn);
+  return () => transferListeners.delete(fn);
+}
+
+export function usePendingAssetTransfers(): Record<string, PendingAssetTransfer> {
+  return useSyncExternalStore(subscribeTransfers, getPendingAssetTransfers, getPendingAssetTransfers);
+}
+
+export function registerAssetTransferProposal(transfer: PendingAssetTransfer) {
+  pendingTransfers = { ...pendingTransfers, [transfer.assetId]: transfer };
+  transferListeners.forEach((fn) => fn());
+}
