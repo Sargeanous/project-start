@@ -14638,3 +14638,78 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 @media (max-width: 720px) {
   .own-model-grid { grid-template-columns: 1fr; }
 }
+
+/* ================================================================
+   MEDIA PLANNER FLIGHT WEEKS (non-contiguous week selection)
+   Collapsible 16-week chip grid under the Budget plan mode:
+   available / booked-disabled / selected chip states, the auto
+   note, and the back-to-auto action. Logical properties keep RTL
+   correct; shared tokens keep both themes right.
+   ================================================================ */
+.flight-weeks { display: grid; gap: 8px; margin-top: 10px; }
+.fw-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+.fw-toggle > span { flex: none; font-size: 12.5px; font-weight: 680; }
+.fw-toggle > small {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fw-toggle svg { flex: none; color: var(--muted); transition: transform 0.15s ease; }
+.fw-toggle svg.open { transform: rotate(180deg); }
+.fw-body { display: grid; gap: 8px; }
+.fw-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.fw-chip {
+  display: grid;
+  gap: 1px;
+  padding: 6px 4px;
+  border: 1px solid var(--ctrl-border);
+  border-radius: 9px;
+  background: var(--surface-input);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+  min-width: 0;
+}
+.fw-chip strong { font-size: 11px; font-weight: 680; white-space: nowrap; }
+.fw-chip small { font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.fw-chip:hover:not(:disabled) { border-color: var(--primary); }
+.fw-chip.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}
+.fw-chip.selected strong { color: var(--primary); }
+.fw-chip.booked { opacity: 0.45; cursor: not-allowed; border-style: dashed; }
+.fw-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fw-foot small { color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.fw-clear {
+  flex: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 640;
+  cursor: pointer;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .fw-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

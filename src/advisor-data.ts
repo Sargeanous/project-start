@@ -129,6 +129,86 @@ export function comparables(assetId: string, count = 3): Comparable[] {
     .map(({ score: _s, ...rest }) => rest);
 }
 
+/* ========================= flight week grid ========================= */
+/* Non-contiguous week selection ("eight here and eight there"): a 16-week
+ * availability grid per asset, coherent with unsoldWeeksNext12 above. Inside
+ * the 12-week horizon a week is booked exactly while the current contract
+ * still runs (remainingWeeks), so both views quote the same availability;
+ * weeks 12-15 sit past that horizon and carry stable hash-seeded spot
+ * bookings. Week dates follow the same convention as the rest of this
+ * module's availability math (the real clock, the sanctioned Media Planner
+ * exception), aligned to Monday starts. Advertiser-safe: availability only. */
+
+export const FLIGHT_WEEKS_COUNT = 16;
+
+export interface FlightWeek {
+  index: number;
+  /** Short chip label, e.g. "Sep 15". */
+  startLabel: string;
+  /** Full range, e.g. "Sep 15 - 21" or "Sep 29 - Oct 5". */
+  rangeLabel: string;
+  /** Month of the week's Monday, e.g. "Sep". Used to narrate split flights. */
+  monthLabel: string;
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function flightWeekStart(index: number): Date {
+  const now = new Date();
+  // Monday of the current week, then whole weeks forward.
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7) + index * 7);
+}
+
+/** The shared 16-week calendar every asset grid is indexed against. */
+export function flightWeekCalendar(): FlightWeek[] {
+  return Array.from({ length: FLIGHT_WEEKS_COUNT }, (_, index) => {
+    const start = flightWeekStart(index);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+    const monthLabel = MONTH_SHORT[start.getMonth()];
+    const rangeLabel = start.getMonth() === end.getMonth()
+      ? `${monthLabel} ${start.getDate()} - ${end.getDate()}`
+      : `${monthLabel} ${start.getDate()} - ${MONTH_SHORT[end.getMonth()]} ${end.getDate()}`;
+    return { index, startLabel: `${monthLabel} ${start.getDate()}`, rangeLabel, monthLabel };
+  });
+}
+
+/** Per-asset bookability across the 16-week grid; true = the screen can take
+ *  a new campaign that week. Weeks 0-11 mirror unsoldWeeksNext12 exactly. */
+export function assetWeekAvailability(assetId: string): boolean[] {
+  const eco = assetEconomics(assetId);
+  if (!eco || !eco.bookable) return Array.from({ length: FLIGHT_WEEKS_COUNT }, () => false);
+  const seed = hashCode(assetId);
+  return Array.from({ length: FLIGHT_WEEKS_COUNT }, (_, i) => {
+    if (i < eco.remainingWeeks) return false; // current contract still runs
+    if (i >= 12 && ((seed >>> (i - 12)) & 3) === 0) return false; // far-out spot booking
+    return true;
+  });
+}
+
+/** How many bookable screens are open in each grid week (chip states). */
+export function flightWeekOpenCounts(): number[] {
+  const counts = Array.from({ length: FLIGHT_WEEKS_COUNT }, () => 0);
+  for (const a of assets) {
+    const avail = assetWeekAvailability(a.id);
+    for (let i = 0; i < FLIGHT_WEEKS_COUNT; i++) if (avail[i]) counts[i] += 1;
+  }
+  return counts;
+}
+
+/** Narrates a selection by month, e.g. "4 wk Sep + 4 wk Nov". */
+export function describeWeekSelection(selected: number[]): string {
+  const cal = flightWeekCalendar();
+  const order: string[] = [];
+  const byMonth = new Map<string, number>();
+  for (const i of [...selected].sort((a, b) => a - b)) {
+    const month = cal[i]?.monthLabel;
+    if (!month) continue;
+    if (!byMonth.has(month)) order.push(month);
+    byMonth.set(month, (byMonth.get(month) ?? 0) + 1);
+  }
+  return order.map((m) => `${byMonth.get(m)} wk ${m}`).join(" + ");
+}
+
 /* ========================= advertiser media plan ========================= */
 /* Goal tables mirror GOAL_ZONE_FIT / GOAL_DAYPARTS in backend/dooh-store.ts. */
 
@@ -180,17 +260,37 @@ export interface MediaPlan {
 }
 
 /** Advertiser-facing plan: public fields only (no operators, no negotiated
- *  values). Rate cards are quoted because bids anchor on them. */
-export function mediaPlan(budgetAed: number, goalRaw: string, category?: string): MediaPlan {
+ *  values). Rate cards are quoted because bids anchor on them.
+ *  Optional selectedWeeks (grid indexes) pins the flight to exactly those
+ *  weeks: pricing and impressions cover the selected weeks each screen can
+ *  actually serve (booked weeks excluded), and the summary narrates the
+ *  split. Omitted or empty = auto, identical to the original behavior. */
+export function mediaPlan(budgetAed: number, goalRaw: string, category?: string, selectedWeeks?: number[]): MediaPlan {
   const goal = (goalRaw || "awareness").toLowerCase();
   const fit = GOAL_ZONE_FIT[goal] ?? GOAL_ZONE_FIT.awareness;
+  const picked = selectedWeeks?.length
+    ? [...new Set(selectedWeeks)].filter((i) => i >= 0 && i < FLIGHT_WEEKS_COUNT).sort((a, b) => a - b)
+    : null;
   const lines: PlanLine[] = assets
     .map((a) => assetEconomics(a.id))
     .filter((e): e is AssetEconomics => Boolean(e && e.bookable && e.audienceWeekly > 0))
     .map((eco) => {
       const zoneFit = fit[eco.asset.zone] ?? 1;
       const weeksAffordable = Math.max(1, Math.floor(budgetAed / eco.rateCardWeekAed));
-      const bookableWeeks = Math.min(weeksAffordable, Math.max(1, eco.unsoldWeeksNext12));
+      let bookableWeeks: number;
+      let weekNote = "";
+      if (picked) {
+        const grid = assetWeekAvailability(eco.asset.id);
+        const servable = picked.filter((i) => grid[i]).length;
+        if (!servable) return null;
+        bookableWeeks = Math.min(weeksAffordable, servable);
+        weekNote = servable === picked.length
+          ? `serves all ${picked.length} selected weeks`
+          : `serves ${servable} of ${picked.length} selected weeks, rest booked`;
+        if (bookableWeeks < servable) weekNote += `, budget covers ${bookableWeeks}`;
+      } else {
+        bookableWeeks = Math.min(weeksAffordable, Math.max(1, eco.unsoldWeeksNext12));
+      }
       const projectedImpressions = Math.round(eco.audienceWeekly * bookableWeeks * zoneFit);
       const spend = Math.min(budgetAed, eco.rateCardWeekAed * bookableWeeks);
       const cpm = projectedImpressions ? Math.round((spend / projectedImpressions) * 1000 * 100) / 100 : 0;
@@ -198,7 +298,7 @@ export function mediaPlan(budgetAed: number, goalRaw: string, category?: string)
       const reason = [
         `${eco.asset.zone} fit x${zoneFit.toFixed(2)}`,
         `${(eco.audienceWeekly / 1000).toFixed(0)}k weekly reach`,
-        `${bookableWeeks} wk within budget at ${money(eco.rateCardWeekAed)}/wk`,
+        picked ? weekNote : `${bookableWeeks} wk within budget at ${money(eco.rateCardWeekAed)}/wk`,
         eco.nextFreeLabel.toLowerCase(),
         catNote,
       ].filter(Boolean).join(", ");
@@ -208,6 +308,7 @@ export function mediaPlan(budgetAed: number, goalRaw: string, category?: string)
         cpm, rateCardWeekAed: eco.rateCardWeekAed, demand: eco.demand, availability: eco.nextFreeLabel, reason,
       };
     })
+    .filter((l): l is PlanLine => Boolean(l))
     .sort((a, b) => b.projectedImpressions - a.projectedImpressions)
     .slice(0, 5);
 
@@ -215,9 +316,13 @@ export function mediaPlan(budgetAed: number, goalRaw: string, category?: string)
   const totalSpend = lines.reduce((s, l) => s + Math.min(budgetAed, l.rateCardWeekAed * l.weeksAffordable), 0);
   const avgCpm = totalImpressions ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0;
   const goalLabel = PLAN_GOALS.find((g) => g.value === goal)?.label ?? goal;
-  const summary = lines.length
-    ? `For ${goalLabel.toLowerCase()} on ${money(budgetAed)}, the strongest placement is ${lines[0].name} (${lines[0].zone}). The top ${lines.length} screens project ${(totalImpressions / 1_000_000).toFixed(1)}M impressions at an average CPM of AED ${avgCpm.toFixed(2)}.`
-    : "No bookable screens fit this budget.";
+  const summary = picked
+    ? (lines.length
+      ? `Split flight ${describeWeekSelection(picked)} (${picked.length} wk total) for ${goalLabel.toLowerCase()} on ${money(budgetAed)}: ${lines[0].name} (${lines[0].zone}) leads, and the top ${lines.length} screens project ${(totalImpressions / 1_000_000).toFixed(1)}M impressions at an average CPM of AED ${avgCpm.toFixed(2)} across the weeks each can serve.`
+      : "No bookable screen can serve the selected weeks. Pick different weeks or return to auto.")
+    : (lines.length
+      ? `For ${goalLabel.toLowerCase()} on ${money(budgetAed)}, the strongest placement is ${lines[0].name} (${lines[0].zone}). The top ${lines.length} screens project ${(totalImpressions / 1_000_000).toFixed(1)}M impressions at an average CPM of AED ${avgCpm.toFixed(2)}.`
+      : "No bookable screens fit this budget.");
   return { budgetAed, goal, lines, dayparts: GOAL_DAYPARTS[goal] ?? GOAL_DAYPARTS.awareness, totalImpressions, avgCpm, summary };
 }
 

@@ -138,6 +138,10 @@ import {
   assetEconomics,
   campaignDelivery,
   comparables as assetComparables,
+  describeWeekSelection,
+  FLIGHT_WEEKS_COUNT,
+  flightWeekCalendar,
+  flightWeekOpenCounts,
   mediaPlan,
   planCitywideCoverage,
   planForTargetViews,
@@ -2975,6 +2979,15 @@ const translations: Record<string, string> = {
   "Set a budget and MediaGPT anchors the strongest screen in every zone, so the whole emirate sees the campaign.": "حدد ميزانية وسيرسي MediaGPT أقوى شاشة في كل منطقة، لتشاهد الإمارة كلها الحملة.",
   "Set an impressions target and MediaGPT searches for the smallest budget that reaches it.": "حدد هدفًا من المشاهدات وسيبحث MediaGPT عن أصغر ميزانية تصل إليه.",
   "Set a budget and MediaGPT ranks the busiest corridors by weekly audience, our proxy for corridor traffic.": "حدد ميزانية وسيرتب MediaGPT الممرات الأكثر ازدحامًا حسب الجمهور الأسبوعي، مؤشرنا البديل لحركة المرور.",
+  // Media planner flight weeks (non-contiguous week selection)
+  "Flight weeks": "أسابيع الحملة",
+  "weeks selected": "أسابيع محددة",
+  "Auto: the engine picks the weeks": "تلقائي: المحرك يختار الأسابيع",
+  "Wk": "أسبوع",
+  "screens open": "شاشات متاحة",
+  "Fully booked": "محجوز بالكامل",
+  "Back to auto": "العودة إلى التلقائي",
+  "Pick non-contiguous weeks, a burst now and another for the season. Booked weeks are excluded per screen.": "اختر أسابيع غير متتالية، دفعة الآن وأخرى للموسم. تُستبعد الأسابيع المحجوزة لكل شاشة.",
   // Operator registry + asset ownership models (Commercial Map)
   "Ownership": "الملكية",
   "Ownership history": "سجل الملكية",
@@ -12440,6 +12453,10 @@ function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (v
   const [coverage, setCoverage] = useState<CoveragePlan | null>(null);
   const [viewsPlan, setViewsPlan] = useState<TargetViewsPlan | null>(null);
   const [corridorPlan, setCorridorPlan] = useState<MediaPlan | null>(null);
+  const [flightWeeks, setFlightWeeks] = useState<number[]>([]);
+  const [weeksOpen, setWeeksOpen] = useState(false);
+  const weekCalendar = useMemo(() => flightWeekCalendar(), []);
+  const weekOpenCounts = useMemo(() => flightWeekOpenCounts(), []);
 
   const inFlight = campaigns.filter((c) => c.status === "Published" || c.status === "Scheduled").length;
   const budgetAed = Number(budget.replace(/[^\d]/g, "")) || 0;
@@ -12454,10 +12471,24 @@ function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (v
   const maxImpr = active ? Math.max(...active.lines.map((l) => l.projectedImpressions), 1) : 1;
 
   const buildPlan = () => {
-    if (mode === "budget") setPlan(mediaPlan(budgetAed, goal, category));
+    if (mode === "budget") setPlan(mediaPlan(budgetAed, goal, category, flightWeeks.length ? flightWeeks : undefined));
     else if (mode === "coverage") setCoverage(planCitywideCoverage(budgetAed, goal));
     else if (mode === "views") setViewsPlan(planForTargetViews(viewsTarget, goal));
     else setCorridorPlan(planTrafficCorridors(budgetAed));
+  };
+
+  const toggleWeek = (index: number) => {
+    if (!weekOpenCounts[index]) return;
+    const next = flightWeeks.includes(index)
+      ? flightWeeks.filter((w) => w !== index)
+      : [...flightWeeks, index].sort((a, b) => a - b);
+    setFlightWeeks(next);
+    if (plan) setPlan(mediaPlan(budgetAed, goal, category, next.length ? next : undefined));
+  };
+
+  const clearWeeks = () => {
+    setFlightWeeks([]);
+    if (plan) setPlan(mediaPlan(budgetAed, goal, category));
   };
 
   const hero =
@@ -12483,6 +12514,9 @@ function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (v
           ? <Metric label="Creative category" value={t(category.split(" and ")[0])} helper={t("Guides the fit notes")} tone="neutral" />
           : <Metric label="Buying mode" value={t(modeMeta.label)} helper={t(modeMeta.helper)} tone="info" />}
         <Metric label="Plan status" value={active ? `${active.lines.length} ${t("placements")}` : t("Not built")} helper={active ? `${(active.totalImpressions / 1_000_000).toFixed(1)}M ${t("impressions")}` : t("Set the inputs and build")} tone={active ? "good" : "neutral"} />
+        {mode === "budget" && flightWeeks.length ? (
+          <Metric label="Flight weeks" value={`${flightWeeks.length} ${t("of")} ${FLIGHT_WEEKS_COUNT}`} helper={describeWeekSelection(flightWeeks)} tone="info" />
+        ) : null}
       </MetricGrid>
       <div className="split-grid wide-left">
         <Panel icon={Target} title={t("Media planner")} action={<StatusPill label={t(modeMeta.helper)} tone="good" />}>
@@ -12501,6 +12535,47 @@ function MediaPlannerPage({ campaigns, t }: { campaigns: BidderCampaign[]; t: (v
             ) : null}
             <Button icon={Sparkles} onClick={buildPlan} disabled={mode === "views" ? !viewsTarget : !budgetAed}>{t("Build my plan")}</Button>
           </div>
+          {mode === "budget" ? (
+            <div className="flight-weeks">
+              <button type="button" className="fw-toggle" onClick={() => setWeeksOpen((v) => !v)} aria-expanded={weeksOpen}>
+                <span>{t("Flight weeks")}</span>
+                <small>
+                  {flightWeeks.length
+                    ? `${flightWeeks.length} ${t("weeks selected")} · ${describeWeekSelection(flightWeeks)}`
+                    : t("Auto: the engine picks the weeks")}
+                </small>
+                <ChevronDown size={14} className={weeksOpen ? "open" : ""} />
+              </button>
+              {weeksOpen ? (
+                <div className="fw-body">
+                  <div className="fw-grid" role="group" aria-label={t("Flight weeks")}>
+                    {weekCalendar.map((week) => {
+                      const openCount = weekOpenCounts[week.index] ?? 0;
+                      const selected = flightWeeks.includes(week.index);
+                      return (
+                        <button
+                          key={week.index}
+                          type="button"
+                          className={`fw-chip${selected ? " selected" : ""}${openCount ? "" : " booked"}`}
+                          disabled={!openCount}
+                          aria-pressed={selected}
+                          onClick={() => toggleWeek(week.index)}
+                          title={openCount ? `${week.rangeLabel} · ${openCount} ${t("screens open")}` : `${week.rangeLabel} · ${t("Fully booked")}`}
+                        >
+                          <strong>{t("Wk")} {week.index + 1}</strong>
+                          <small>{week.startLabel}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="fw-foot">
+                    <small>{t("Pick non-contiguous weeks, a burst now and another for the season. Booked weeks are excluded per screen.")}</small>
+                    {flightWeeks.length ? <button type="button" className="fw-clear" onClick={clearWeeks}>{t("Back to auto")}</button> : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {active ? (
             <div className="linked-detail">
               {hero ? (
