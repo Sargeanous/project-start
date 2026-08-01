@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { assets as dataAssets, assetAllocations } from "../data";
 import { distanceM, evaluateRules, type RuleContext, type RuleVerdict } from "../rules-engine";
+import { COMPETITIVE_BUFFER_M, competitiveNeighbours } from "../loop-data";
 
 type SubmissionStage = "Submitted" | "In review" | "Approved" | "Scheduled" | "Published" | "Changes requested";
 type AlertState = "Check required" | "Checked" | "Approval required" | "Approved" | "Broadcast queued" | "Broadcasting" | "Live on network";
@@ -360,6 +361,11 @@ export interface RadiusBroadcastScreen {
   /* Selection overlap: an existing commitment on this screen. */
   conflict?: string;
   conflictLevel?: "hard" | "soft";
+  /* Competitive separation buffer (RULE-COM-002), advisory only: the
+   * neighbouring screens inside COMPETITIVE_BUFFER_M that already carry a
+   * brand vertical, so the desk can see what this screen sits next to. */
+  competitive?: string;
+  competitiveVerticals?: string[];
 }
 
 export interface RadiusBroadcast {
@@ -2647,6 +2653,21 @@ function selectionConflict(assetId: string): { conflict?: string; conflictLevel?
   return {};
 }
 
+// Spatial leg of the competitive separation buffer (RULE-COM-002): which
+// neighbouring screens inside the buffer already carry a brand vertical. It is
+// read-only advice on top of the existing preflight, so it never changes the
+// clear/flagged verdict and never holds a screen back.
+function competitiveBuffer(assetId: string): { competitive?: string; competitiveVerticals?: string[] } {
+  const neighbours = competitiveNeighbours(assetId);
+  if (!neighbours.length) return {};
+  return {
+    competitive: neighbours
+      .map((n) => `${n.assetId} at ${n.distanceM} m carries ${n.vertical} (${n.holder})`)
+      .join("; "),
+    competitiveVerticals: [...new Set(neighbours.map((n) => n.vertical))],
+  };
+}
+
 export function computeSelectionScreens(assetIds: string[], opts: { category?: string; daypart?: string } = {}): RadiusBroadcastScreen[] {
   const ids = new Set(assetIds);
   return dataAssets
@@ -2655,6 +2676,7 @@ export function computeSelectionScreens(assetIds: string[], opts: { category?: s
       const verdict = evaluateRules({ kind: "scheduling", assetIds: [asset.id], category: opts.category, daypart: opts.daypart });
       const flag = verdict.hits[0] ?? verdict.warnings[0];
       const overlap = selectionConflict(asset.id);
+      const buffer = competitiveBuffer(asset.id);
       return {
         assetId: asset.id,
         name: asset.name,
@@ -2665,6 +2687,8 @@ export function computeSelectionScreens(assetIds: string[], opts: { category?: s
         flagDetail: flag?.detail,
         conflict: overlap.conflict,
         conflictLevel: overlap.conflictLevel,
+        competitive: buffer.competitive,
+        competitiveVerticals: buffer.competitiveVerticals,
       } as RadiusBroadcastScreen;
     });
 }

@@ -14795,3 +14795,112 @@ button.cpl-slot.sellable:focus-visible {
 .cpl-legend i.reserved { background: color-mix(in srgb, var(--amber) 28%, var(--surface)); border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); }
 .commercial-popover-loop .cell-note { margin: 0; }
 .sell-slot-dialog { max-width: 420px; }
+
+/* ==========================================================================
+   Competitive separation buffers (RULE-COM-002)
+   Advisory surfaces for the two legs of the separation check: the inline
+   warning inside the sell-slot dialog (temporal + spatial) and the
+   Competitive separation rail block in the bulk-apply preflight (spatial).
+   Amber advisory, never a danger/block styling, because the rule runs in
+   Recommend mode and a named human decides. All colours come from the
+   existing theme custom properties, so light and dark both follow.
+   ========================================================================== */
+
+/* --- Sell-slot dialog: inline advisory --- */
+.comp-sep-advisory {
+  display: grid;
+  gap: 6px;
+  padding: 10px 11px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+  background: color-mix(in srgb, var(--amber) 12%, var(--surface));
+}
+.comp-sep-advisory-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--amber);
+}
+.comp-sep-advisory-head svg { flex: none; }
+.comp-sep-advisory ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-inline-start: 17px;
+}
+.comp-sep-advisory li {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.comp-sep-advisory > small {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* --- Sell-slot dialog: cleared state --- */
+.comp-sep-ok {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.comp-sep-ok svg { flex: none; color: var(--primary); }
+
+/* --- Bulk-apply preflight: Competitive separation rail block --- */
+.comp-sep-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--line));
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface-2));
+}
+.comp-sep-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.comp-sep-head svg { flex: none; margin-top: 2px; color: var(--amber); }
+.comp-sep-head strong { color: var(--ink); font-weight: 700; }
+.comp-sep-list { display: flex; flex-direction: column; gap: 8px; }
+.comp-sep-item {
+  display: grid;
+  gap: 4px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.comp-sep-item strong { font-size: 13px; font-weight: 600; color: var(--ink); }
+.comp-sep-item small { font-size: 12px; line-height: 1.4; color: var(--muted); }
+.comp-sep-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.comp-sep-tags em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+  background: color-mix(in srgb, var(--amber) 16%, var(--surface));
+  color: var(--amber);
+}
+.comp-sep-cite { font-size: 11.5px; line-height: 1.45; color: var(--muted); }

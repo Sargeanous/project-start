@@ -155,7 +155,17 @@ import {
   type TargetViewsPlan,
 } from "./advisor-data";
 import { assetAudienceBands } from "./audience-data";
-import { assetLoops, LOOP_BIDDERS, LOOP_SLOT_COUNT, LOOP_SLOT_SECONDS, type LoopSlot } from "./loop-data";
+import {
+  assetLoops,
+  COMPETITIVE_BUFFER_M,
+  COMPETITIVE_SEPARATION_RULE,
+  LOOP_BIDDERS,
+  LOOP_SLOT_COUNT,
+  LOOP_SLOT_SECONDS,
+  spatialCompetitiveFlags,
+  temporalCompetitiveFlags,
+  type LoopSlot,
+} from "./loop-data";
 import {
   assetOwnership,
   assetsOwnedBy,
@@ -2178,6 +2188,30 @@ const translations: Record<string, string> = {
   "Reserve and send to finance": "حجز وإرسال إلى المالية",
   "Demo loop model; loop policy and slot lengths pending operator integration.": "نموذج حلقة تجريبي؛ سياسة الحلقة وأطوال الفترات بانتظار التكامل مع المشغلين.",
   "Slot reserved, pending finance approval": "تم حجز الفترة بانتظار الموافقة المالية",
+  // Competitive separation buffers (RULE-COM-002). Brand verticals plus the
+  // advisory copy for the spatial and temporal legs. "Food and beverage",
+  // "Finance" and "Government" already exist elsewhere in this record.
+  "Automotive": "السيارات",
+  "Real estate": "العقارات",
+  "Retail": "التجزئة",
+  "Telecom": "الاتصالات",
+  "Tourism": "السياحة",
+  "Competitive separation": "الفصل التنافسي",
+  "Competitive separation advisory": "تنبيه الفصل التنافسي",
+  "immediately before this one": "السابقة لها مباشرة",
+  "immediately after this one": "التالية لها مباشرة",
+  "is sold to": "مباعة إلى",
+  "in the same vertical": "ضمن القطاع نفسه",
+  "m away, allocated to": "م، ومخصصة إلى",
+  "Advisory only. RULE-COM-002 recommends an alternate slot or a protected split; the reservation stays available and a named approver decides.": "تنبيه استرشادي فقط. توصي القاعدة RULE-COM-002 بفترة بديلة أو تقسيم محمي؛ ويبقى الحجز متاحاً ويقرر معتمد محدد بالاسم.",
+  "No competitive separation conflict beside this slot or within": "لا يوجد تعارض فصل تنافسي بجوار هذه الفترة أو ضمن",
+  "m of this screen.": "م من هذه الشاشة.",
+  "screens sit inside the competitive buffer of a neighbouring screen.": "شاشات تقع ضمن النطاق التنافسي لشاشة مجاورة.",
+  "Competing brands should not run within": "يجب ألا تعرض العلامات المتنافسة ضمن",
+  "m of each other. Advisory only: check the campaign vertical before queuing, nothing is held back.": "م من بعضها. تنبيه استرشادي فقط: تحقق من قطاع الحملة قبل الإدراج، ولا يتم حجب أي شاشة.",
+  "No neighbouring screen carries a brand vertical.": "لا توجد شاشة مجاورة تحمل قطاع علامة تجارية.",
+  "Nothing sits within": "لا شيء يقع ضمن",
+  "m of these screens.": "م من هذه الشاشات.",
   "Commuters": "المتنقلون",
   "Residents": "السكان",
   "Tourists": "السياح",
@@ -4425,6 +4459,9 @@ interface SelectionScreen {
   flagDetail?: string;
   conflict?: string;
   conflictLevel?: "hard" | "soft";
+  /* Competitive separation buffer (RULE-COM-002), advisory only. */
+  competitive?: string;
+  competitiveVerticals?: string[];
 }
 
 // Daypart choices shared by the composers (brief wizard targeting, radius
@@ -4509,6 +4546,9 @@ function SelectionActionDialog({
   const ruleFlagged = flagged.filter((s) => !s.conflict);
   const heldForOverlap = overlapPolicy === "exclude" ? hardConflicts : [];
   const clearCount = Math.max(0, (screens?.length ?? 0) - ruleFlagged.length - heldForOverlap.length);
+  // Competitive separation buffer (RULE-COM-002): advisory, so it stays out of
+  // clearCount and never disables the queue button.
+  const buffered = (screens ?? []).filter((s) => s.competitive);
   const libraryItems = seedMediaAssets.filter((item) => item.status === "Approved" && item.type !== "Document").slice(0, 6);
   const selectedLibraryIndex = Math.max(0, libraryItems.findIndex((item) => item.id === selectedLibraryId));
   const selectedLibrary = libraryItems[selectedLibraryIndex] ?? libraryItems[0];
@@ -4772,6 +4812,47 @@ function SelectionActionDialog({
                   <div>
                     <strong>{t("No commitments in this selection.")}</strong>
                     <span>{t("All")} {clearCount} {t("selected screens are clear to play.")}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Competitive separation buffers, spatial leg (RULE-COM-002).
+                Advisory: it names the verticals already held around each
+                selected screen and leaves the queue action untouched. */}
+            <div className="bc-rail-block">
+              <div className="bc-rail-label">{t("Competitive separation")}</div>
+              {buffered.length ? (
+                <div className="comp-sep-panel">
+                  <p className="comp-sep-head">
+                    <ShieldAlert size={16} />
+                    <span>
+                      <strong>{buffered.length}</strong> {t("of")} {assetIds.length} {t("screens sit inside the competitive buffer of a neighbouring screen.")}
+                    </span>
+                  </p>
+                  <div className="comp-sep-list">
+                    {buffered.map((s) => (
+                      <div key={s.assetId} className="comp-sep-item">
+                        <strong>{s.assetId} · {t(s.name)}</strong>
+                        <span className="comp-sep-tags">
+                          {(s.competitiveVerticals ?? []).map((vertical) => (
+                            <em key={vertical}>{t(vertical)}</em>
+                          ))}
+                        </span>
+                        <small>{s.competitive}</small>
+                      </div>
+                    ))}
+                  </div>
+                  <small className="comp-sep-cite">
+                    {COMPETITIVE_SEPARATION_RULE} · {t("Competing brands should not run within")} {COMPETITIVE_BUFFER_M} {t("m of each other. Advisory only: check the campaign vertical before queuing, nothing is held back.")}
+                  </small>
+                </div>
+              ) : (
+                <div className="bc-commit-clear">
+                  <CheckCircle2 size={18} />
+                  <div>
+                    <strong>{t("No neighbouring screen carries a brand vertical.")}</strong>
+                    <span>{COMPETITIVE_SEPARATION_RULE} · {t("Nothing sits within")} {COMPETITIVE_BUFFER_M} {t("m of these screens.")}</span>
                   </div>
                 </div>
               )}
@@ -11349,6 +11430,20 @@ function SellSlotDialog({
   const [campaign, setCampaign] = useState("");
   const valid = advertiser.trim().length > 0 && campaign.trim().length >= 4;
   const money = (value: number) => `AED ${value.toLocaleString("en-US")}`;
+  // Competitive separation buffers (RULE-COM-002), both legs, recomputed as the
+  // advertiser changes. TEMPORAL: the slots either side of this one in the same
+  // loop, wrapping position 16 to position 1. SPATIAL: allocated screens inside
+  // the buffer around this site. Both are advisory, the reserve action below
+  // stays enabled either way because a named human decides.
+  const temporalFlags = useMemo(
+    () => temporalCompetitiveFlags(context.assetId, context.daypart, context.slot.index, advertiser),
+    [context.assetId, context.daypart, context.slot.index, advertiser],
+  );
+  const spatialFlags = useMemo(
+    () => spatialCompetitiveFlags(context.assetId, advertiser),
+    [context.assetId, advertiser],
+  );
+  const separationClash = temporalFlags.length > 0 || spatialFlags.length > 0;
   return (
     <div className="wizard-backdrop revision-backdrop" role="presentation" onClick={onCancel}>
       <section className="revision-dialog sell-slot-dialog" role="dialog" aria-modal="true" aria-label={t("Sell this slot")} onClick={(event) => event.stopPropagation()}>
@@ -11373,6 +11468,33 @@ function SellSlotDialog({
             {t("Campaign label")}
             <input value={campaign} onChange={(event) => setCampaign(event.target.value)} placeholder={t("e.g. Summer awareness flight")} />
           </label>
+          {separationClash ? (
+            <div className="comp-sep-advisory" role="status" data-testid="competitive-separation-advisory">
+              <p className="comp-sep-advisory-head">
+                <AlertTriangle size={15} />
+                <span>{t("Competitive separation advisory")} · {COMPETITIVE_SEPARATION_RULE}</span>
+              </p>
+              <ul>
+                {temporalFlags.map((flag) => (
+                  <li key={`slot-${flag.slotIndex}`}>
+                    {t("Slot")} {flag.slotIndex} ({t(flag.position === "before" ? "immediately before this one" : "immediately after this one")}) {t("is sold to")} {t(flag.occupant)}
+                    {flag.campaign ? ` (${t(flag.campaign)})` : ""} {t("in the same vertical")}: {t(flag.vertical)}.
+                  </li>
+                ))}
+                {spatialFlags.map((flag) => (
+                  <li key={`site-${flag.assetId}`}>
+                    {flag.assetId} · {t(flag.assetName)}: {flag.distanceM} {t("m away, allocated to")} {t(flag.holder)} {t("in the same vertical")}: {t(flag.vertical)}.
+                  </li>
+                ))}
+              </ul>
+              <small>{t("Advisory only. RULE-COM-002 recommends an alternate slot or a protected split; the reservation stays available and a named approver decides.")}</small>
+            </div>
+          ) : (
+            <p className="comp-sep-ok">
+              <CheckCircle2 size={14} />
+              {t("No competitive separation conflict beside this slot or within")} {COMPETITIVE_BUFFER_M} {t("m of this screen.")} · {COMPETITIVE_SEPARATION_RULE}
+            </p>
+          )}
           <p className="own-dialog-note">{t("Raises a pending finance approval in the existing chain; the slot books only after finance signs off and the invoice issues.")}</p>
         </div>
         <footer className="revision-footer">
