@@ -22,6 +22,7 @@ import {
   Image as ImageIcon,
   Layers3,
   LayoutDashboard,
+  LogIn,
   LockKeyhole,
   LogOut,
   MapPinned,
@@ -306,7 +307,9 @@ type Page =
   | "construction"
   | "tickets";
 
-type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "operator-oasis" | "operator-wathba" | "bidder";
+// Operator ids are derived from the operator registry at startup, so they are
+// typed as a pattern rather than a fixed list.
+type ProfileId = "control-room" | "reviewer" | "finance" | "admin" | "technical" | "bidder" | `operator-${string}`;
 type Lang = "en" | "ar";
 type Tone = "neutral" | "good" | "warn" | "danger" | "info";
 type NotificationPreferenceKey = Page | "critical";
@@ -664,7 +667,13 @@ interface DoohStatePayload {
   notifications: PlatformNotification[];
 }
 
-const profiles: Profile[] = [
+/* -------- Access groups -------- *\
+   The login screen separates three kinds of access so the demo never mixes
+   them: ADMO internal roles, external operator companies (who sign in with
+   credentials and see only their own screens), and the advertiser.
+\* -------------------------------- */
+
+const internalProfiles: Profile[] = [
   {
     id: "control-room",
     name: "ADMO Control Room",
@@ -700,33 +709,31 @@ const profiles: Profile[] = [
     organization: "Abu Dhabi Media Office",
     pages: ["mediagpt", "tickets", "knowledge", "rules", "skillsCatalogue", "skillWorkflows", "skillRuns", "modelCenter", "integrations", "accessRoles", "auditLog", "edgeCompute"],
   },
-  // External operator logins sit between the ADMO roles and the Advertiser:
-  // two private screen-owning companies from the operator registry. Their
-  // operatorId scopes every asset-driven view to the assets they own.
-  {
-    id: "operator-oasis",
-    name: "Oasis Media Holdings",
-    role: "Operator account",
-    organization: "External operator",
-    operatorId: "OP-OMH",
-    pages: ["control", "network", "tickets", "allocations"],
-  },
-  {
-    id: "operator-wathba",
-    name: "Al Wathba Media Infrastructure",
-    role: "Operator account",
-    organization: "External operator",
-    operatorId: "OP-AWI",
-    pages: ["control", "network", "tickets", "allocations"],
-  },
-  {
-    id: "bidder",
-    name: "Advertiser",
-    role: "Bidder account",
-    organization: "External partner",
-    pages: ["campaigns", "marketplace", "mediaPlanner"],
-  },
 ];
+
+const OPERATOR_PAGES: Page[] = ["control", "network", "tickets", "allocations"];
+
+// Operator logins are derived from the ownership register: every company that
+// owns estate assets, apart from ADMO itself, can sign in. Deriving them means
+// the sign-in list can never offer a company with nothing to show.
+const operatorProfiles: Profile[] = operators
+  .filter((company) => company.id !== "OP-ADMO" && assetsOwnedBy(company.id).length > 0)
+  .map((company) => ({
+    id: `operator-${company.id.toLowerCase()}`,
+    name: company.name,
+    role: "Operator account",
+    organization: company.kind === "Government" ? "Government operator" : "External operator",
+    operatorId: company.id,
+    pages: OPERATOR_PAGES,
+  }));
+
+const advertiserProfile: Profile = {
+  id: "bidder",
+  name: "Advertiser",
+  role: "Bidder account",
+  organization: "External partner",
+  pages: ["campaigns", "marketplace", "mediaPlanner"],
+};
 
 /* -------- Operator-scoped views -------- *\
    One central helper decides what the active profile may see. Internal
@@ -1614,6 +1621,23 @@ const translations: Record<string, string> = {
   "Access profile": "ملف الدخول",
   "Choose who is using the platform. The sidebar and workflow are permissioned from this point.": "اختر ملف المستخدم. ستظهر القوائم وسير العمل حسب الصلاحيات من هذه النقطة.",
   "Total domain awareness. One unified view.": "وعيٌ شامل بالمجال. عرضٌ موحّد واحد.",
+  "Select how you are accessing the platform. Each access type has its own permissions and workflows.": "اختر طريقة دخولك إلى المنصة. لكل نوع وصول صلاحياته وسير عمله.",
+  "Internal": "داخلي",
+  "ADMO operations, content, finance, technical and governance roles": "أدوار العمليات والمحتوى والمالية والتقنية والحوكمة في ADMO",
+  "Screen owning companies signing in to manage their own estate": "الشركات المالكة للشاشات تسجل الدخول لإدارة أصولها",
+  "Brands and agencies buying inventory on the marketplace": "العلامات التجارية والوكالات التي تشتري المساحات عبر السوق",
+  "roles": "أدوار",
+  "companies": "شركات",
+  "Internal access": "الوصول الداخلي",
+  "Operator access": "وصول المشغلين",
+  "Sign in with your company account. You will only see the screens your company owns.": "سجّل الدخول بحساب شركتك. سترى فقط الشاشات التي تملكها شركتك.",
+  "Company": "الشركة",
+  "Work email": "البريد الإلكتروني للعمل",
+  "Password": "كلمة المرور",
+  "Enter your password": "أدخل كلمة المرور",
+  "Demo access: any password is accepted. Production connects to the ADMO identity provider.": "وصول تجريبي: تُقبل أي كلمة مرور. أما في الإنتاج فيتم الربط بمزود الهوية لدى ADMO.",
+  "Sign in": "تسجيل الدخول",
+  "Government operator": "مشغل حكومي",
   "Secure role-based access. Every action is scoped and audited.": "وصول آمن قائم على الأدوار. كل إجراء محدّد النطاق ومُدقّق.",
   "Enter": "دخول",
   "Full governance": "حوكمة كاملة",
@@ -3713,7 +3737,9 @@ function App() {
         <LoginScreen
           lang={lang}
           setLang={setLang}
-          profiles={profiles}
+          internalProfiles={internalProfiles}
+          operatorProfiles={operatorProfiles}
+          advertiserProfile={advertiserProfile}
           onChoose={chooseProfile}
           t={t}
         />
@@ -3832,24 +3858,68 @@ const PROFILE_META: Record<string, { icon: LucideIcon; scope: string; privileged
   finance: { icon: WalletCards, scope: "Commercial" },
   admin: { icon: ShieldCheck, scope: "Full governance", privileged: true },
   technical: { icon: Cpu, scope: "Technical" },
-  "operator-oasis": { icon: Building2, scope: "External operator" },
-  "operator-wathba": { icon: Building2, scope: "External operator" },
   bidder: { icon: Megaphone, scope: "External" },
 };
+
+// Access types are kept apart on purpose: internal ADMO roles, external
+// operator companies, and the advertiser are three different audiences and
+// mixing them in one list made the access model hard to read.
+const ACCESS_TYPES: Array<{ id: "internal" | "operator" | "advertiser"; label: string; blurb: string; icon: LucideIcon }> = [
+  { id: "internal", label: "Internal", blurb: "ADMO operations, content, finance, technical and governance roles", icon: ShieldCheck },
+  { id: "operator", label: "Operator", blurb: "Screen owning companies signing in to manage their own estate", icon: Building2 },
+  { id: "advertiser", label: "Advertiser", blurb: "Brands and agencies buying inventory on the marketplace", icon: Megaphone },
+];
+
+/** Mock sign-in address for a company, derived from its name. */
+function operatorSignInEmail(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return `operations@${slug}.ae`;
+}
 
 function LoginScreen({
   lang,
   setLang,
-  profiles,
+  internalProfiles,
+  operatorProfiles,
+  advertiserProfile,
   onChoose,
   t,
 }: {
   lang: Lang;
   setLang: (lang: Lang) => void;
-  profiles: Profile[];
+  internalProfiles: Profile[];
+  operatorProfiles: Profile[];
+  advertiserProfile: Profile;
   onChoose: (profile: Profile) => void;
   t: (value: string) => string;
 }) {
+  const [stage, setStage] = useState<"choose" | "internal" | "operator">("choose");
+  const [operatorId, setOperatorId] = useState<string>(operatorProfiles[0]?.id ?? "");
+  const [password, setPassword] = useState("");
+  const selectedOperator = operatorProfiles.find((item) => item.id === operatorId) ?? operatorProfiles[0];
+  const email = selectedOperator ? operatorSignInEmail(selectedOperator.name) : "";
+
+  function renderProfileCard(item: Profile) {
+    const meta = PROFILE_META[item.id] ?? (item.operatorId
+      ? { icon: Building2, scope: item.organization, privileged: false }
+      : { icon: UserRound, scope: "", privileged: false });
+    const Icon = meta.icon;
+    return (
+      <button key={item.id} className="profile-card" type="button" onClick={() => onChoose(item)}>
+        <span className="profile-icon"><Icon size={20} /></span>
+        <span className="profile-card-body">
+          <strong>{t(item.name)}</strong>
+          <small>{t(item.role)}</small>
+          <em>{t(item.organization)}</em>
+        </span>
+        <span className="profile-card-aside">
+          {meta.scope ? <span className={`profile-scope ${meta.privileged ? "is-privileged" : ""}`}>{t(meta.scope)}</span> : null}
+          <span className="profile-card-cue">{t("Enter")} <ChevronRight size={15} /></span>
+        </span>
+      </button>
+    );
+  }
+
   return (
     <main className="login-screen" dir={lang === "ar" ? "rtl" : "ltr"}>
       <section className="login-panel">
@@ -3864,27 +3934,98 @@ function LoginScreen({
             {lang === "en" ? "AR" : "EN"}
           </button>
         </div>
-        <p className="login-intro">{t("Choose who is using the platform. The sidebar and workflow are permissioned from this point.")}</p>
-        <div className="profile-grid">
-          {profiles.map((item) => {
-            const meta = PROFILE_META[item.id] ?? { icon: UserRound, scope: "" };
-            const Icon = meta.icon;
-            return (
-              <button key={item.id} className="profile-card" type="button" onClick={() => onChoose(item)}>
-                <span className="profile-icon"><Icon size={20} /></span>
-                <span className="profile-card-body">
-                  <strong>{t(item.name)}</strong>
-                  <small>{t(item.role)}</small>
-                  <em>{t(item.organization)}</em>
-                </span>
-                <span className="profile-card-aside">
-                  {meta.scope ? <span className={`profile-scope ${meta.privileged ? "is-privileged" : ""}`}>{t(meta.scope)}</span> : null}
-                  <span className="profile-card-cue">{t("Enter")} <ChevronRight size={15} /></span>
-                </span>
+
+        {stage === "choose" ? (
+          <>
+            <p className="login-intro">{t("Select how you are accessing the platform. Each access type has its own permissions and workflows.")}</p>
+            <div className="access-grid">
+              {ACCESS_TYPES.map((type) => {
+                const Icon = type.icon;
+                const count = type.id === "internal" ? internalProfiles.length : type.id === "operator" ? operatorProfiles.length : 1;
+                return (
+                  <button
+                    key={type.id}
+                    className="access-card"
+                    type="button"
+                    onClick={() => {
+                      if (type.id === "advertiser") onChoose(advertiserProfile);
+                      else setStage(type.id);
+                    }}
+                  >
+                    <span className="access-icon"><Icon size={22} /></span>
+                    <strong>{t(type.label)}</strong>
+                    <small>{t(type.blurb)}</small>
+                    <span className="access-cue">
+                      {type.id === "advertiser"
+                        ? t("Enter")
+                        : `${count} ${type.id === "internal" ? t("roles") : t("companies")}`}
+                      <ChevronRight size={15} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {stage === "internal" ? (
+          <>
+            <div className="login-step-head">
+              <button type="button" className="login-back" onClick={() => setStage("choose")}>
+                <ChevronLeft size={15} /> {t("Back")}
               </button>
-            );
-          })}
-        </div>
+              <span>{t("Internal access")}</span>
+            </div>
+            <p className="login-intro">{t("Choose who is using the platform. The sidebar and workflow are permissioned from this point.")}</p>
+            <div className="profile-grid">{internalProfiles.map(renderProfileCard)}</div>
+          </>
+        ) : null}
+
+        {stage === "operator" ? (
+          <>
+            <div className="login-step-head">
+              <button type="button" className="login-back" onClick={() => setStage("choose")}>
+                <ChevronLeft size={15} /> {t("Back")}
+              </button>
+              <span>{t("Operator access")}</span>
+            </div>
+            <p className="login-intro">{t("Sign in with your company account. You will only see the screens your company owns.")}</p>
+            <form
+              className="operator-signin"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (selectedOperator) onChoose(selectedOperator);
+              }}
+            >
+              <label className="operator-field">
+                <span>{t("Company")}</span>
+                <select value={operatorId} onChange={(event) => setOperatorId(event.target.value)}>
+                  {operatorProfiles.map((item) => (
+                    <option key={item.id} value={item.id}>{t(item.name)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="operator-field">
+                <span>{t("Work email")}</span>
+                <input type="email" value={email} readOnly />
+              </label>
+              <label className="operator-field">
+                <span>{t("Password")}</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={t("Enter your password")}
+                  autoComplete="off"
+                />
+              </label>
+              <p className="operator-note">{t("Demo access: any password is accepted. Production connects to the ADMO identity provider.")}</p>
+              <Button type="submit" icon={LogIn} disabled={!selectedOperator || password.trim().length === 0}>
+                {t("Sign in")}
+              </Button>
+            </form>
+          </>
+        ) : null}
       </section>
       <div className="powered-by powered-by--login">
         <span>{t("Powered by")}</span>

@@ -14908,3 +14908,102 @@ button.cpl-slot.sellable:focus-visible {
   color: var(--amber);
 }
 .comp-sep-cite { font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+
+/* ================================================================
+   LOGIN ACCESS TYPES (Internal / Operator / Advertiser)
+   The access model is read in two steps: pick an access type, then
+   either pick an internal role or sign in as an operator company.
+   Shared tokens and logical properties keep both themes and RTL right.
+   ================================================================ */
+.access-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.access-card {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 8px;
+  min-height: 168px;
+  padding: 20px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.access-card:hover { border-color: var(--primary); background: var(--primary-soft); transform: translateY(-1px); }
+.access-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.access-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.access-card strong { font-size: 16px; font-weight: 660; }
+.access-card small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.access-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-block-start: auto;
+  padding-block-start: 6px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 620;
+}
+[dir="rtl"] .access-cue svg { transform: scaleX(-1); }
+
+.login-step-head { display: flex; align-items: center; gap: 10px; }
+.login-step-head > span {
+  font-size: 11px;
+  font-weight: 660;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.login-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.login-back:hover { border-color: var(--primary); color: var(--primary); }
+[dir="rtl"] .login-back svg { transform: scaleX(-1); }
+
+.operator-signin { display: grid; gap: 12px; }
+.operator-field { display: grid; gap: 6px; }
+.operator-field > span { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.operator-field select,
+.operator-field input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-input);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.operator-field input[readonly] { color: var(--muted); }
+.operator-field select:focus-visible,
+.operator-field input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.operator-note { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.operator-signin button { justify-self: start; }
+
+@media (max-width: 720px) {
+  .access-grid { grid-template-columns: minmax(0, 1fr); }
+  .access-card { min-height: 0; }
+}
