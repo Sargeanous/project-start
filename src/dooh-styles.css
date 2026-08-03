@@ -14722,7 +14722,7 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
    Shared tokens keep both themes correct; the grid and logical
    properties keep RTL correct.
    ================================================================ */
-.commercial-popover-loop { display: grid; gap: 7px; }
+.commercial-popover-loop { display: grid; gap: 7px; min-width: 0; }
 .commercial-popover-loop > strong {
   font-size: 9.5px;
   font-weight: 680;
@@ -14733,16 +14733,20 @@ html[data-theme="light"] .nd-stage-clip { background: #dce7f1; }
 .cpl-loop {
   display: grid;
   gap: 6px;
+  min-width: 0;
   padding: 8px 9px;
   border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--line);
 }
-.cpl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.cpl-head > span { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
-.cpl-head strong { color: var(--ink); font-size: 12px; white-space: nowrap; }
-.cpl-head small { color: var(--muted); font-size: 10px; white-space: nowrap; }
-.cpl-head em { flex: 0 0 auto; font-style: normal; color: var(--ink-2); font-size: 10px; font-weight: 600; white-space: nowrap; }
+/* The head must be allowed to wrap and shrink: nowrap text here sets a
+   minimum width on the whole loop card, which pushed the 16th slot past
+   the popover edge. */
+.cpl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; min-width: 0; }
+.cpl-head > span { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.cpl-head strong { color: var(--ink); font-size: 12px; }
+.cpl-head small { color: var(--muted); font-size: 10px; }
+.cpl-head em { font-style: normal; color: var(--ink-2); font-size: 10px; font-weight: 600; }
 .cpl-strip { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
 .cpl-slot {
   display: flex;
